@@ -34,7 +34,7 @@ static void renderGradient(int xOffset, int yOffset)
 	*pixel++ = 0;
 	*pixel++ = y + yOffset;
 	*pixel++ = x + xOffset;
-	*pixel++ = 0;
+	pixel++;
       }
       row += pitch;
     }
