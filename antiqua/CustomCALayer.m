@@ -2,8 +2,8 @@
 
 typedef struct 
 {
-  uint16_t width;
-  uint16_t height;
+  double_t width;
+  double_t height;
   uint8_t *memory;
 } Framebuffer;
 
@@ -20,6 +20,24 @@ static const void * getBytePointerCallback(void *info)
 static void releaseBytePointerCallback(void *info, const void *pointer)
 {
   free(info);
+}
+
+static void renderGradient(int xOffset, int yOffset)
+{
+    int pitch = framebuffer.width * 4;
+    uint8_t *row = framebuffer.memory;
+    for (int y = 0; y < framebuffer.height; y++)
+    {
+      uint8_t *pixel = row;
+      for (int x = 0; x < framebuffer.width; x++)
+      {
+	*pixel++ = 0;
+	*pixel++ = y + yOffset;
+	*pixel++ = x + xOffset;
+	*pixel++ = 0;
+      }
+      row += pitch;
+    }
 }
 
 @implementation CustomCALayer
@@ -51,30 +69,19 @@ static void releaseBytePointerCallback(void *info, const void *pointer)
   @autoreleasepool
   {
     CGRect dirtyRect = CGContextGetClipBoundingBox(ctx);
-    CGFloat width = dirtyRect.size.width;
-    CGFloat height = dirtyRect.size.height;
-    size_t bitmapSize = sizeof(uint8_t) * width * 4 * height;
+    framebuffer.width = dirtyRect.size.width;
+    framebuffer.height = dirtyRect.size.height;
+    size_t bitmapSize = sizeof(uint8_t) * framebuffer.width * 4 * framebuffer.height;
     
     framebuffer.memory = malloc(bitmapSize);
     
-    int pitch = width * 4;
-    uint8_t *row = framebuffer.memory;
-    for (int y = 0; y < height; y++)
-    {
-      uint8_t *pixel = row;
-      for (int x = 0; x < width; x++)
-      {
-	*pixel++ = 0;
-	*pixel++ = y;
-	*pixel++ = x;
-	*pixel++ = 0;
-      }
-      row += pitch;
-    }
+    static xOff = 0;
+    renderGradient(xOff, 0);
+    xOff++;
 
     CGDataProviderRef dataProvider = CGDataProviderCreateDirect(framebuffer.memory, bitmapSize, &callbacks);
 
-    image = CGImageCreate(width, height, 8, 32, width * 4, colorSpace, kCGImageAlphaNoneSkipLast, dataProvider, NULL, false, kCGRenderingIntentDefault);
+    image = CGImageCreate(framebuffer.width, framebuffer.height, 8, 32, framebuffer.width * 4, colorSpace, kCGImageAlphaNoneSkipLast, dataProvider, NULL, false, kCGRenderingIntentDefault);
 
     CGContextDrawImage(ctx, dirtyRect, image);
 
