@@ -12,7 +12,8 @@
 #import "CustomCALayer.h"
 
 static struct mach_timebase_info mti;
-CustomCALayer *layer;
+static CustomCALayer *layer;
+static CVDisplayLinkRef displayLink;
 
 static void initTimebaseInfo(void)
 {
@@ -31,17 +32,13 @@ static void logFrameTime(const CVTimeStamp *inNow, const CVTimeStamp *inOutputTi
 }
 
 @implementation CustomNSView
-{
-  CVDisplayLinkRef displayLink;
-}
 
 static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext)
 {
   logFrameTime(inNow, inOutputTime);
-  CVReturn error = [(__bridge CustomNSView*) displayLinkContext displayFrame:inOutputTime];
+  CVReturn error = [(__bridge CustomNSView *) displayLinkContext displayFrame:inOutputTime];
   return error;
 }
-
 
 - (CVReturn)displayFrame:(const CVTimeStamp *)inOutputTime {
   dispatch_sync(dispatch_get_main_queue(), ^{
@@ -69,14 +66,13 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 
 - (void)releaseDisplayLink {
   [self stopDisplayLink];
-  [[NSApplication sharedApplication] replyToApplicationShouldTerminate:YES];
 }
 
 - (id) initWithCoder:(NSCoder *)coder {
   self = [super initWithCoder:coder];
   
   layer = [[CustomCALayer alloc] init];
-  layer.bounds = self.bounds;
+//  layer.bounds = self.bounds;
   NSLog(@"layerw x h: %f x %f", layer.bounds.size.width, layer.bounds.size.height);
   self.wantsLayer = YES;
   self.layer = layer;
@@ -104,7 +100,7 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 }
 
 - (void)updateLayer {
-  NSLog(@"updateLayer!");
+  NSLog(@"updateLayer - never called!");
 }
 
 @end
