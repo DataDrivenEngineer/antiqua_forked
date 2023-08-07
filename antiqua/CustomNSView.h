@@ -13,6 +13,7 @@
 - (void)resumeDisplayLink;
 - (void)stopDisplayLink;
 - (void)releaseDisplayLink;
+- (void)updateLayer;
 
 @end
 

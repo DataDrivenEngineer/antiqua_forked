@@ -7,8 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		9F4F34DB2A7D81BC0034A6D6 /* WindowDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F4F34D92A7D81BC0034A6D6 /* WindowDelegate.m */; };
-		9F4F34DE2A7D87700034A6D6 /* WindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F4F34DD2A7D87700034A6D6 /* WindowController.m */; };
+		9FBB7D742A80BA17001EA2E0 /* CustomCALayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FBB7D722A80BA17001EA2E0 /* CustomCALayer.m */; };
 		9FC718E92A7D5E44007ADAA1 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC718E82A7D5E44007ADAA1 /* AppDelegate.m */; };
 		9FC718EE2A7D5E45007ADAA1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */; };
 		9FC718F12A7D5E45007ADAA1 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9FC718EF2A7D5E45007ADAA1 /* Main.storyboard */; };
@@ -52,11 +51,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		9F4F34D92A7D81BC0034A6D6 /* WindowDelegate.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WindowDelegate.m; sourceTree = "<group>"; };
-		9F4F34DA2A7D81BC0034A6D6 /* WindowDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WindowDelegate.h; sourceTree = "<group>"; };
-		9F4F34DC2A7D870B0034A6D6 /* WindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WindowController.h; sourceTree = "<group>"; };
-		9F4F34DD2A7D87700034A6D6 /* WindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = WindowController.m; sourceTree = "<group>"; };
 		9F6E25E32A7D7559006DF7A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9FBB7D722A80BA17001EA2E0 /* CustomCALayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomCALayer.m; sourceTree = "<group>"; };
+		9FBB7D732A80BA17001EA2E0 /* CustomCALayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomCALayer.h; sourceTree = "<group>"; };
 		9FC718E42A7D5E44007ADAA1 /* antiqua.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = antiqua.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9FC718E72A7D5E44007ADAA1 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		9FC718E82A7D5E44007ADAA1 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -123,8 +120,8 @@
 		9FC718E62A7D5E44007ADAA1 /* antiqua */ = {
 			isa = PBXGroup;
 			children = (
-				9F4F34DA2A7D81BC0034A6D6 /* WindowDelegate.h */,
-				9F4F34D92A7D81BC0034A6D6 /* WindowDelegate.m */,
+				9FBB7D732A80BA17001EA2E0 /* CustomCALayer.h */,
+				9FBB7D722A80BA17001EA2E0 /* CustomCALayer.m */,
 				9F6E25E32A7D7559006DF7A3 /* Info.plist */,
 				9FC719182A7D5F7E007ADAA1 /* CustomNSView.h */,
 				9FC719162A7D5F7E007ADAA1 /* CustomNSView.m */,
@@ -136,8 +133,6 @@
 				9FC718EF2A7D5E45007ADAA1 /* Main.storyboard */,
 				9FC718F22A7D5E45007ADAA1 /* main.m */,
 				9FC718F42A7D5E45007ADAA1 /* antiqua.entitlements */,
-				9F4F34DC2A7D870B0034A6D6 /* WindowController.h */,
-				9F4F34DD2A7D87700034A6D6 /* WindowController.m */,
 			);
 			path = antiqua;
 			sourceTree = "<group>";
@@ -290,10 +285,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				9FC718F32A7D5E45007ADAA1 /* main.m in Sources */,
-				9F4F34DE2A7D87700034A6D6 /* WindowController.m in Sources */,
 				9FC719192A7D5F7E007ADAA1 /* CustomNSView.m in Sources */,
 				9FC7191A2A7D5F7E007ADAA1 /* ViewController.m in Sources */,
-				9F4F34DB2A7D81BC0034A6D6 /* WindowDelegate.m in Sources */,
+				9FBB7D742A80BA17001EA2E0 /* CustomCALayer.m in Sources */,
 				9FC718E92A7D5E44007ADAA1 /* AppDelegate.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
