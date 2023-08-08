@@ -3,8 +3,6 @@
 
 #import <QuartzCore/CALayer.h>
 
-void releaseCGImage(void);
-
 @interface CustomCALayer : CALayer
 
 @end
