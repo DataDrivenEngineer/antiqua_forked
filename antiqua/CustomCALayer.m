@@ -69,8 +69,8 @@ static void renderGradient(int xOffset, int yOffset)
   @autoreleasepool
   {
     CGRect dirtyRect = CGContextGetClipBoundingBox(ctx);
-    framebuffer.width = dirtyRect.size.width;
-    framebuffer.height = dirtyRect.size.height;
+    framebuffer.width = 1024;
+    framebuffer.height = 640;
     size_t bitmapSize = sizeof(uint8_t) * framebuffer.width * 4 * framebuffer.height;
     
     framebuffer.memory = malloc(bitmapSize);
