@@ -12,7 +12,6 @@
 - (CVReturn)displayFrame:(const CVTimeStamp *)inOutputTime;
 - (void)resumeDisplayLink;
 - (void)stopDisplayLink;
-- (void)releaseDisplayLink;
 - (void)updateLayer;
 
 @end

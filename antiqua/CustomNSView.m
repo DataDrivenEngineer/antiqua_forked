@@ -64,10 +64,6 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   CVDisplayLinkRelease(displayLink);
 }
 
-- (void)releaseDisplayLink {
-  [self stopDisplayLink];
-}
-
 - (id) initWithCoder:(NSCoder *)coder {
   self = [super initWithCoder:coder];
   
