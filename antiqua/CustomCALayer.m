@@ -75,9 +75,11 @@ static void renderGradient(int xOffset, int yOffset)
     
     framebuffer.memory = malloc(bitmapSize);
     
-    static xOff = 0;
-    renderGradient(xOff, 0);
+    static uint64_t xOff = 0;
+    static uint64_t yOff = 0;
+    renderGradient(xOff, yOff);
     xOff++;
+    yOff++;
 
     CGDataProviderRef dataProvider = CGDataProviderCreateDirect(framebuffer.memory, bitmapSize, &callbacks);
 

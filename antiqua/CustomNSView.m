@@ -72,7 +72,6 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   self = [super initWithCoder:coder];
   
   layer = [[CustomCALayer alloc] init];
-//  layer.bounds = self.bounds;
   NSLog(@"layerw x h: %f x %f", layer.bounds.size.width, layer.bounds.size.height);
   self.wantsLayer = YES;
   self.layer = layer;
