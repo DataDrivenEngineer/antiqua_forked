@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9F1D09F12A86C1A100263859 /* CustomWindowDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F1D09EF2A86C1A100263859 /* CustomWindowDelegate.m */; };
 		9FBB7D742A80BA17001EA2E0 /* CustomCALayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FBB7D722A80BA17001EA2E0 /* CustomCALayer.m */; };
 		9FC718E92A7D5E44007ADAA1 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC718E82A7D5E44007ADAA1 /* AppDelegate.m */; };
 		9FC718EE2A7D5E45007ADAA1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */; };
@@ -16,7 +17,6 @@
 		9FC719082A7D5E45007ADAA1 /* antiquaUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC719072A7D5E45007ADAA1 /* antiquaUITests.m */; };
 		9FC7190A2A7D5E45007ADAA1 /* antiquaUITestsLaunchTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC719092A7D5E45007ADAA1 /* antiquaUITestsLaunchTests.m */; };
 		9FC719192A7D5F7E007ADAA1 /* CustomNSView.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC719162A7D5F7E007ADAA1 /* CustomNSView.m */; };
-		9FC7191A2A7D5F7E007ADAA1 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC719172A7D5F7E007ADAA1 /* ViewController.m */; };
 		9FC7191C2A7D608E007ADAA1 /* antiqua.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = 9FC718E42A7D5E44007ADAA1 /* antiqua.app */; };
 /* End PBXBuildFile section */
 
@@ -51,13 +51,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		9F1D09EF2A86C1A100263859 /* CustomWindowDelegate.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomWindowDelegate.m; sourceTree = "<group>"; };
+		9F1D09F02A86C1A100263859 /* CustomWindowDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomWindowDelegate.h; sourceTree = "<group>"; };
 		9F6E25E32A7D7559006DF7A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9FBB7D722A80BA17001EA2E0 /* CustomCALayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomCALayer.m; sourceTree = "<group>"; };
 		9FBB7D732A80BA17001EA2E0 /* CustomCALayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomCALayer.h; sourceTree = "<group>"; };
 		9FC718E42A7D5E44007ADAA1 /* antiqua.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = antiqua.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9FC718E72A7D5E44007ADAA1 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		9FC718E82A7D5E44007ADAA1 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
-		9FC718EA2A7D5E44007ADAA1 /* ViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViewController.h; sourceTree = "<group>"; };
 		9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9FC718F02A7D5E45007ADAA1 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		9FC718F22A7D5E45007ADAA1 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
@@ -68,7 +69,6 @@
 		9FC719072A7D5E45007ADAA1 /* antiquaUITests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = antiquaUITests.m; sourceTree = "<group>"; };
 		9FC719092A7D5E45007ADAA1 /* antiquaUITestsLaunchTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = antiquaUITestsLaunchTests.m; sourceTree = "<group>"; };
 		9FC719162A7D5F7E007ADAA1 /* CustomNSView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomNSView.m; sourceTree = "<group>"; };
-		9FC719172A7D5F7E007ADAA1 /* ViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ViewController.m; sourceTree = "<group>"; };
 		9FC719182A7D5F7E007ADAA1 /* CustomNSView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomNSView.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -120,15 +120,15 @@
 		9FC718E62A7D5E44007ADAA1 /* antiqua */ = {
 			isa = PBXGroup;
 			children = (
+				9F1D09F02A86C1A100263859 /* CustomWindowDelegate.h */,
+				9F1D09EF2A86C1A100263859 /* CustomWindowDelegate.m */,
 				9FBB7D732A80BA17001EA2E0 /* CustomCALayer.h */,
 				9FBB7D722A80BA17001EA2E0 /* CustomCALayer.m */,
 				9F6E25E32A7D7559006DF7A3 /* Info.plist */,
 				9FC719182A7D5F7E007ADAA1 /* CustomNSView.h */,
 				9FC719162A7D5F7E007ADAA1 /* CustomNSView.m */,
-				9FC719172A7D5F7E007ADAA1 /* ViewController.m */,
 				9FC718E72A7D5E44007ADAA1 /* AppDelegate.h */,
 				9FC718E82A7D5E44007ADAA1 /* AppDelegate.m */,
-				9FC718EA2A7D5E44007ADAA1 /* ViewController.h */,
 				9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */,
 				9FC718EF2A7D5E45007ADAA1 /* Main.storyboard */,
 				9FC718F22A7D5E45007ADAA1 /* main.m */,
@@ -286,9 +286,9 @@
 			files = (
 				9FC718F32A7D5E45007ADAA1 /* main.m in Sources */,
 				9FC719192A7D5F7E007ADAA1 /* CustomNSView.m in Sources */,
-				9FC7191A2A7D5F7E007ADAA1 /* ViewController.m in Sources */,
 				9FBB7D742A80BA17001EA2E0 /* CustomCALayer.m in Sources */,
 				9FC718E92A7D5E44007ADAA1 /* AppDelegate.m in Sources */,
+				9F1D09F12A86C1A100263859 /* CustomWindowDelegate.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

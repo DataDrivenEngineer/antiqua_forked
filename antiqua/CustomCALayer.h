@@ -5,6 +5,9 @@
 
 @interface CustomCALayer : CALayer
 
+void incXOff(void);
+void incYOff(void);
+
 @end
 
 #endif

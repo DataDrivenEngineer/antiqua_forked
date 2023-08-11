@@ -29,6 +29,23 @@ static void logFrameTime(const CVTimeStamp *inNow, const CVTimeStamp *inOutputTi
   previousNowNs = currentNowNs;
   // Divide by 1000000 to convert from ns to ms
   NSLog(@"inNow frame time: %f ms", (float)inNowDiff / 1000000);
+
+  uint64_t processingWindowNs = (inOutputTime->hostTime - inNow->hostTime) * mti.numer / mti.denom;
+  NSLog(@"processingWindow: %f ms", (float)processingWindowNs / 1000000);
+}
+
+void resumeDisplayLink(void)
+{
+  if (!CVDisplayLinkIsRunning(displayLink)) {
+    CVDisplayLinkStart(displayLink);
+  }
+}
+
+void stopDisplayLink(void)
+{
+  if (CVDisplayLinkIsRunning(displayLink)) {
+    CVDisplayLinkStop(displayLink);
+  }
 }
 
 @implementation CustomNSView
@@ -41,31 +58,28 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 }
 
 - (CVReturn)displayFrame:(const CVTimeStamp *)inOutputTime {
+//  @autoreleasepool
+//  {
+//    NSEvent *e;
+//    while ((e = [[NSApplication sharedApplication] nextEventMatchingMask:NSEventMaskKeyDown
+//      // TODO: maybe we need an expiration date? 
+//      untilDate:nil
+//      inMode:NSEventTrackingRunLoopMode
+//      dequeue:YES]) != nil)
+//    {
+//      NSLog(@"event keyCode: %u", e.keyCode);
+//    }
+//  }
+
   dispatch_sync(dispatch_get_main_queue(), ^{
     [self setNeedsDisplay:YES];
   });
   return kCVReturnSuccess;
 }
 
-- (void)resumeDisplayLink {
-  if (!CVDisplayLinkIsRunning(displayLink)) {
-    CVDisplayLinkStart(displayLink);
-  }
-}
 
-- (void)stopDisplayLink {
-  if (CVDisplayLinkIsRunning(displayLink)) {
-    CVDisplayLinkStop(displayLink);
-  }
-}
-
-- (void) dealloc {
-  [self stopDisplayLink];
-  CVDisplayLinkRelease(displayLink);
-}
-
-- (id) initWithCoder:(NSCoder *)coder {
-  self = [super initWithCoder:coder];
+- (instancetype)initWithFrame:(NSRect)frameRect {
+  self = [super initWithFrame:frameRect];
   
   layer = [[CustomCALayer alloc] init];
   NSLog(@"layerw x h: %f x %f", layer.bounds.size.width, layer.bounds.size.height);

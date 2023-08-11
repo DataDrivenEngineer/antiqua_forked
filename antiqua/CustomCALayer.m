@@ -12,6 +12,19 @@ static CGImageRef image;
 static CGColorSpaceRef colorSpace;
 static struct CGDataProviderDirectCallbacks callbacks;
 
+static uint64_t xOff = 0;
+static uint64_t yOff = 0;
+
+void incXOff(void)
+{
+  xOff+=10;
+}
+
+void incYOff(void)
+{
+  yOff+=10;
+}
+
 static const void * getBytePointerCallback(void *info)
 {
   return (const void *)info;
@@ -75,9 +88,7 @@ static void renderGradient(int xOffset, int yOffset)
     
     framebuffer.memory = malloc(bitmapSize);
     
-    static uint64_t xOff = 0;
-    static uint64_t yOff = 0;
-    renderGradient(xOff++, yOff++);
+    renderGradient(xOff, yOff);
 
     CGDataProviderRef dataProvider = CGDataProviderCreateDirect(framebuffer.memory, bitmapSize, &callbacks);
 

@@ -9,9 +9,10 @@
 
 @interface CustomNSView : NSView
 
+void resumeDisplayLink(void);
+void stopDisplayLink(void);
+
 - (CVReturn)displayFrame:(const CVTimeStamp *)inOutputTime;
-- (void)resumeDisplayLink;
-- (void)stopDisplayLink;
 - (void)updateLayer;
 
 @end
