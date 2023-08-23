@@ -2,6 +2,7 @@
 
 #import <Cocoa/Cocoa.h>
 #import <Carbon/Carbon.h>
+#import <AudioToolbox/AudioToolbox.h>
 
 #import "CustomNSView.h"
 #import "CustomWindowDelegate.h"
@@ -10,6 +11,142 @@
 #import "AppDelegate.h"
 
 static uint8_t shouldKeepRunning = 1;
+
+#define PI32 3.14159265359f
+typedef struct
+{
+  float sampleRate;
+  float toneHz;
+  float volume;
+  uint32_t runningFrameIndex;
+  float frameOffset;
+} SoundState;
+static SoundState soundState = {0};
+static AudioQueueRef audioQueue = 0;
+static AudioQueueBufferRef audioBuffer[2] = {};
+
+void audioCallback(void *inUserData, AudioQueueRef inAQ, AudioQueueBufferRef inBuffer)
+{
+  SoundState *soundState = (SoundState *) inUserData;
+
+  // we're just filling the entire buffer here
+  // In a real game we might only fill part of the buffer and set the mAudioDataBytes
+  // accordingly.
+  uint32_t framesToGen = inBuffer->mAudioDataBytesCapacity / 4;
+  inBuffer->mAudioDataByteSize = framesToGen * 4;
+
+  // calc the samples per up/down portion of each square wave (with 50% period)
+  float framesPerPeriod = soundState->sampleRate / soundState->toneHz;
+
+  int16_t *bufferPos = (int16_t *) (inBuffer->mAudioData);
+  float frameOffset = soundState->frameOffset;
+
+  while (framesToGen) {
+
+    // calc rounded frames to generate and accumulate fractional error
+    uint32_t frames;
+    uint32_t needFrames = (uint32_t)(round(framesPerPeriod - frameOffset));
+    frameOffset -= framesPerPeriod - needFrames;
+
+    // we may be at the end of the buffer, if so, place offset at location in wave and clip
+    if (needFrames > framesToGen) {
+      frameOffset += framesToGen;
+      frames = framesToGen;
+    }
+    else {
+      frames = needFrames;
+    }
+    framesToGen -= frames;
+
+    // simply put the samples in
+    for (int x = 0; x < frames; ++x) {
+      float t = 2.f * PI32 * (float) soundState->runningFrameIndex / framesPerPeriod;
+      float sineValue = sinf(t);
+      int16_t sample = (int16_t) (sineValue * soundState->volume);
+      *bufferPos++ = sample;
+      *bufferPos++ = sample;
+      ++soundState->runningFrameIndex;
+    }
+  }
+
+  soundState->frameOffset = frameOffset;
+
+  AudioQueueEnqueueBuffer(audioQueue, inBuffer, 0, NULL);
+}
+
+void initAudio(void)
+{
+  soundState.sampleRate = 48000.f;
+  soundState.toneHz = 256.f;
+  soundState.volume = 3000.f;
+
+  soundState.runningFrameIndex = 0;
+
+  AudioStreamBasicDescription audioDataFormat = {0};
+  // Values below are for stereo 
+  audioDataFormat.mSampleRate = soundState.sampleRate;
+  audioDataFormat.mFormatID = kAudioFormatLinearPCM;
+  audioDataFormat.mFormatFlags = kLinearPCMFormatFlagIsBigEndian | kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked;
+  audioDataFormat.mBitsPerChannel = 16;
+  audioDataFormat.mBytesPerFrame = 4;
+  audioDataFormat.mChannelsPerFrame = 2;
+  audioDataFormat.mBytesPerPacket = 4;
+  audioDataFormat.mFramesPerPacket = 1;
+
+  OSStatus res = AudioQueueNewOutput(
+    &audioDataFormat, 
+    &audioCallback, 
+    &soundState, 
+    0, 
+    0, 
+    0, 
+    &audioQueue);
+  if (!res)
+  {
+    // Allocate buffer for 2 seconds of sound
+    uint32_t audioBufferSize = audioDataFormat.mSampleRate * sizeof(int16_t) * 2;
+    res = AudioQueueAllocateBuffer(audioQueue, audioBufferSize, &(audioBuffer[0])) | AudioQueueAllocateBuffer(audioQueue, audioBufferSize, &(audioBuffer[1]));
+    if (!res)
+    {
+    }
+    else
+    {
+      NSLog(@"Failed to allocate audio buffers, error code: %d", res);
+    }
+  }
+  else
+  {
+    NSLog(@"Failed to create audio queue, error code: %d", res);
+  }
+}
+
+void playAudio(void)
+{
+  audioCallback(&soundState, audioQueue, audioBuffer[0]);
+  audioCallback(&soundState, audioQueue, audioBuffer[1]);
+  OSStatus res = AudioQueueEnqueueBuffer(audioQueue, audioBuffer[0], 0, NULL) | AudioQueueEnqueueBuffer(audioQueue, audioBuffer[1], 0, NULL);
+//  OSStatus res = AudioQueueEnqueueBuffer(audioQueue, audioBuffer[0], 0, NULL); 
+  if (!res)
+  {
+    res = AudioQueuePrime(audioQueue, 0, NULL);
+    if (!res)
+    {
+      res = AudioQueueStart(audioQueue, NULL);
+      if (res)
+      {
+	NSLog(@"Failed to play audio queue, error code: %d", res);
+      }
+    }
+    else
+    {
+      NSLog(@"Failed to prime audio buffer, error code: %d", res);
+    }
+  }
+  else
+  {
+    NSLog(@"Failed to enqueue audio buffers, error code: %d", res);
+  }
+}
 
 void processEvent(NSEvent *e)
 {
@@ -69,6 +206,9 @@ int main(int argc, const char * argv[]) {
     [NSApp activateIgnoringOtherApps:YES];
     [NSApp finishLaunching];
 
+    initAudio();
+    uint8_t isAudioPlaying = 0;
+
     while (shouldKeepRunning)
     {
       @autoreleasepool
@@ -81,11 +221,28 @@ int main(int argc, const char * argv[]) {
 
 	processEvent(event);
 
+	if (!isAudioPlaying)
+	{
+	  isAudioPlaying = 1;
+	  playAudio();
+	}
+
 	[NSApp sendEvent:event];
 	[NSApp updateWindows];
       }
     }
     [NSApp terminate:NSApp];
+    
+    OSStatus res = AudioQueueDispose(audioQueue, false);
+    if (res)
+    {
+      NSLog(@"Failed to dispose of audio queue, error code: %d", res);
+    }
+    res = AudioQueueFreeBuffer(audioQueue, audioBuffer[0]) | AudioQueueFreeBuffer(audioQueue, audioBuffer[1]);
+    if (res)
+    {
+      NSLog(@"Failed to free audio buffers, error code: %d", res);
+    }
   }
   return 0;
 }
