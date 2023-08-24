@@ -10,18 +10,19 @@
 #import "CustomNSView.h"
 #import "AppDelegate.h"
 
+#include "types.h"
 #include "antiqua.cpp"
 
-static uint8_t shouldKeepRunning = 1;
+static u8 shouldKeepRunning = 1;
 
 #define PI32 3.14159265359f
 typedef struct
 {
-  float sampleRate;
-  float toneHz;
-  float volume;
-  uint32_t runningFrameIndex;
-  float frameOffset;
+  r32 sampleRate;
+  r32 toneHz;
+  r32 volume;
+  u32 runningFrameIndex;
+  r32 frameOffset;
 } SoundState;
 static SoundState soundState = {0};
 static AudioQueueRef audioQueue = 0;
@@ -34,20 +35,20 @@ void audioCallback(void *inUserData, AudioQueueRef inAQ, AudioQueueBufferRef inB
   // we're just filling the entire buffer here
   // In a real game we might only fill part of the buffer and set the mAudioDataBytes
   // accordingly.
-  uint32_t framesToGen = inBuffer->mAudioDataBytesCapacity / 4;
+  u32 framesToGen = inBuffer->mAudioDataBytesCapacity / 4;
   inBuffer->mAudioDataByteSize = framesToGen * 4;
 
   // calc the samples per up/down portion of each square wave (with 50% period)
-  float framesPerPeriod = soundState->sampleRate / soundState->toneHz;
+  r32 framesPerPeriod = soundState->sampleRate / soundState->toneHz;
 
-  int16_t *bufferPos = (int16_t *) (inBuffer->mAudioData);
-  float frameOffset = soundState->frameOffset;
+  s16 *bufferPos = (s16 *) (inBuffer->mAudioData);
+  r32 frameOffset = soundState->frameOffset;
 
   while (framesToGen) {
 
     // calc rounded frames to generate and accumulate fractional error
-    uint32_t frames;
-    uint32_t needFrames = (uint32_t)(round(framesPerPeriod - frameOffset));
+    u32 frames;
+    u32 needFrames = (u32)(round(framesPerPeriod - frameOffset));
     frameOffset -= framesPerPeriod - needFrames;
 
     // we may be at the end of the buffer, if so, place offset at location in wave and clip
@@ -62,9 +63,9 @@ void audioCallback(void *inUserData, AudioQueueRef inAQ, AudioQueueBufferRef inB
 
     // simply put the samples in
     for (int x = 0; x < frames; ++x) {
-      float t = 2.f * PI32 * (float) soundState->runningFrameIndex / framesPerPeriod;
-      float sineValue = sinf(t);
-      int16_t sample = (int16_t) (sineValue * soundState->volume);
+      r32 t = 2.f * PI32 * (r32) soundState->runningFrameIndex / framesPerPeriod;
+      r32 sineValue = sinf(t);
+      s16 sample = (s16) (sineValue * soundState->volume);
       *bufferPos++ = sample;
       *bufferPos++ = sample;
       ++soundState->runningFrameIndex;
@@ -106,7 +107,7 @@ void initAudio(void)
   if (!res)
   {
     // Allocate buffer for 2 seconds of sound
-    uint32_t audioBufferSize = audioDataFormat.mSampleRate * sizeof(int16_t) * 2;
+    u32 audioBufferSize = audioDataFormat.mSampleRate * sizeof(s16) * 2;
     res = AudioQueueAllocateBuffer(audioQueue, audioBufferSize, &(audioBuffer[0])) | AudioQueueAllocateBuffer(audioQueue, audioBufferSize, &(audioBuffer[1]));
     if (!res)
     {
@@ -209,7 +210,7 @@ int main(int argc, const char * argv[]) {
     [NSApp finishLaunching];
 
     initAudio();
-    uint8_t isAudioPlaying = 0;
+    u8 isAudioPlaying = 0;
 
     while (shouldKeepRunning)
     {

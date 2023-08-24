@@ -8,6 +8,7 @@
 #import <mach/mach_time.h>
 #import <math.h>
 
+#import "types.h"
 #import "CustomNSView.h"
 #import "CustomCALayer.h"
 
@@ -23,15 +24,15 @@ static void initTimebaseInfo(void)
 
 static void logFrameTime(const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime)
 {
-  static uint64_t previousNowNs = 0;
-  uint64_t currentNowNs = inNow->hostTime * mti.numer / mti.denom;
-  uint64_t inNowDiff = currentNowNs - previousNowNs;
+  static u64 previousNowNs = 0;
+  u64 currentNowNs = inNow->hostTime * mti.numer / mti.denom;
+  u64 inNowDiff = currentNowNs - previousNowNs;
   previousNowNs = currentNowNs;
   // Divide by 1000000 to convert from ns to ms
-  NSLog(@"inNow frame time: %f ms", (float)inNowDiff / 1000000);
+  NSLog(@"inNow frame time: %f ms", (r32)inNowDiff / 1000000);
 
-  uint64_t processingWindowNs = (inOutputTime->hostTime - inNow->hostTime) * mti.numer / mti.denom;
-  NSLog(@"processingWindow: %f ms", (float)processingWindowNs / 1000000);
+  u64 processingWindowNs = (inOutputTime->hostTime - inNow->hostTime) * mti.numer / mti.denom;
+  NSLog(@"processingWindow: %f ms", (r32)processingWindowNs / 1000000);
 }
 
 void resumeDisplayLink(void)
