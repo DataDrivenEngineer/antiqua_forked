@@ -1,19 +1,14 @@
 #import "CustomCALayer.h"
+#import "antiqua.h"
+#import "types.h"
 
-typedef struct 
-{
-  double_t width;
-  double_t height;
-  uint8_t *memory;
-} Framebuffer;
-
-static Framebuffer framebuffer;
+static struct GameOffscreenBuffer framebuffer;
 static CGImageRef image;
 static CGColorSpaceRef colorSpace;
 static struct CGDataProviderDirectCallbacks callbacks;
 
-static uint64_t xOff = 0;
-static uint64_t yOff = 0;
+static u64 xOff = 0;
+static u64 yOff = 0;
 
 void incXOff(void)
 {
@@ -35,23 +30,6 @@ static void releaseBytePointerCallback(void *info, const void *pointer)
   free(info);
 }
 
-static void renderGradient(int xOffset, int yOffset)
-{
-    int pitch = framebuffer.width * 4;
-    uint8_t *row = framebuffer.memory;
-    for (int y = 0; y < framebuffer.height; y++)
-    {
-      uint8_t *pixel = row;
-      for (int x = 0; x < framebuffer.width; x++)
-      {
-	*pixel++ = 0;
-	*pixel++ = y + yOffset;
-	*pixel++ = x + xOffset;
-	pixel++;
-      }
-      row += pitch;
-    }
-}
 
 @implementation CustomCALayer
 
@@ -88,7 +66,7 @@ static void renderGradient(int xOffset, int yOffset)
     
     framebuffer.memory = malloc(bitmapSize);
     
-    renderGradient(xOff, yOff);
+    updateGameAndRender(&framebuffer, xOff, yOff);
 
     CGDataProviderRef dataProvider = CGDataProviderCreateDirect(framebuffer.memory, bitmapSize, &callbacks);
 
