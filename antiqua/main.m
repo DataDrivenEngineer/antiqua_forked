@@ -11,68 +11,22 @@
 #import "AppDelegate.h"
 
 #include "types.h"
+#include "antiqua.h"
 #include "antiqua.cpp"
 
 static u8 shouldKeepRunning = 1;
 
-#define PI32 3.14159265359f
-typedef struct
-{
-  r32 sampleRate;
-  r32 toneHz;
-  r32 volume;
-  u32 runningFrameIndex;
-  r32 frameOffset;
-} SoundState;
-static SoundState soundState = {0};
+static struct SoundState soundState = {0};
 static AudioQueueRef audioQueue = 0;
 static AudioQueueBufferRef audioBuffer[2] = {};
 
-void audioCallback(void *inUserData, AudioQueueRef inAQ, AudioQueueBufferRef inBuffer)
-{
-  SoundState *soundState = (SoundState *) inUserData;
+  void audioCallback(void *inUserData, AudioQueueRef inAQ, AudioQueueBufferRef inBuffer)
+  {
+  struct SoundState *soundState = (struct SoundState *) inUserData;
+  soundState->buf = inBuffer->mAudioData;
+  fillSoundBuffer(soundState);
 
-  // we're just filling the entire buffer here
-  // In a real game we might only fill part of the buffer and set the mAudioDataBytes
-  // accordingly.
-  u32 framesToGen = inBuffer->mAudioDataBytesCapacity / 4;
-  inBuffer->mAudioDataByteSize = framesToGen * 4;
-
-  // calc the samples per up/down portion of each square wave (with 50% period)
-  r32 framesPerPeriod = soundState->sampleRate / soundState->toneHz;
-
-  s16 *bufferPos = (s16 *) (inBuffer->mAudioData);
-  r32 frameOffset = soundState->frameOffset;
-
-  while (framesToGen) {
-
-    // calc rounded frames to generate and accumulate fractional error
-    u32 frames;
-    u32 needFrames = (u32)(round(framesPerPeriod - frameOffset));
-    frameOffset -= framesPerPeriod - needFrames;
-
-    // we may be at the end of the buffer, if so, place offset at location in wave and clip
-    if (needFrames > framesToGen) {
-      frameOffset += framesToGen;
-      frames = framesToGen;
-    }
-    else {
-      frames = needFrames;
-    }
-    framesToGen -= frames;
-
-    // simply put the samples in
-    for (int x = 0; x < frames; ++x) {
-      r32 t = 2.f * PI32 * (r32) soundState->runningFrameIndex / framesPerPeriod;
-      r32 sineValue = sinf(t);
-      s16 sample = (s16) (sineValue * soundState->volume);
-      *bufferPos++ = sample;
-      *bufferPos++ = sample;
-      ++soundState->runningFrameIndex;
-    }
-  }
-
-  soundState->frameOffset = frameOffset;
+  inBuffer->mAudioDataByteSize = inBuffer->mAudioDataBytesCapacity;
 
   AudioQueueEnqueueBuffer(audioQueue, inBuffer, 0, NULL);
 }
@@ -96,6 +50,8 @@ void initAudio(void)
   audioDataFormat.mBytesPerPacket = 4;
   audioDataFormat.mFramesPerPacket = 1;
 
+  soundState.bufCapacity = audioDataFormat.mSampleRate * sizeof(s16) * 2;
+
   OSStatus res = AudioQueueNewOutput(
     &audioDataFormat, 
     &audioCallback, 
@@ -109,10 +65,7 @@ void initAudio(void)
     // Allocate buffer for 2 seconds of sound
     u32 audioBufferSize = audioDataFormat.mSampleRate * sizeof(s16) * 2;
     res = AudioQueueAllocateBuffer(audioQueue, audioBufferSize, &(audioBuffer[0])) | AudioQueueAllocateBuffer(audioQueue, audioBufferSize, &(audioBuffer[1]));
-    if (!res)
-    {
-    }
-    else
+    if (res)
     {
       NSLog(@"Failed to allocate audio buffers, error code: %d", res);
     }

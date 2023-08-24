@@ -22,3 +22,47 @@ void updateGameAndRender(struct GameOffscreenBuffer *buf, u64 xOff, u64 yOff)
 {
   renderGradient(buf, xOff, yOff);
 }
+
+void fillSoundBuffer(struct SoundState *soundState)
+{
+  // we're just filling the entire buffer here
+  // In a real game we might only fill part of the buffer and set the mAudioDataBytes
+  // accordingly.
+  u32 framesToGen = soundState->bufCapacity / 4;
+
+  // calc the samples per up/down portion of each square wave (with 50% period)
+  r32 framesPerPeriod = soundState->sampleRate / soundState->toneHz;
+
+  s16 *bufferPos = (s16 *) (soundState->buf);
+  r32 frameOffset = soundState->frameOffset;
+
+  while (framesToGen) {
+
+    // calc rounded frames to generate and accumulate fractional error
+    u32 frames;
+    u32 needFrames = (u32)(round(framesPerPeriod - frameOffset));
+    frameOffset -= framesPerPeriod - needFrames;
+
+    // we may be at the end of the buffer, if so, place offset at location in wave and clip
+    if (needFrames > framesToGen) {
+      frameOffset += framesToGen;
+      frames = framesToGen;
+    }
+    else {
+      frames = needFrames;
+    }
+    framesToGen -= frames;
+
+    // simply put the samples in
+    for (int x = 0; x < frames; ++x) {
+      r32 t = 2.f * PI32 * (r32) soundState->runningFrameIndex / framesPerPeriod;
+      r32 sineValue = sinf(t);
+      s16 sample = (s16) (sineValue * soundState->volume);
+      *bufferPos++ = sample;
+      *bufferPos++ = sample;
+      ++soundState->runningFrameIndex;
+    }
+  }
+
+  soundState->frameOffset = frameOffset;
+}
