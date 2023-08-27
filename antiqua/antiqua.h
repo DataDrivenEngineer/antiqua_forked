@@ -7,13 +7,12 @@
 
 struct SoundState
 {
-  r32 sampleRate;
-  r32 toneHz;
-  r32 volume;
-  u32 runningFrameIndex;
+  u32 sampleRate;
+  u32 toneHz;
+  u32 runningSampleCount;
   r32 frameOffset;
-  s16 *buf;
-  u32 bufCapacity;
+  r32 *frames;
+  u32 needFrames;
 };
 
 struct GameOffscreenBuffer

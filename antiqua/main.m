@@ -2,7 +2,7 @@
 
 #import <Cocoa/Cocoa.h>
 #import <Carbon/Carbon.h>
-#import <AudioToolbox/AudioToolbox.h>
+#import <CoreAudio/AudioHardware.h>
 
 #import "CustomNSView.h"
 #import "CustomWindowDelegate.h"
@@ -17,94 +17,238 @@
 static u8 shouldKeepRunning = 1;
 
 static struct SoundState soundState = {0};
-static AudioQueueRef audioQueue = 0;
-static AudioQueueBufferRef audioBuffer[2] = {};
+static AudioObjectID device = kAudioObjectUnknown;
+static u8 soundPlaying = 0;
 
-  void audioCallback(void *inUserData, AudioQueueRef inAQ, AudioQueueBufferRef inBuffer)
-  {
-  struct SoundState *soundState = (struct SoundState *) inUserData;
-  soundState->buf = inBuffer->mAudioData;
+static OSStatus appIOProc(AudioObjectID inDevice,
+                        const AudioTimeStamp*   inNow,
+                        const AudioBufferList*  inInputData,
+                        const AudioTimeStamp*   inInputTime,
+                        AudioBufferList*        outOutputData,
+                        const AudioTimeStamp*   inOutputTime,
+                        void* __nullable        inClientData)
+{
+  fprintf(stderr, "num of buffers in list: %d\n", outOutputData->mNumberBuffers);
+  fprintf(stderr, "size of audio buffer: %d\n", outOutputData->mBuffers[0].mDataByteSize);
+  fprintf(stderr, "num of interleaved channels in audio buffer: %d\n", outOutputData->mBuffers[0].mNumberChannels);
+  struct SoundState *soundState = (struct SoundState *) inClientData;
+  fprintf(stderr, "soundState needFrames: %d\n", soundState->needFrames);
+  soundState->frames = (r32 *) outOutputData->mBuffers[0].mData;
   fillSoundBuffer(soundState);
 
-  inBuffer->mAudioDataByteSize = inBuffer->mAudioDataBytesCapacity;
+  return kAudioHardwareNoError;     
+}
 
-  AudioQueueEnqueueBuffer(audioQueue, inBuffer, 0, NULL);
+static u8 playAudio()
+{
+  OSStatus err = kAudioHardwareNoError;
+
+  if (soundPlaying) return 0;
+  
+  AudioDeviceIOProcID procID;
+  err = AudioDeviceCreateIOProcID(device, appIOProc, (void *) &soundState, &procID);
+  if (err != kAudioHardwareNoError) return 0;
+
+  err = AudioDeviceStart(device, procID);				// start playing sound through the device
+  if (err != kAudioHardwareNoError) return 0;
+
+  soundPlaying = 1; // set the playing status global to true
+  return soundPlaying;
+}
+
+static u8 stopAudio()
+{
+    OSStatus err = kAudioHardwareNoError;
+    
+    if (!soundPlaying) return 0;
+    
+    err = AudioDeviceStop(device, appIOProc);				// stop playing sound through the device
+    if (err != kAudioHardwareNoError) return 0;
+
+    err = AudioDeviceRemoveIOProc(device, appIOProc);			// remove the IO proc from the device
+    if (err != kAudioHardwareNoError) return 0;
+    
+    soundPlaying = 0;						// set the playing status global to false
+    return 1;
+}
+
+OSStatus appObjPropertyListenerProc(AudioObjectID nObjectID, UInt32 inNumberAddresses, const AudioObjectPropertyAddress* inAddresses, void* __nullable inClientData)
+{
+  for (int i = 0; i < inNumberAddresses; i++)
+  {
+    if (inAddresses[i].mSelector == kAudioHardwarePropertyDefaultOutputDevice)
+    {
+      fprintf(stderr, "Default audio device changed!\n");
+      stopAudio();
+//      OSStatus err = kAudioHardwareNoError;
+//      err = AudioHardwareUnload();
+//      if (err != kAudioHardwareNoError) {
+//	  fprintf(stderr, "failed to unload hardware, error: %ld\n", err);
+//      }
+      void initAudio(void);
+      initAudio();
+      playAudio();
+    }
+  }
+  return kAudioHardwareNoError;     
 }
 
 void initAudio(void)
 {
-  soundState.sampleRate = 48000.f;
-  soundState.toneHz = 256.f;
-  soundState.volume = 3000.f;
+  OSStatus err = kAudioHardwareNoError;
+  r32 volumeScalar;
+  u32 count;
+  AudioObjectPropertyAddress devicePropertyAddress = {0};
+  AudioObjectPropertyAddress propertyAddress = {0};
+  AudioStreamBasicDescription deviceFormat;
+  AudioBufferList bufferList;
+  u32 deviceBufferSize;
+ 
+  // get the default output device for the HAL
+  devicePropertyAddress.mSelector = kAudioHardwarePropertyDefaultOutputDevice;
+  devicePropertyAddress.mScope = kAudioObjectPropertyScopeGlobal;
+  devicePropertyAddress.mElement = kAudioObjectPropertyElementMain;
+  count = sizeof(device);		// it is required to pass the size of the data to be returned
+  err = AudioObjectGetPropertyData(kAudioObjectSystemObject, &devicePropertyAddress, 0, 0, &count, (void *) &device);
+  if (err != kAudioHardwareNoError) {
+      fprintf(stderr, "get kAudioHardwarePropertyDefaultOutputDevice error %ld\n", err);
+      return;
+  }
 
-  soundState.runningFrameIndex = 0;
+  AudioObjectPropertyAddress loopPropertyAddress = { kAudioHardwarePropertyRunLoop, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain };
+  // tell the HAL to manage its own thread for notifications. Need this so that the listener for audio default change is called
+  if(!AudioObjectHasProperty(kAudioObjectSystemObject, &loopPropertyAddress))
+  {
+    CFRunLoopRef theRunLoop = 0;
+    err = AudioObjectSetPropertyData(kAudioObjectSystemObject, &loopPropertyAddress, 0, 0, sizeof(CFRunLoopRef), &theRunLoop);
+    if (err != kAudioHardwareNoError) {
+	fprintf(stderr, "failed to register run loop, error: %ld\n", err);
+	return;
+    }
+  }
+
+  if(!AudioObjectHasProperty(kAudioObjectSystemObject, &devicePropertyAddress))
+  {
+    err = AudioObjectAddPropertyListener(kAudioObjectSystemObject, &devicePropertyAddress, appObjPropertyListenerProc, 0);
+    if (err != kAudioHardwareNoError) {
+	fprintf(stderr, "failed to add listener for kAudioHardwarePropertyDefaultOutputDevice property, error: %ld\n", err);
+	return;
+    }
+  }
+
+  // get the bufferlist that the default device uses for IO
+  count = sizeof(bufferList);	// it is required to pass the size of the data to be returned
+  propertyAddress.mSelector = kAudioDevicePropertyStreamConfiguration;
+  propertyAddress.mScope = kAudioObjectPropertyScopeOutput;
+  propertyAddress.mElement = kAudioObjectPropertyElementMain;
+  err = AudioObjectGetPropertyData(device, &propertyAddress, 0, 0, &count, (void *) &bufferList);
+  if (err != kAudioHardwareNoError) {
+      fprintf(stderr, "get kAudioDevicePropertyStreamConfiguration error %ld\n", err);
+      return;
+  }
+  fprintf(stderr, "bufferList = %ld\n", bufferList);
+
+  // get the buffersize that the default device uses for IO
+  count = sizeof(deviceBufferSize);	// it is required to pass the size of the data to be returned
+  propertyAddress.mSelector = kAudioDevicePropertyBufferSize;
+  propertyAddress.mScope = kAudioObjectPropertyScopeOutput;
+  propertyAddress.mElement = kAudioObjectPropertyElementMain;
+  err = AudioObjectGetPropertyData(device, &propertyAddress, 0, 0, &count, (void *) &deviceBufferSize);
+  if (err != kAudioHardwareNoError) {
+      fprintf(stderr, "get kAudioDevicePropertyBufferSize error %ld\n", err);
+      return;
+  }
+  fprintf(stderr, "deviceBufferSize = %ld\n", deviceBufferSize);
+  
+  u32 newBufferSize = 48000 / 30 * 2 * 4;
+  err = AudioObjectSetPropertyData(device, &propertyAddress, 0, 0, sizeof(u32), &newBufferSize);
+  if (err != kAudioHardwareNoError) {
+      fprintf(stderr, "failed to update buffer size, error: %ld\n", err);
+      return;
+  }
+
+  // get a description of the data format used by the default device
+//  count = sizeof(deviceFormat);				// it is required to pass the size of the data to be returned
+//  propertyAddress.mSelector = kAudioDevicePropertyStreamFormat;
+//  propertyAddress.mScope = kAudioObjectPropertyScopeOutput;
+//  propertyAddress.mElement = kAudioObjectPropertyElementMain;
+//  err = AudioObjectGetPropertyData(device, &propertyAddress, 0, 0, &count, (void *) &deviceFormat);
+//  if (err != kAudioHardwareNoError)
+//  {
+//      fprintf(stderr, "get kAudioDevicePropertyStreamFormat error %ld\n", err);
+//  }
+//  fprintf(stderr, "old format:\n");
+//  fprintf(stderr, "kAudioDevicePropertyStreamFormat %d\n", err);
+//  fprintf(stderr, "sampleRate %g\n", deviceFormat.mSampleRate);
+//  fprintf(stderr, "mFormatID %08X\n", deviceFormat.mFormatID);
+//  fprintf(stderr, "mFormatFlags %08X\n", deviceFormat.mFormatFlags);
+//  fprintf(stderr, "mBytesPerPacket %d\n", deviceFormat.mBytesPerPacket);
+//  fprintf(stderr, "mFramesPerPacket %d\n", deviceFormat.mFramesPerPacket);
+//  fprintf(stderr, "mChannelsPerFrame %d\n", deviceFormat.mChannelsPerFrame);
+//  fprintf(stderr, "mBytesPerFrame %d\n", deviceFormat.mBytesPerFrame);
+//  fprintf(stderr, "mBitsPerChannel %d\n", deviceFormat.mBitsPerChannel);
 
   AudioStreamBasicDescription audioDataFormat = {0};
+  count = sizeof(audioDataFormat);				// it is required to pass the size of the data to be returned
+  propertyAddress.mSelector = kAudioDevicePropertyStreamFormat;
+  propertyAddress.mScope = kAudioObjectPropertyScopeOutput;
+  propertyAddress.mElement = kAudioObjectPropertyElementMain;
   // Values below are for stereo 
-  audioDataFormat.mSampleRate = soundState.sampleRate;
+  audioDataFormat.mSampleRate = 48000.f;
   audioDataFormat.mFormatID = kAudioFormatLinearPCM;
-  audioDataFormat.mFormatFlags = kLinearPCMFormatFlagIsBigEndian | kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked;
-  audioDataFormat.mBitsPerChannel = 16;
-  audioDataFormat.mBytesPerFrame = 4;
+  audioDataFormat.mFormatFlags = kAudioFormatFlagIsFloat | kLinearPCMFormatFlagIsPacked;
+  audioDataFormat.mBitsPerChannel = 32;
+  audioDataFormat.mBytesPerFrame = 8;
   audioDataFormat.mChannelsPerFrame = 2;
-  audioDataFormat.mBytesPerPacket = 4;
+  audioDataFormat.mBytesPerPacket = 8;
   audioDataFormat.mFramesPerPacket = 1;
 
-  soundState.bufCapacity = audioDataFormat.mSampleRate * sizeof(s16) * 2;
+  fprintf(stderr, "new format:\n");
+  fprintf(stderr, "kAudioDevicePropertyStreamFormat %d\n", err);
+  fprintf(stderr, "sampleRate %g\n", audioDataFormat.mSampleRate);
+  fprintf(stderr, "mFormatID %08X\n", audioDataFormat.mFormatID);
+  fprintf(stderr, "mFormatFlags %08X\n", audioDataFormat.mFormatFlags);
+  fprintf(stderr, "mBytesPerPacket %d\n", audioDataFormat.mBytesPerPacket);
+  fprintf(stderr, "mFramesPerPacket %d\n", audioDataFormat.mFramesPerPacket);
+  fprintf(stderr, "mChannelsPerFrame %d\n", audioDataFormat.mChannelsPerFrame);
+  fprintf(stderr, "mBytesPerFrame %d\n", audioDataFormat.mBytesPerFrame);
+  fprintf(stderr, "mBitsPerChannel %d\n", audioDataFormat.mBitsPerChannel);
+  
+  err = AudioObjectSetPropertyData(device, &propertyAddress, 0, 0, count, &audioDataFormat);
+  if (err != kAudioHardwareNoError)
+  {
+      fprintf(stderr, "set kAudioDevicePropertyStreamFormat error %ld\n", err);
+  }
 
-  OSStatus res = AudioQueueNewOutput(
-    &audioDataFormat, 
-    &audioCallback, 
-    &soundState, 
-    0, 
-    0, 
-    0, 
-    &audioQueue);
-  if (!res)
+  // Get volume scalar
+  propertyAddress.mSelector = kAudioDevicePropertyVolumeScalar;
+  propertyAddress.mScope = kAudioObjectPropertyScopeOutput;
+  propertyAddress.mElement = kAudioObjectPropertyElementMain;
+  if(AudioObjectHasProperty(device, &propertyAddress))
   {
-    // Allocate buffer for 2 seconds of sound
-    u32 audioBufferSize = audioDataFormat.mSampleRate * sizeof(s16) * 2;
-    res = AudioQueueAllocateBuffer(audioQueue, audioBufferSize, &(audioBuffer[0])) | AudioQueueAllocateBuffer(audioQueue, audioBufferSize, &(audioBuffer[1]));
-    if (res)
-    {
-      NSLog(@"Failed to allocate audio buffers, error code: %d", res);
+    err = AudioObjectGetPropertyData(device, &propertyAddress, 0, 0, &count, (void *) &volumeScalar);
+    if (err != kAudioHardwareNoError) {
+	fprintf(stderr, "get kAudioDevicePropertyVolumeScalar error %ld\n", err);
+	return;
     }
+    fprintf(stderr, "old volumeScalar = %f\n", volumeScalar);
   }
-  else
-  {
-    NSLog(@"Failed to create audio queue, error code: %d", res);
-  }
+
+  // Update volume scalar
+//  volumeScalar = 0.1f;
+//  err = AudioObjectSetPropertyData(device, &propertyAddress, 0, 0, count, &volumeScalar);
+//  if (err != kAudioHardwareNoError)
+//  {
+//      fprintf(stderr, "set kAudioDevicePropertyVolumeScalar error %ld\n", err);
+//  }
+
+  soundState.sampleRate = 48000;
+  soundState.toneHz = 256;
+  soundState.needFrames = newBufferSize / 8;
 }
 
-void playAudio(void)
-{
-  audioCallback(&soundState, audioQueue, audioBuffer[0]);
-  audioCallback(&soundState, audioQueue, audioBuffer[1]);
-  OSStatus res = AudioQueueEnqueueBuffer(audioQueue, audioBuffer[0], 0, NULL) | AudioQueueEnqueueBuffer(audioQueue, audioBuffer[1], 0, NULL);
-//  OSStatus res = AudioQueueEnqueueBuffer(audioQueue, audioBuffer[0], 0, NULL); 
-  if (!res)
-  {
-    res = AudioQueuePrime(audioQueue, 0, NULL);
-    if (!res)
-    {
-      res = AudioQueueStart(audioQueue, NULL);
-      if (res)
-      {
-	NSLog(@"Failed to play audio queue, error code: %d", res);
-      }
-    }
-    else
-    {
-      NSLog(@"Failed to prime audio buffer, error code: %d", res);
-    }
-  }
-  else
-  {
-    NSLog(@"Failed to enqueue audio buffers, error code: %d", res);
-  }
-}
 
-void processEvent(NSEvent *e)
+static void processEvent(NSEvent *e)
 {
   if (e.type == NSEventTypeKeyDown)
   {
@@ -162,9 +306,6 @@ int main(int argc, const char * argv[]) {
     [NSApp activateIgnoringOtherApps:YES];
     [NSApp finishLaunching];
 
-    initAudio();
-    u8 isAudioPlaying = 0;
-
     while (shouldKeepRunning)
     {
       @autoreleasepool
@@ -177,10 +318,10 @@ int main(int argc, const char * argv[]) {
 
 	processEvent(event);
 
-	if (!isAudioPlaying)
+	if (!soundPlaying)
 	{
-	  isAudioPlaying = 1;
-	  playAudio();
+	  initAudio();
+	  soundPlaying = playAudio();
 	}
 
 	[NSApp sendEvent:event];
@@ -188,17 +329,6 @@ int main(int argc, const char * argv[]) {
       }
     }
     [NSApp terminate:NSApp];
-    
-    OSStatus res = AudioQueueDispose(audioQueue, false);
-    if (res)
-    {
-      NSLog(@"Failed to dispose of audio queue, error code: %d", res);
-    }
-    res = AudioQueueFreeBuffer(audioQueue, audioBuffer[0]) | AudioQueueFreeBuffer(audioQueue, audioBuffer[1]);
-    if (res)
-    {
-      NSLog(@"Failed to free audio buffers, error code: %d", res);
-    }
   }
   return 0;
 }
