@@ -57,10 +57,14 @@ void fillSoundBuffer(struct SoundState *soundState)
       r32 t = 2.f * PI32 * (r32) soundState->runningSampleCount / framesPerCycle;
       r32 sineValue = sinf(t);
       r32 sample = sineValue;
-      NSLog(@"sample = %f", sample);
       *bufferPos++ = sample;
       *bufferPos++ = sample;
       soundState->runningSampleCount++;
+    }
+    // Doing this to avoid floating point precision loss, which distorts the sine wave as the time goes by
+    if (soundState->runningSampleCount >= framesPerCycle)
+    {
+      soundState->runningSampleCount -= framesPerCycle;
     }
   }
 
