@@ -10,14 +10,14 @@ static struct CGDataProviderDirectCallbacks callbacks;
 static u64 xOff = 0;
 static u64 yOff = 0;
 
-void incXOff(void)
+void incXOff(s32 val)
 {
-  xOff+=10;
+  xOff += val;
 }
 
-void incYOff(void)
+void incYOff(s32 val)
 {
-  yOff+=10;
+  yOff += val;
 }
 
 static const void * getBytePointerCallback(void *info)

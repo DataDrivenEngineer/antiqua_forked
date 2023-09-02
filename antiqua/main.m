@@ -175,11 +175,11 @@ static void processEvent(NSEvent *e)
     }
     if (e.keyCode == kVK_ANSI_S)
     {
-      incYOff();
+      incYOff(10);
     }
     if (e.keyCode == kVK_ANSI_D)
     {
-      incXOff();
+      incXOff(10);
     }
   }
 }
@@ -240,13 +240,13 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
     u8 left = (usage == kHIDUsage_GD_Hatswitch && intValue == 6) ? intValue : 0;
     u8 right = (usage == kHIDUsage_GD_Hatswitch && intValue == 2) ? intValue : 0;
 
-    if (down)
+    if (lStickX)
     {
-      incYOff();
+      incXOff(lStickX >> 4);
     }
-    if (right)
+    if (lStickY)
     {
-      incXOff();
+      incYOff(lStickY >> 4);
     }
   }
   else if (usagePage == kHIDPage_Button)
