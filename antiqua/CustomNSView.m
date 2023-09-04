@@ -8,6 +8,7 @@
 #import <mach/mach_time.h>
 #import <math.h>
 
+#import "osx_audio.h"
 #import "types.h"
 #import "CustomNSView.h"
 #import "CustomCALayer.h"
@@ -59,18 +60,11 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 }
 
 - (CVReturn)displayFrame:(const CVTimeStamp *)inOutputTime {
-//  @autoreleasepool
-//  {
-//    NSEvent *e;
-//    while ((e = [[NSApplication sharedApplication] nextEventMatchingMask:NSEventMaskKeyDown
-//      // TODO: maybe we need an expiration date? 
-//      untilDate:nil
-//      inMode:NSEventTrackingRunLoopMode
-//      dequeue:YES]) != nil)
-//    {
-//      NSLog(@"event keyCode: %u", e.keyCode);
-//    }
-//  }
+  if (!soundPlaying)
+  {
+    initAudio();
+    soundPlaying = playAudio();
+  }
 
   dispatch_sync(dispatch_get_main_queue(), ^{
     [self setNeedsDisplay:YES];
@@ -102,6 +96,12 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   initTimebaseInfo();
   
   return self;
+}
+
+- (void) dealloc
+{
+  stopDisplayLink();
+  CVDisplayLinkRelease(displayLink);
 }
 
 - (BOOL) wantsUpdateLayer

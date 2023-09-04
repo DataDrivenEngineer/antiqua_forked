@@ -22,6 +22,45 @@ struct GameOffscreenBuffer
   u8 *memory;
 };
 
+struct GameButtonState
+{
+  u32 halfTransitionCount;
+  u8 endedDown;
+};
+
+struct GameControllerInput
+{
+  u8 isAnalog;
+
+  r32 startX;
+  r32 startY;
+
+  r32 minX;
+  r32 minY;
+
+  r32 maxX;
+  r32 maxY;
+
+  r32 endX;
+  r32 endY;
+
+  union
+  {
+    struct GameButtonState Buttons[8];
+    struct
+    {
+      struct GameButtonState Up;
+      struct GameButtonState Down;
+      struct GameButtonState Left;
+      struct GameButtonState Right;
+      struct GameButtonState LeftShoulder;
+      struct GameButtonState RightShoulder;
+      struct GameButtonState LeftBumper;
+      struct GameButtonState RightBumper;
+    };
+  };
+};
+
 void updateGameAndRender(struct GameOffscreenBuffer *buf, u64 xOff, u64 yOff);
 void fillSoundBuffer(struct SoundState *soundState);
 
