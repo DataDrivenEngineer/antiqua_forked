@@ -11,6 +11,6 @@ extern u8 soundPlaying;
 u8 playAudio(void);
 u8 stopAudio(void);
 void initAudio(void);
-void resetAudio(void);
+OSStatus resetAudio(void);
 
 #endif

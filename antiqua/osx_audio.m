@@ -1,10 +1,4 @@
-#ifndef osx_audio_h
-#define osx_audio_h
-
-#include <CoreAudio/AudioHardware.h>
-
 #include "osx_audio.h"
-#include "antiqua.h"
 
 u8 soundPlaying = 0;
 static struct SoundState soundState = {0};
@@ -42,7 +36,7 @@ u8 playAudio()
   return 1;
 }
 
-static u8 stopAudio()
+u8 stopAudio()
 {
     OSStatus err = kAudioHardwareNoError;
     
@@ -153,13 +147,12 @@ void initAudio(void)
   }
 }
 
-void resetAudio()
+OSStatus resetAudio()
 {
   OSStatus err = kAudioHardwareNoError;
   err = AudioHardwareUnload();
   if (err != kAudioHardwareNoError) {
       fprintf(stderr, "failed to unload hardware, error: %ld\n", err);
   }
+  return err;
 }
-
-#endif
