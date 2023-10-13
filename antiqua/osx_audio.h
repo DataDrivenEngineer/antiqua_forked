@@ -6,11 +6,18 @@
 #include "types.h"
 #include "antiqua.h"
 
-extern u8 soundPlaying;
+#if !defined(__cplusplus)
+#define MONExternC extern
+#else
+#define MONExternC extern "C"
+#endif
 
-u8 playAudio(void);
+extern u8 soundPlaying;
+extern struct SoundState soundState;
+
+MONExternC u8 playAudio(void);
 u8 stopAudio(void);
-void initAudio(void);
+MONExternC void initAudio(void);
 OSStatus resetAudio(void);
 
 #endif

@@ -2,23 +2,27 @@
 #define _ANTIQUA_H_
 
 #include "types.h"
+#include <pthread.h>
 
 #define PI32 3.14159265359f
+
+extern pthread_mutex_t mutex;
 
 struct SoundState
 {
   u32 sampleRate;
   u32 toneHz;
-  u32 runningSampleCount;
   r32 frameOffset;
   r32 *frames;
   u32 needFrames;
+  r32 tSine;
 };
 
 struct GameOffscreenBuffer
 {
   u32 width;
   u32 height;
+  u32 sizeBytes;
   u8 *memory;
 };
 
@@ -61,7 +65,13 @@ struct GameControllerInput
   };
 };
 
-void updateGameAndRender(struct GameOffscreenBuffer *buf, u64 xOff, u64 yOff);
-void fillSoundBuffer(struct SoundState *soundState);
+#if !defined(__cplusplus)
+#define MONExternC extern
+#else
+#define MONExternC extern "C"
+#endif
+
+MONExternC void updateGameAndRender(struct GameOffscreenBuffer *buff);
+MONExternC void fillSoundBuffer(struct SoundState *soundState);
 
 #endif

@@ -7,9 +7,6 @@
 
 @interface CustomCALayer : CALayer
 
-void incXOff(s32 val);
-void incYOff(s32 val);
-
 @end
 
 #endif

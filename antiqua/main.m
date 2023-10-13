@@ -6,12 +6,10 @@
 #import "CustomNSView.h"
 #import "CustomWindowDelegate.h"
 #import "CustomCALayer.h"
-#import "AppDelegate.h"
 
 #include "types.h"
 #include "osx_audio.h"
 #include "osx_input.h"
-#include "antiqua.cpp"
 
 static u8 shouldKeepRunning = 1;
 
@@ -25,11 +23,9 @@ static void processEvent(NSEvent *e)
     }
     if (e.keyCode == kVK_ANSI_S)
     {
-      incYOff(10);
     }
     if (e.keyCode == kVK_ANSI_D)
     {
-      incXOff(10);
     }
   }
 }
@@ -39,15 +35,12 @@ int main(int argc, const char * argv[]) {
     // Setup code that might create autoreleased objects goes here.
     [NSApplication sharedApplication];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-    id appDelegate = [AppDelegate alloc];
-    [NSApp setDelegate:appDelegate];
 
     id menuBar = [NSMenu new];
     id appMenuItem = [NSMenuItem new];
     [menuBar addItem:appMenuItem];
     [NSApp setMainMenu:menuBar];
     id appMenu = [NSMenu new];
-    id appName = [[NSProcessInfo processInfo] processName];
     id quitTitle = @"Quit";
     id quitMenuItem = [[NSMenuItem alloc] initWithTitle:quitTitle
     action:@selector(terminate:) keyEquivalent:@"q"];
@@ -55,7 +48,10 @@ int main(int argc, const char * argv[]) {
     [appMenuItem setSubmenu:appMenu];
 
     NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1000, 600)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     styleMask:NSTitledWindowMask | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
+#pragma clang diagnostic pop
     backing:NSBackingStoreBuffered defer:NO];
     // Center the window
     CGFloat xPos = NSWidth([[window screen] frame]) / 2 - NSWidth([window frame]) / 2;
@@ -85,7 +81,10 @@ int main(int argc, const char * argv[]) {
       @autoreleasepool
       {
 	NSEvent *event = [NSApp
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 	  nextEventMatchingMask:NSAnyEventMask
+#pragma clang diagnostic pop
 	  untilDate:[NSDate distantPast]
 	  inMode:NSDefaultRunLoopMode
 	  dequeue:YES];

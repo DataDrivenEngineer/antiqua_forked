@@ -6,12 +6,14 @@
 #import <AppKit/NSView.h>
 #import <CoreVideo/CVBase.h>
 #import <CoreVideo/CVReturn.h>
+#import "antiqua.h"
+
+extern struct GameOffscreenBuffer framebuffer;
 
 @interface CustomNSView : NSView
 
-void resumeDisplayLink(void);
-void stopDisplayLink(void);
-
+- (void) resumeDisplayLink;
+- (void) stopDisplayLink;
 - (CVReturn)displayFrame:(const CVTimeStamp *)inOutputTime;
 - (void)updateLayer;
 

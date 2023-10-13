@@ -1,35 +1,17 @@
 #import "CustomCALayer.h"
-#import "antiqua.h"
+#import "CustomNSView.h"
 #import "types.h"
 
-static struct GameOffscreenBuffer framebuffer;
 static CGImageRef image;
 static CGColorSpaceRef colorSpace;
 static struct CGDataProviderDirectCallbacks callbacks;
-
-static u64 xOff = 0;
-static u64 yOff = 0;
-
-void incXOff(s32 val)
-{
-  xOff += val;
-}
-
-void incYOff(s32 val)
-{
-  yOff += val;
-}
 
 static const void * getBytePointerCallback(void *info)
 {
   return (const void *)info;
 }
 
-static void releaseBytePointerCallback(void *info, const void *pointer)
-{
-  free(info);
-}
-
+static void releaseBytePointerCallback(void *info, const void *pointer) {}
 
 @implementation CustomCALayer
 
@@ -45,11 +27,6 @@ static void releaseBytePointerCallback(void *info, const void *pointer)
   return self;
 }
 
-- (void) dealloc
-{
-  CGColorSpaceRelease(colorSpace);
-}
-
 - (void)displayLayer:(CALayer *)theLayer
 {
   NSLog(@"displayLayer - never called!");
@@ -60,17 +37,15 @@ static void releaseBytePointerCallback(void *info, const void *pointer)
   @autoreleasepool
   {
     CGRect dirtyRect = CGContextGetClipBoundingBox(ctx);
-    framebuffer.width = 1024;
-    framebuffer.height = 640;
-    size_t bitmapSize = sizeof(uint8_t) * framebuffer.width * 4 * framebuffer.height;
     
-    framebuffer.memory = malloc(bitmapSize);
-    
-    updateGameAndRender(&framebuffer, xOff, yOff);
+    CGDataProviderRef dataProvider = CGDataProviderCreateDirect(framebuffer.memory, framebuffer.sizeBytes, &callbacks);
 
-    CGDataProviderRef dataProvider = CGDataProviderCreateDirect(framebuffer.memory, bitmapSize, &callbacks);
-
-    image = CGImageCreate(framebuffer.width, framebuffer.height, 8, 32, framebuffer.width * 4, colorSpace, kCGImageAlphaNoneSkipLast, dataProvider, NULL, false, kCGRenderingIntentDefault);
+    image = CGImageCreate(framebuffer.width, framebuffer.height, 8, 32, framebuffer.width * 4, colorSpace, 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wenum-conversion"
+    kCGImageAlphaNoneSkipLast,
+#pragma clang diagnostic pop
+    dataProvider, NULL, false, kCGRenderingIntentDefault);
 
     CGContextDrawImage(ctx, dirtyRect, image);
 

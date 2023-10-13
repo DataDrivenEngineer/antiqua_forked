@@ -12,10 +12,14 @@
 #import "types.h"
 #import "CustomNSView.h"
 #import "CustomCALayer.h"
+#import "antiqua.h"
+
+struct GameOffscreenBuffer framebuffer;
 
 static struct mach_timebase_info mti;
 static CustomCALayer *layer;
 static CVDisplayLinkRef displayLink;
+static u8 shouldStopDL = 0;
 
 static void initTimebaseInfo(void)
 {
@@ -36,39 +40,47 @@ static void logFrameTime(const CVTimeStamp *inNow, const CVTimeStamp *inOutputTi
   NSLog(@"processingWindow: %f ms", (r32)processingWindowNs / 1000000);
 }
 
-void resumeDisplayLink(void)
+static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext)
 {
-  if (!CVDisplayLinkIsRunning(displayLink)) {
-    CVDisplayLinkStart(displayLink);
-  }
+  logFrameTime(inNow, inOutputTime);
+  CVReturn error = [(__bridge CustomNSView *) displayLinkContext displayFrame:inOutputTime];
+  return error;
 }
 
-void stopDisplayLink(void)
+@implementation CustomNSView
+
+-(void) resumeDisplayLink
+{
+  shouldStopDL = 0;
+  if (!CVDisplayLinkIsRunning(displayLink)) CVDisplayLinkStart(displayLink);
+
+}
+
+-(void) doStop
 {
   if (CVDisplayLinkIsRunning(displayLink)) {
     CVDisplayLinkStop(displayLink);
   }
 }
 
-@implementation CustomNSView
-
-static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext)
+-(void) stopDisplayLink
 {
-//  logFrameTime(inNow, inOutputTime);
-  CVReturn error = [(__bridge CustomNSView *) displayLinkContext displayFrame:inOutputTime];
-  return error;
+  shouldStopDL = 1;
 }
 
 - (CVReturn)displayFrame:(const CVTimeStamp *)inOutputTime {
-  if (!soundPlaying)
+  if (shouldStopDL)
   {
-    initAudio();
-    soundPlaying = playAudio();
+    [self doStop];
   }
+  else
+  {
+    updateGameAndRender(&framebuffer);
 
-  dispatch_sync(dispatch_get_main_queue(), ^{
-    [self setNeedsDisplay:YES];
-  });
+    dispatch_sync(dispatch_get_main_queue(), ^{
+      [self setNeedsDisplay:YES];
+    });
+  }
   return kCVReturnSuccess;
 }
 
@@ -81,7 +93,7 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   self.wantsLayer = YES;
   self.layer = layer;
   self.layerContentsRedrawPolicy = NSViewLayerContentsRedrawOnSetNeedsDisplay;
-  
+
   CGDirectDisplayID displayID = CGMainDisplayID();
   CVReturn error = kCVReturnSuccess;
   error = CVDisplayLinkCreateWithCGDisplay(displayID, &displayLink);
@@ -94,14 +106,14 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   CVDisplayLinkStart(displayLink);
   
   initTimebaseInfo();
+
+  // init game specific state
+  framebuffer.width = 1024;
+  framebuffer.height = 640;
+  framebuffer.sizeBytes = sizeof(u8) * framebuffer.width * 4 * framebuffer.height;
+  framebuffer.memory = malloc(framebuffer.sizeBytes);
   
   return self;
-}
-
-- (void) dealloc
-{
-  stopDisplayLink();
-  CVDisplayLinkRelease(displayLink);
 }
 
 - (BOOL) wantsUpdateLayer

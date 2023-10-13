@@ -7,17 +7,20 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		9F1D09F12A86C1A100263859 /* CustomWindowDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F1D09EF2A86C1A100263859 /* CustomWindowDelegate.m */; };
-		9FBB7D742A80BA17001EA2E0 /* CustomCALayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FBB7D722A80BA17001EA2E0 /* CustomCALayer.m */; };
-		9FC718E92A7D5E44007ADAA1 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC718E82A7D5E44007ADAA1 /* AppDelegate.m */; };
 		9FC718EE2A7D5E45007ADAA1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */; };
 		9FC718F12A7D5E45007ADAA1 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9FC718EF2A7D5E45007ADAA1 /* Main.storyboard */; };
-		9FC718F32A7D5E45007ADAA1 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC718F22A7D5E45007ADAA1 /* main.m */; };
 		9FC718FE2A7D5E45007ADAA1 /* antiquaTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC718FD2A7D5E45007ADAA1 /* antiquaTests.m */; };
 		9FC719082A7D5E45007ADAA1 /* antiquaUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC719072A7D5E45007ADAA1 /* antiquaUITests.m */; };
 		9FC7190A2A7D5E45007ADAA1 /* antiquaUITestsLaunchTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC719092A7D5E45007ADAA1 /* antiquaUITestsLaunchTests.m */; };
-		9FC719192A7D5F7E007ADAA1 /* CustomNSView.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC719162A7D5F7E007ADAA1 /* CustomNSView.m */; };
 		9FC7191C2A7D608E007ADAA1 /* antiqua.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = 9FC718E42A7D5E44007ADAA1 /* antiqua.app */; };
+		9FCE02832AD9174900BB84CA /* antiqua.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FCE027D2AD9174900BB84CA /* antiqua.m */; };
+		9FCE02872AD918A500BB84CA /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FCE02862AD918A500BB84CA /* Carbon.framework */; };
+		9FCE02892AD918AC00BB84CA /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FCE02882AD918AC00BB84CA /* AppKit.framework */; };
+		9FCE028B2AD918B200BB84CA /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FCE028A2AD918B200BB84CA /* CoreVideo.framework */; };
+		9FCE028D2AD918B900BB84CA /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FCE028C2AD918B900BB84CA /* QuartzCore.framework */; };
+		9FCE028E2AD918BF00BB84CA /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FD312022AADA5D900C3A9EF /* CoreAudio.framework */; };
+		9FCE02902AD918C500BB84CA /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FCE028F2AD918C500BB84CA /* IOKit.framework */; };
+		9FD311FE2AADA0A500C3A9EF /* antiqua.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9FD311F82AADA0A500C3A9EF /* antiqua.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -51,14 +54,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		9F1D09EF2A86C1A100263859 /* CustomWindowDelegate.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomWindowDelegate.m; sourceTree = "<group>"; };
 		9F1D09F02A86C1A100263859 /* CustomWindowDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomWindowDelegate.h; sourceTree = "<group>"; };
 		9F6E25E32A7D7559006DF7A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		9FBB7D722A80BA17001EA2E0 /* CustomCALayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomCALayer.m; sourceTree = "<group>"; };
 		9FBB7D732A80BA17001EA2E0 /* CustomCALayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomCALayer.h; sourceTree = "<group>"; };
 		9FC718E42A7D5E44007ADAA1 /* antiqua.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = antiqua.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		9FC718E72A7D5E44007ADAA1 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
-		9FC718E82A7D5E44007ADAA1 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9FC718F02A7D5E45007ADAA1 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		9FC718F22A7D5E45007ADAA1 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
@@ -68,8 +67,24 @@
 		9FC719032A7D5E45007ADAA1 /* antiquaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = antiquaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9FC719072A7D5E45007ADAA1 /* antiquaUITests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = antiquaUITests.m; sourceTree = "<group>"; };
 		9FC719092A7D5E45007ADAA1 /* antiquaUITestsLaunchTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = antiquaUITestsLaunchTests.m; sourceTree = "<group>"; };
-		9FC719162A7D5F7E007ADAA1 /* CustomNSView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomNSView.m; sourceTree = "<group>"; };
 		9FC719182A7D5F7E007ADAA1 /* CustomNSView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomNSView.h; sourceTree = "<group>"; };
+		9FCE027A2AD9174900BB84CA /* osx_audio.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_audio.m; sourceTree = "<group>"; };
+		9FCE027B2AD9174900BB84CA /* osx_input.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_input.m; sourceTree = "<group>"; };
+		9FCE027C2AD9174900BB84CA /* CustomNSView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomNSView.m; sourceTree = "<group>"; };
+		9FCE027D2AD9174900BB84CA /* antiqua.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = antiqua.m; sourceTree = "<group>"; };
+		9FCE027E2AD9174900BB84CA /* CustomWindowDelegate.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomWindowDelegate.m; sourceTree = "<group>"; };
+		9FCE027F2AD9174900BB84CA /* CustomCALayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomCALayer.m; sourceTree = "<group>"; };
+		9FCE02862AD918A500BB84CA /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
+		9FCE02882AD918AC00BB84CA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		9FCE028A2AD918B200BB84CA /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
+		9FCE028C2AD918B900BB84CA /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		9FCE028F2AD918C500BB84CA /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		9FD311F72AADA0A500C3A9EF /* types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = types.h; sourceTree = "<group>"; };
+		9FD311F82AADA0A500C3A9EF /* antiqua.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = antiqua.cpp; sourceTree = "<group>"; };
+		9FD311FA2AADA0A500C3A9EF /* antiqua.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua.h; sourceTree = "<group>"; };
+		9FD311FB2AADA0A500C3A9EF /* osx_input.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_input.h; sourceTree = "<group>"; };
+		9FD311FD2AADA0A500C3A9EF /* osx_audio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_audio.h; sourceTree = "<group>"; };
+		9FD312022AADA5D900C3A9EF /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -77,6 +92,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9FCE02902AD918C500BB84CA /* IOKit.framework in Frameworks */,
+				9FCE028E2AD918BF00BB84CA /* CoreAudio.framework in Frameworks */,
+				9FCE028D2AD918B900BB84CA /* QuartzCore.framework in Frameworks */,
+				9FCE028B2AD918B200BB84CA /* CoreVideo.framework in Frameworks */,
+				9FCE02892AD918AC00BB84CA /* AppKit.framework in Frameworks */,
+				9FCE02872AD918A500BB84CA /* Carbon.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -104,6 +125,7 @@
 				9FC718FC2A7D5E45007ADAA1 /* antiquaTests */,
 				9FC719062A7D5E45007ADAA1 /* antiquaUITests */,
 				9FC718E52A7D5E44007ADAA1 /* Products */,
+				9FD312012AADA5D900C3A9EF /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -120,15 +142,21 @@
 		9FC718E62A7D5E44007ADAA1 /* antiqua */ = {
 			isa = PBXGroup;
 			children = (
+				9FCE027D2AD9174900BB84CA /* antiqua.m */,
+				9FCE027F2AD9174900BB84CA /* CustomCALayer.m */,
+				9FCE027C2AD9174900BB84CA /* CustomNSView.m */,
+				9FCE027E2AD9174900BB84CA /* CustomWindowDelegate.m */,
+				9FCE027A2AD9174900BB84CA /* osx_audio.m */,
+				9FCE027B2AD9174900BB84CA /* osx_input.m */,
+				9FD311F82AADA0A500C3A9EF /* antiqua.cpp */,
+				9FD311FA2AADA0A500C3A9EF /* antiqua.h */,
+				9FD311FD2AADA0A500C3A9EF /* osx_audio.h */,
+				9FD311FB2AADA0A500C3A9EF /* osx_input.h */,
+				9FD311F72AADA0A500C3A9EF /* types.h */,
 				9F1D09F02A86C1A100263859 /* CustomWindowDelegate.h */,
-				9F1D09EF2A86C1A100263859 /* CustomWindowDelegate.m */,
 				9FBB7D732A80BA17001EA2E0 /* CustomCALayer.h */,
-				9FBB7D722A80BA17001EA2E0 /* CustomCALayer.m */,
 				9F6E25E32A7D7559006DF7A3 /* Info.plist */,
 				9FC719182A7D5F7E007ADAA1 /* CustomNSView.h */,
-				9FC719162A7D5F7E007ADAA1 /* CustomNSView.m */,
-				9FC718E72A7D5E44007ADAA1 /* AppDelegate.h */,
-				9FC718E82A7D5E44007ADAA1 /* AppDelegate.m */,
 				9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */,
 				9FC718EF2A7D5E45007ADAA1 /* Main.storyboard */,
 				9FC718F22A7D5E45007ADAA1 /* main.m */,
@@ -152,6 +180,19 @@
 				9FC719092A7D5E45007ADAA1 /* antiquaUITestsLaunchTests.m */,
 			);
 			path = antiquaUITests;
+			sourceTree = "<group>";
+		};
+		9FD312012AADA5D900C3A9EF /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				9FCE028F2AD918C500BB84CA /* IOKit.framework */,
+				9FCE028C2AD918B900BB84CA /* QuartzCore.framework */,
+				9FCE028A2AD918B200BB84CA /* CoreVideo.framework */,
+				9FCE02882AD918AC00BB84CA /* AppKit.framework */,
+				9FCE02862AD918A500BB84CA /* Carbon.framework */,
+				9FD312022AADA5D900C3A9EF /* CoreAudio.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -284,11 +325,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9FC718F32A7D5E45007ADAA1 /* main.m in Sources */,
-				9FC719192A7D5F7E007ADAA1 /* CustomNSView.m in Sources */,
-				9FBB7D742A80BA17001EA2E0 /* CustomCALayer.m in Sources */,
-				9FC718E92A7D5E44007ADAA1 /* AppDelegate.m in Sources */,
-				9F1D09F12A86C1A100263859 /* CustomWindowDelegate.m in Sources */,
+				9FD311FE2AADA0A500C3A9EF /* antiqua.cpp in Sources */,
+				9FCE02832AD9174900BB84CA /* antiqua.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

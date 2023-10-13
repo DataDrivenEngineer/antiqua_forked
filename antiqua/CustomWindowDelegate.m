@@ -9,17 +9,17 @@
 
 - (void)windowWillMiniaturize:(NSNotification *)notification
 {
-  stopDisplayLink();
+  [(CustomNSView *) ((NSWindow *) notification.object).contentView stopDisplayLink];
 }
 
 - (void)windowDidDeminiaturize:(NSNotification *)notification
 {
-  resumeDisplayLink();
+  [(CustomNSView *) ((NSWindow *) notification.object).contentView resumeDisplayLink];
 }
 
 - (void)windowWillClose:(NSNotification *)notification
 {
-  stopDisplayLink();
+  [(CustomNSView *) ((NSWindow *) notification.object).contentView stopDisplayLink];
 }
 
 @end

@@ -1,49 +1,76 @@
 #include "osx_input.h"
 
-IOHIDManagerRef ioHIDManager;
+#define INPUT_NOT_INITIALIZED -9999
+#define DEAD_ZONE 15
+#define ARRAY_COUNT(arr) sizeof(arr) / sizeof((arr)[0])
+
+IOHIDManagerRef __nullable ioHIDManager;
+struct GameControllerInput gcInput;
 
 // this will be called when the HID Manager matches a new (hot plugged) HID device
 static void inIOHIDDeviceRegistrationCallback(
-            void *inContext,       // context from IOHIDManagerRegisterDeviceMatchingCallback
+            void * __nullable inContext,       // context from IOHIDManagerRegisterDeviceMatchingCallback
             IOReturn inResult,        // the result of the matching operation
-            void *inSender,        // the IOHIDManagerRef for the new device
-            IOHIDDeviceRef inIOHIDDeviceRef // the new HID device
+            void * __nullable inSender,        // the IOHIDManagerRef for the new device
+            IOHIDDeviceRef __nullable inIOHIDDeviceRef // the new HID device
 ) {
     Boolean isGamepad = IOHIDDeviceConformsTo(inIOHIDDeviceRef, kHIDPage_GenericDesktop, kHIDUsage_GD_GamePad);
     if (isGamepad)
     {
       fprintf(stderr, "Gamepad found\n!");
+      pthread_mutex_lock(&mutex);
+      resetInputState();
+      pthread_mutex_unlock(&mutex);
     }
 }
 
 // this will be called when a HID device is removed (unplugged)
 static void inIOHIDDeviceRemovalCallback(
-                void *inContext,       // context from IOHIDManagerRegisterDeviceMatchingCallback
+                void * __nullable inContext,       // context from IOHIDManagerRegisterDeviceMatchingCallback
                 IOReturn inResult,        // the result of the removing operation
-                void *inSender,        // the IOHIDManagerRef for the device being removed
-                IOHIDDeviceRef inIOHIDDeviceRef // the removed HID device
-) {
-    printf("%s(context: %p, result: %p, sender: %p, device: %p).\n",
-        __PRETTY_FUNCTION__, inContext, (void *) inResult, inSender, (void*) inIOHIDDeviceRef);
+                void * __nullable inSender,        // the IOHIDManagerRef for the device being removed
+                IOHIDDeviceRef __nullable inIOHIDDeviceRef // the removed HID device
+) {}
+
+void resetInputState(void)
+{
+  gcInput.isAnalog = 0;
+  gcInput.startX = INPUT_NOT_INITIALIZED;
+  gcInput.startY = INPUT_NOT_INITIALIZED;
+  gcInput.minX = INPUT_NOT_INITIALIZED;
+  gcInput.minY = INPUT_NOT_INITIALIZED;
+  gcInput.maxX = INPUT_NOT_INITIALIZED;
+  gcInput.maxY = INPUT_NOT_INITIALIZED;
+  gcInput.endX = 127.f;
+  gcInput.endY = 127.f;
+
+  for (s32 i = 0; i < ARRAY_COUNT(gcInput.Buttons); i++)
+  {
+    gcInput.Buttons[i].halfTransitionCount = INPUT_NOT_INITIALIZED;
+    gcInput.Buttons[i].endedDown = 0;
+  }
 }
 
-static void inputValueCallback(void * _Nullable context, IOReturn result, void * _Nullable sender, IOHIDValueRef value)
+static void inputValueCallback(void * _Nullable context, IOReturn result, void * _Nullable sender, IOHIDValueRef __nullable value)
 {
+  pthread_mutex_lock(&mutex);
+  gcInput.isAnalog = 1;
+
   // TODO: support controllers other than PS5 DualSense
-  u8 up;
-  u8 down;
-  u8 left;
-  u8 right;
-  u8 leftBumper;
-  u8 rightBumper;
-  u8 leftShoulder;
-  u8 rightShoulder;
-  u8 squareButton; //Xbox: X
-  u8 triangleButton; //Xbox: Y
-  u8 circleButton; //Xbox: B
-  u8 crossButton; //Xbox: A
-  s16 lStickX;
-  s16 lStickY;
+  s32 up;
+  s32 down;
+  s32 left;
+  s32 right;
+  s32 leftBumper;
+  s32 rightBumper;
+  s32 leftShoulder;
+  s32 rightShoulder;
+  s32 squareButton; //Xbox: X
+  s32 triangleButton; //Xbox: Y
+  s32 circleButton; //Xbox: B
+  s32 crossButton; //Xbox: A
+  r32 lStickX;
+  r32 lStickY;
 
   IOHIDElementRef elem = IOHIDValueGetElement(value);
   s16 usagePage = IOHIDElementGetUsagePage(elem);
@@ -51,45 +78,79 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
   CFIndex intValue = IOHIDValueGetIntegerValue(value);
   if (usagePage == kHIDPage_GenericDesktop)
   {
-    lStickX = usage == kHIDUsage_GD_X ? intValue : 0;
-    lStickY = usage == kHIDUsage_GD_Y ? intValue : 0;
-    u8 up = (usage == kHIDUsage_GD_Hatswitch && intValue == 0) ? intValue : 0;
-    u8 down = (usage == kHIDUsage_GD_Hatswitch && intValue == 4) ? intValue : 0;
-    u8 left = (usage == kHIDUsage_GD_Hatswitch && intValue == 6) ? intValue : 0;
-    u8 right = (usage == kHIDUsage_GD_Hatswitch && intValue == 2) ? intValue : 0;
+    lStickX = usage == kHIDUsage_GD_X ? intValue : INPUT_NOT_INITIALIZED;
+    lStickY = usage == kHIDUsage_GD_Y ? intValue : INPUT_NOT_INITIALIZED;
+    up = (usage == kHIDUsage_GD_Hatswitch && intValue == 0) ? intValue : INPUT_NOT_INITIALIZED;
+    down = (usage == kHIDUsage_GD_Hatswitch && intValue == 4) ? intValue : INPUT_NOT_INITIALIZED;
+    left = (usage == kHIDUsage_GD_Hatswitch && intValue == 6) ? intValue : INPUT_NOT_INITIALIZED;
+    right = (usage == kHIDUsage_GD_Hatswitch && intValue == 2) ? intValue : INPUT_NOT_INITIALIZED;
 
-    if (lStickX)
+    if (lStickX != INPUT_NOT_INITIALIZED)
     {
-      s16 normalized = (s16) ((lStickX / 256.f) * (32767 + 32767) - 32767);
-      fprintf(stderr, "%d\n", normalized);
-//      incXOff(normalized >> 12);
+      if (gcInput.startX != INPUT_NOT_INITIALIZED)
+      {
+	gcInput.startX = lStickX;
+      }
+      if (lStickX < gcInput.minX)
+      {
+	gcInput.minX = lStickX;
+      }
+      if (lStickX > gcInput.maxX)
+      {
+	gcInput.maxX = lStickX;
+      }
+//      fprintf(stderr, "lStickX raw: %f\n", lStickX);
+      if (lStickX >= 127 - DEAD_ZONE && lStickX <= 127 + DEAD_ZONE)
+      {
+	gcInput.endX = 127;
+      }
+      else
+      {
+	gcInput.endX = lStickX;
+      }
     }
-    if (lStickY)
+    if (lStickY != INPUT_NOT_INITIALIZED)
     {
-      s16 normalized = (s16) ((lStickY / 255.f) * (32767 + 32767) - 32767);
-      s32 toneHzModifier = (s32) (256.f * (normalized / 32767.f));
-      // TODO: move this to platform-independent code
-//      soundState.toneHz = 512 + toneHzModifier;
-//      incYOff(normalized >> 12);
+      if (gcInput.startY != INPUT_NOT_INITIALIZED)
+      {
+	gcInput.startY = lStickY;
+      }
+      if (lStickY < gcInput.minY)
+      {
+	gcInput.minY = lStickY;
+      }
+      if (lStickY > gcInput.maxY)
+      {
+	gcInput.maxY = lStickY;
+      }
+      if (lStickY >= 127 - DEAD_ZONE && lStickY <= 127 + DEAD_ZONE)
+      {
+	gcInput.endY = 127;
+      }
+      else
+      {
+	gcInput.endY = lStickY;
+      }
     }
   }
   else if (usagePage == kHIDPage_Button)
   {
-    u8 leftBumper = usage == kHIDUsage_Button_5 ? intValue : 0;
-    u8 rightBumper = usage == kHIDUsage_Button_6 ? intValue : 0;
-    u8 leftShoulder = usage == kHIDUsage_Button_7 ? intValue : 0;
-    u8 rightShoulder = usage == kHIDUsage_Button_8 ? intValue : 0;
-    u8 squareButton = usage == kHIDUsage_Button_1 ? intValue : 0;
-    u8 triangleButton = usage == kHIDUsage_Button_4 ? intValue : 0;
-    u8 circleButton = usage == kHIDUsage_Button_3 ? intValue : 0;
-    u8 crossButton = usage == kHIDUsage_Button_2 ? intValue : 0;
+    leftBumper = usage == kHIDUsage_Button_5 ? intValue : INPUT_NOT_INITIALIZED;
+    rightBumper = usage == kHIDUsage_Button_6 ? intValue : INPUT_NOT_INITIALIZED;
+    leftShoulder = usage == kHIDUsage_Button_7 ? intValue : INPUT_NOT_INITIALIZED;
+    rightShoulder = usage == kHIDUsage_Button_8 ? intValue : INPUT_NOT_INITIALIZED;
+    squareButton = usage == kHIDUsage_Button_1 ? intValue : INPUT_NOT_INITIALIZED;
+    triangleButton = usage == kHIDUsage_Button_4 ? intValue : INPUT_NOT_INITIALIZED;
+    circleButton = usage == kHIDUsage_Button_3 ? intValue : INPUT_NOT_INITIALIZED;
+    crossButton = usage == kHIDUsage_Button_2 ? intValue : INPUT_NOT_INITIALIZED;
   }
+  pthread_mutex_unlock(&mutex);
 }
 
 /**
   Populate dictionary with up to two key-value pairs
 */
-static void populateMatchingDictionary(CFMutableDictionaryRef matcher, CFStringRef keyOne, s32 valOne, CFStringRef keyTwo, s32 valTwo)
+static void populateMatchingDictionary(CFMutableDictionaryRef __nonnull matcher, CFStringRef __nonnull keyOne, s32 valOne, CFStringRef __nonnull keyTwo, s32 valTwo)
 {
   if (matcher)
   {
@@ -115,7 +176,7 @@ static void populateMatchingDictionary(CFMutableDictionaryRef matcher, CFStringR
   }
 }
 
-u8 initControllerInput()
+u8 initControllerInput(void)
 {
   ioHIDManager = IOHIDManagerCreate(
 		  0,   // Use default allocator
@@ -163,11 +224,12 @@ u8 initControllerInput()
   if (ioResult != kIOReturnSuccess)
   {
     fprintf(stderr, "Failed to open HIDManager, error: %d\n", ioResult);
-    return -1;
+    return ioResult;
   }
+  return kIOReturnSuccess;
 }
 
-IOReturn resetInput()
+IOReturn resetInput(void)
 {
   IOReturn ioResult = IOHIDManagerClose(
 	  ioHIDManager,  // HID Manager reference

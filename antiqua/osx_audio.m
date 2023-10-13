@@ -1,26 +1,29 @@
 #include "osx_audio.h"
+#include "types.h"
 
 u8 soundPlaying = 0;
-static struct SoundState soundState = {0};
+struct SoundState soundState = {0};
 static AudioObjectID device = kAudioObjectUnknown;
-static AudioDeviceIOProcID procID;
+static _Nullable AudioDeviceIOProcID procID;
 
 static OSStatus appIOProc(AudioObjectID inDevice,
-                        const AudioTimeStamp*   inNow,
-                        const AudioBufferList*  inInputData,
-                        const AudioTimeStamp*   inInputTime,
-                        AudioBufferList*        outOutputData,
-                        const AudioTimeStamp*   inOutputTime,
+                        const AudioTimeStamp* _Nonnull   inNow,
+                        const AudioBufferList* _Nonnull inInputData,
+                        const AudioTimeStamp*   _Nonnull inInputTime,
+                        AudioBufferList*        _Nonnull outOutputData,
+                        const AudioTimeStamp*   _Nonnull inOutputTime,
                         void* __nullable        inClientData)
 {
   struct SoundState *soundState = (struct SoundState *) inClientData;
+  pthread_mutex_lock(&mutex);
   soundState->frames = (r32 *) outOutputData->mBuffers[0].mData;
   fillSoundBuffer(soundState);
+  pthread_mutex_unlock(&mutex);
 
   return kAudioHardwareNoError;     
 }
 
-u8 playAudio()
+u8 playAudio(void)
 {
   OSStatus err = kAudioHardwareNoError;
 
@@ -36,7 +39,7 @@ u8 playAudio()
   return 1;
 }
 
-u8 stopAudio()
+u8 stopAudio(void)
 {
     OSStatus err = kAudioHardwareNoError;
     
@@ -60,7 +63,7 @@ u8 stopAudio()
     return 1;
 }
 
-OSStatus appObjPropertyListenerProc(AudioObjectID nObjectID, UInt32 inNumberAddresses, const AudioObjectPropertyAddress* inAddresses, void* __nullable inClientData)
+OSStatus appObjPropertyListenerProc(AudioObjectID nObjectID, UInt32 inNumberAddresses, const AudioObjectPropertyAddress* __nullable inAddresses, void* __nullable inClientData)
 {
   for (s32 i = 0; i < inNumberAddresses; i++)
   {
@@ -85,6 +88,7 @@ void initAudio(void)
   soundState.toneHz = 256;
   // Num of frames enough for playing audio for 1/30th of a second
   soundState.needFrames = soundState.sampleRate / 30;
+  soundState.tSine = 0;
   // Each frame has 2 samples, each sample is a float (4 bytes)
   newBufferSize = soundState.needFrames * 2 * 4;
  
@@ -95,7 +99,7 @@ void initAudio(void)
   tempSize = sizeof(device);		// it is required to pass the size of the data to be returned
   err = AudioObjectGetPropertyData(kAudioObjectSystemObject, &devicePropertyAddress, 0, 0, &tempSize, (void *) &device);
   if (err != kAudioHardwareNoError) {
-      fprintf(stderr, "get kAudioHardwarePropertyDefaultOutputDevice error %ld\n", err);
+      fprintf(stderr, "get kAudioHardwarePropertyDefaultOutputDevice error %d\n", err);
       return;
   }
 
@@ -106,14 +110,14 @@ void initAudio(void)
     CFRunLoopRef theRunLoop = 0;
     err = AudioObjectSetPropertyData(kAudioObjectSystemObject, &loopPropertyAddress, 0, 0, sizeof(CFRunLoopRef), &theRunLoop);
     if (err != kAudioHardwareNoError) {
-	fprintf(stderr, "failed to register run loop, error: %ld\n", err);
+	fprintf(stderr, "failed to register run loop, error: %d\n", err);
 	return;
     }
   }
 
   err = AudioObjectAddPropertyListener(kAudioObjectSystemObject, &devicePropertyAddress, appObjPropertyListenerProc, 0);
   if (err != kAudioHardwareNoError) {
-      fprintf(stderr, "failed to add listener for kAudioHardwarePropertyDefaultOutputDevice property, error: %ld\n", err);
+      fprintf(stderr, "failed to add listener for kAudioHardwarePropertyDefaultOutputDevice property, error: %d\n", err);
   }
 
   tempPropertyAddress.mSelector = kAudioDevicePropertyBufferSize;
@@ -121,7 +125,7 @@ void initAudio(void)
   tempPropertyAddress.mElement = kAudioObjectPropertyElementMain;
   err = AudioObjectSetPropertyData(device, &tempPropertyAddress, 0, 0, sizeof(newBufferSize), &newBufferSize);
   if (err != kAudioHardwareNoError) {
-      fprintf(stderr, "failed to update buffer size, error: %ld\n", err);
+      fprintf(stderr, "failed to update buffer size, error: %d\n", err);
       return;
   }
 
@@ -143,16 +147,16 @@ void initAudio(void)
   err = AudioObjectSetPropertyData(device, &tempPropertyAddress, 0, 0, tempSize, &audioDataFormat);
   if (err != kAudioHardwareNoError)
   {
-      fprintf(stderr, "set kAudioDevicePropertyStreamFormat error %ld\n", err);
+      fprintf(stderr, "set kAudioDevicePropertyStreamFormat error %d\n", err);
   }
 }
 
-OSStatus resetAudio()
+OSStatus resetAudio(void)
 {
   OSStatus err = kAudioHardwareNoError;
   err = AudioHardwareUnload();
   if (err != kAudioHardwareNoError) {
-      fprintf(stderr, "failed to unload hardware, error: %ld\n", err);
+      fprintf(stderr, "failed to unload hardware, error: %d\n", err);
   }
   return err;
 }
