@@ -8,10 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		9FC718EE2A7D5E45007ADAA1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */; };
-		9FC718F12A7D5E45007ADAA1 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9FC718EF2A7D5E45007ADAA1 /* Main.storyboard */; };
-		9FC718FE2A7D5E45007ADAA1 /* antiquaTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC718FD2A7D5E45007ADAA1 /* antiquaTests.m */; };
-		9FC719082A7D5E45007ADAA1 /* antiquaUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC719072A7D5E45007ADAA1 /* antiquaUITests.m */; };
-		9FC7190A2A7D5E45007ADAA1 /* antiquaUITestsLaunchTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FC719092A7D5E45007ADAA1 /* antiquaUITestsLaunchTests.m */; };
 		9FC7191C2A7D608E007ADAA1 /* antiqua.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = 9FC718E42A7D5E44007ADAA1 /* antiqua.app */; };
 		9FCE02832AD9174900BB84CA /* antiqua.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FCE027D2AD9174900BB84CA /* antiqua.m */; };
 		9FCE02872AD918A500BB84CA /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FCE02862AD918A500BB84CA /* Carbon.framework */; };
@@ -22,23 +18,6 @@
 		9FCE02902AD918C500BB84CA /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FCE028F2AD918C500BB84CA /* IOKit.framework */; };
 		9FD311FE2AADA0A500C3A9EF /* antiqua.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9FD311F82AADA0A500C3A9EF /* antiqua.cpp */; };
 /* End PBXBuildFile section */
-
-/* Begin PBXContainerItemProxy section */
-		9FC718FA2A7D5E45007ADAA1 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 9FC718DC2A7D5E44007ADAA1 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 9FC718E32A7D5E44007ADAA1;
-			remoteInfo = antiqua;
-		};
-		9FC719042A7D5E45007ADAA1 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 9FC718DC2A7D5E44007ADAA1 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 9FC718E32A7D5E44007ADAA1;
-			remoteInfo = antiqua;
-		};
-/* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
 		9FC7191B2A7D6075007ADAA1 /* CopyFiles */ = {
@@ -59,14 +38,8 @@
 		9FBB7D732A80BA17001EA2E0 /* CustomCALayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomCALayer.h; sourceTree = "<group>"; };
 		9FC718E42A7D5E44007ADAA1 /* antiqua.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = antiqua.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		9FC718F02A7D5E45007ADAA1 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		9FC718F22A7D5E45007ADAA1 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		9FC718F42A7D5E45007ADAA1 /* antiqua.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = antiqua.entitlements; sourceTree = "<group>"; };
-		9FC718F92A7D5E45007ADAA1 /* antiquaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = antiquaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		9FC718FD2A7D5E45007ADAA1 /* antiquaTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = antiquaTests.m; sourceTree = "<group>"; };
-		9FC719032A7D5E45007ADAA1 /* antiquaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = antiquaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		9FC719072A7D5E45007ADAA1 /* antiquaUITests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = antiquaUITests.m; sourceTree = "<group>"; };
-		9FC719092A7D5E45007ADAA1 /* antiquaUITestsLaunchTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = antiquaUITestsLaunchTests.m; sourceTree = "<group>"; };
 		9FC719182A7D5F7E007ADAA1 /* CustomNSView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomNSView.h; sourceTree = "<group>"; };
 		9FCE027A2AD9174900BB84CA /* osx_audio.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_audio.m; sourceTree = "<group>"; };
 		9FCE027B2AD9174900BB84CA /* osx_input.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_input.m; sourceTree = "<group>"; };
@@ -101,20 +74,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		9FC718F62A7D5E45007ADAA1 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		9FC719002A7D5E45007ADAA1 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -122,8 +81,6 @@
 			isa = PBXGroup;
 			children = (
 				9FC718E62A7D5E44007ADAA1 /* antiqua */,
-				9FC718FC2A7D5E45007ADAA1 /* antiquaTests */,
-				9FC719062A7D5E45007ADAA1 /* antiquaUITests */,
 				9FC718E52A7D5E44007ADAA1 /* Products */,
 				9FD312012AADA5D900C3A9EF /* Frameworks */,
 			);
@@ -133,8 +90,6 @@
 			isa = PBXGroup;
 			children = (
 				9FC718E42A7D5E44007ADAA1 /* antiqua.app */,
-				9FC718F92A7D5E45007ADAA1 /* antiquaTests.xctest */,
-				9FC719032A7D5E45007ADAA1 /* antiquaUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -158,28 +113,10 @@
 				9F6E25E32A7D7559006DF7A3 /* Info.plist */,
 				9FC719182A7D5F7E007ADAA1 /* CustomNSView.h */,
 				9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */,
-				9FC718EF2A7D5E45007ADAA1 /* Main.storyboard */,
 				9FC718F22A7D5E45007ADAA1 /* main.m */,
 				9FC718F42A7D5E45007ADAA1 /* antiqua.entitlements */,
 			);
 			path = antiqua;
-			sourceTree = "<group>";
-		};
-		9FC718FC2A7D5E45007ADAA1 /* antiquaTests */ = {
-			isa = PBXGroup;
-			children = (
-				9FC718FD2A7D5E45007ADAA1 /* antiquaTests.m */,
-			);
-			path = antiquaTests;
-			sourceTree = "<group>";
-		};
-		9FC719062A7D5E45007ADAA1 /* antiquaUITests */ = {
-			isa = PBXGroup;
-			children = (
-				9FC719072A7D5E45007ADAA1 /* antiquaUITests.m */,
-				9FC719092A7D5E45007ADAA1 /* antiquaUITestsLaunchTests.m */,
-			);
-			path = antiquaUITests;
 			sourceTree = "<group>";
 		};
 		9FD312012AADA5D900C3A9EF /* Frameworks */ = {
@@ -216,42 +153,6 @@
 			productReference = 9FC718E42A7D5E44007ADAA1 /* antiqua.app */;
 			productType = "com.apple.product-type.application";
 		};
-		9FC718F82A7D5E45007ADAA1 /* antiquaTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 9FC719102A7D5E45007ADAA1 /* Build configuration list for PBXNativeTarget "antiquaTests" */;
-			buildPhases = (
-				9FC718F52A7D5E45007ADAA1 /* Sources */,
-				9FC718F62A7D5E45007ADAA1 /* Frameworks */,
-				9FC718F72A7D5E45007ADAA1 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				9FC718FB2A7D5E45007ADAA1 /* PBXTargetDependency */,
-			);
-			name = antiquaTests;
-			productName = antiquaTests;
-			productReference = 9FC718F92A7D5E45007ADAA1 /* antiquaTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
-		9FC719022A7D5E45007ADAA1 /* antiquaUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 9FC719132A7D5E45007ADAA1 /* Build configuration list for PBXNativeTarget "antiquaUITests" */;
-			buildPhases = (
-				9FC718FF2A7D5E45007ADAA1 /* Sources */,
-				9FC719002A7D5E45007ADAA1 /* Frameworks */,
-				9FC719012A7D5E45007ADAA1 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				9FC719052A7D5E45007ADAA1 /* PBXTargetDependency */,
-			);
-			name = antiquaUITests;
-			productName = antiquaUITests;
-			productReference = 9FC719032A7D5E45007ADAA1 /* antiquaUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -263,14 +164,6 @@
 				TargetAttributes = {
 					9FC718E32A7D5E44007ADAA1 = {
 						CreatedOnToolsVersion = 14.3.1;
-					};
-					9FC718F82A7D5E45007ADAA1 = {
-						CreatedOnToolsVersion = 14.3.1;
-						TestTargetID = 9FC718E32A7D5E44007ADAA1;
-					};
-					9FC719022A7D5E45007ADAA1 = {
-						CreatedOnToolsVersion = 14.3.1;
-						TestTargetID = 9FC718E32A7D5E44007ADAA1;
 					};
 				};
 			};
@@ -288,8 +181,6 @@
 			projectRoot = "";
 			targets = (
 				9FC718E32A7D5E44007ADAA1 /* antiqua */,
-				9FC718F82A7D5E45007ADAA1 /* antiquaTests */,
-				9FC719022A7D5E45007ADAA1 /* antiquaUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -300,21 +191,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				9FC718EE2A7D5E45007ADAA1 /* Assets.xcassets in Resources */,
-				9FC718F12A7D5E45007ADAA1 /* Main.storyboard in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		9FC718F72A7D5E45007ADAA1 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		9FC719012A7D5E45007ADAA1 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -330,48 +206,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		9FC718F52A7D5E45007ADAA1 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				9FC718FE2A7D5E45007ADAA1 /* antiquaTests.m in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		9FC718FF2A7D5E45007ADAA1 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				9FC7190A2A7D5E45007ADAA1 /* antiquaUITestsLaunchTests.m in Sources */,
-				9FC719082A7D5E45007ADAA1 /* antiquaUITests.m in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXTargetDependency section */
-		9FC718FB2A7D5E45007ADAA1 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 9FC718E32A7D5E44007ADAA1 /* antiqua */;
-			targetProxy = 9FC718FA2A7D5E45007ADAA1 /* PBXContainerItemProxy */;
-		};
-		9FC719052A7D5E45007ADAA1 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 9FC718E32A7D5E44007ADAA1 /* antiqua */;
-			targetProxy = 9FC719042A7D5E45007ADAA1 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
-
-/* Begin PBXVariantGroup section */
-		9FC718EF2A7D5E45007ADAA1 /* Main.storyboard */ = {
-			isa = PBXVariantGroup;
-			children = (
-				9FC718F02A7D5E45007ADAA1 /* Base */,
-			);
-			name = Main.storyboard;
-			sourceTree = "<group>";
-		};
-/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		9FC7190B2A7D5E45007ADAA1 /* Debug */ = {
@@ -541,66 +376,6 @@
 			};
 			name = Release;
 		};
-		9FC719112A7D5E45007ADAA1 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 13.3;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dimatheprogrammer.antiquaTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/antiqua.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/antiqua";
-			};
-			name = Debug;
-		};
-		9FC719122A7D5E45007ADAA1 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 13.3;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dimatheprogrammer.antiquaTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/antiqua.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/antiqua";
-			};
-			name = Release;
-		};
-		9FC719142A7D5E45007ADAA1 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dimatheprogrammer.antiquaUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				TEST_TARGET_NAME = antiqua;
-			};
-			name = Debug;
-		};
-		9FC719152A7D5E45007ADAA1 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dimatheprogrammer.antiquaUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				TEST_TARGET_NAME = antiqua;
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -618,24 +393,6 @@
 			buildConfigurations = (
 				9FC7190E2A7D5E45007ADAA1 /* Debug */,
 				9FC7190F2A7D5E45007ADAA1 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		9FC719102A7D5E45007ADAA1 /* Build configuration list for PBXNativeTarget "antiquaTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				9FC719112A7D5E45007ADAA1 /* Debug */,
-				9FC719122A7D5E45007ADAA1 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		9FC719132A7D5E45007ADAA1 /* Build configuration list for PBXNativeTarget "antiquaUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				9FC719142A7D5E45007ADAA1 /* Debug */,
-				9FC719152A7D5E45007ADAA1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
