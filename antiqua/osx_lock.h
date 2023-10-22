@@ -1,13 +1,8 @@
 #ifndef _OSX_LOCK_H_
 #define _OSX_LOCK_H_
 
+#include "types.h"
 #include <pthread.h>
-
-#if !defined(__cplusplus)
-#define MONExternC extern
-#else
-#define MONExternC extern "C"
-#endif
 
 extern pthread_mutex_t mutex;
 

@@ -96,12 +96,6 @@ struct GameMemory
   void *transientStorage;
 };
 
-#if !defined(__cplusplus)
-#define MONExternC extern
-#else
-#define MONExternC extern "C"
-#endif
-
 MONExternC void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *buff);
 MONExternC void fillSoundBuffer(struct SoundState *soundState);
 

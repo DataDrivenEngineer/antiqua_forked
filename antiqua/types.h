@@ -1,6 +1,12 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
 
+#if !defined(__cplusplus)
+#define MONExternC extern
+#else
+#define MONExternC extern "C"
+#endif
+
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
