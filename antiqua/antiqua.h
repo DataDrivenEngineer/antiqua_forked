@@ -105,4 +105,17 @@ struct GameMemory
 MONExternC void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *buff);
 MONExternC void fillSoundBuffer(struct SoundState *soundState);
 
+// Services that the platform provides to the game
+#if ANTIQUA_INTERNAL
+struct debug_ReadFileResult
+{
+  u32 contentsSize;
+  void *contents;
+};
+MONExternC u8 debug_platformReadEntireFile(struct debug_ReadFileResult *outFile, const char *filename);
+MONExternC void debug_platformFreeFileMemory(struct debug_ReadFileResult *file);
+MONExternC u8 debug_platformWriteEntireFile(const char *filename, u32 memorySize, void *memory);
+#endif
+
+
 #endif

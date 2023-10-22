@@ -2,6 +2,12 @@
 
 #import <Cocoa/Cocoa.h>
 #import <Carbon/Carbon.h>
+#import <fcntl.h>
+#import <sys/stat.h>
+#import <unistd.h>
+#import <sys/types.h>
+#import <sys/uio.h>
+#import <sys/mman.h>
 
 #import "CustomNSView.h"
 #import "CustomWindowDelegate.h"
@@ -28,6 +34,93 @@ static void processEvent(NSEvent *e)
     {
     }
   }
+}
+
+inline static u32 safeTruncateUInt64(u64 value)
+{
+  ASSERT(value <= 0xFFFFFFFF);
+  u32 result = (u32) value;
+  return result;
+}
+
+u8 debug_platformReadEntireFile(struct debug_ReadFileResult *outFile, const char *filename)
+{
+  u8 result = 0;
+  s32 fd = open(filename, O_RDONLY | O_SHLOCK);
+  if (fd != -1)
+  {
+    struct stat st;
+    if (fstat(fd, &st) != -1)
+    {
+      outFile->contentsSize = safeTruncateUInt64(st.st_size);
+      outFile->contents = mmap(0, outFile->contentsSize, PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+      msync(outFile->contents, outFile->contentsSize, MS_SYNC | MS_INVALIDATE);
+      if (outFile->contents != MAP_FAILED)
+      {
+	s32 bytesRead = read(fd, outFile->contents, outFile->contentsSize);
+	if (bytesRead != -1 && bytesRead == outFile->contentsSize)
+	{
+	  // TODO: File read successfully. Now do something with it...
+	  result = 1;
+	}
+	else
+	{
+	  fprintf(stderr, "Failed to read from a file %s, bytesRead: %d, error: %d\n", filename, bytesRead, errno);
+	  debug_platformFreeFileMemory(outFile);
+	  result = 0;
+	}
+      }
+      else
+      {
+	fprintf(stderr, "Failed to allocate memory for a file %s - error: %d\n", filename, errno);
+      }
+    }
+    else
+    {
+      fprintf(stderr, "Failed to get stats for a file %s - error: %d\n", filename, errno);
+    }
+
+    if (close(fd) == -1)
+    {
+      fprintf(stderr, "Failed to close a file %s, error: %d\n", filename, errno);
+    }
+  }
+  else
+  {
+    fprintf(stderr, "Failed to open a file %s, error: %d\n", filename, errno);
+  }
+
+  return result;
+}
+
+void debug_platformFreeFileMemory(struct debug_ReadFileResult *file)
+{
+  msync(file->contents, file->contentsSize, MS_SYNC);
+  munmap(file->contents, file->contentsSize);
+}
+
+u8 debug_platformWriteEntireFile(const char *filename, u32 memorySize, void *memory)
+{
+  u8 result = 0;
+
+  s32 fd = open(filename, O_WRONLY | O_EXLOCK | O_CREAT);
+  if (fd != -1)
+  {
+    if (write(fd, memory, memorySize) != -1)
+    {
+      result = 1;
+    }
+    else
+    {
+      fprintf(stderr, "Failed to write to a file %s, error: %d\n", filename, errno);
+    }
+  }
+  else
+  {
+    fprintf(stderr, "Failed to open a file %s, error: %d\n", filename, errno);
+  }
+
+  return result;
 }
 
 int main(int argc, const char * argv[]) {

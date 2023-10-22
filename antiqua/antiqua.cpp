@@ -29,8 +29,16 @@ void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *
   GameState *gameState = (GameState *) memory->permanentStorage;
   if (!memory->isInitialized)
   {
-    memory->isInitialized = 1;
     // do initialization here as needed
+    const char *filename = __FILE__;
+    struct debug_ReadFileResult file;
+    if (debug_platformReadEntireFile(&file, filename))
+    {
+      debug_platformWriteEntireFile("/opt/projects/antiqua/data/test.out", file.contentsSize, file.contents);
+      debug_platformFreeFileMemory(&file);
+    }
+
+    memory->isInitialized = 1;
   }
 
   if (!soundPlaying)

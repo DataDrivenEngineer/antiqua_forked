@@ -118,11 +118,13 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   // allocate physical memory
   // equivalent of VirtualAlloc(addr, size, MEM_COMMIT, PAGE_READWRITE) - except that memory is going to be committed on as-needed basis when we write to it
 #if ANTIQUA_INTERNAL
-  gameMemory.permanentStorage = mmap((void *) GB(10), totalStorageSize, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
+  u64 baseAddress = GB(10);
+  gameMemory.permanentStorage = mmap((void *) baseAddress, totalStorageSize, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
+  msync((void *) baseAddress, gameMemory.permanentStorageSize, MS_SYNC | MS_INVALIDATE);
 #else
   gameMemory.permanentStorage = mmap(0, totalStorageSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+  msync(gameMemory.permanentStorage, gameMemory.permanentStorageSize, MS_SYNC | MS_INVALIDATE);
 #endif
-  msync(0, gameMemory.permanentStorageSize, MS_SYNC | MS_INVALIDATE);
   if (gameMemory.permanentStorage == MAP_FAILED)
   {
     fprintf(stderr, "Failed to allocate permanentStorage - error: %d\n", errno);
