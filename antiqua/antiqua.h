@@ -117,5 +117,4 @@ MONExternC void debug_platformFreeFileMemory(struct debug_ReadFileResult *file);
 MONExternC u8 debug_platformWriteEntireFile(const char *filename, u32 memorySize, void *memory);
 #endif
 
-
 #endif
