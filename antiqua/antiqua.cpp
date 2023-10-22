@@ -1,9 +1,9 @@
+#include "osx_lock.cpp"
+
 #include "antiqua.h"
 #include "osx_audio.h"
 #include "osx_input.h"
 #include "types.h"
-
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void renderGradient(struct GameOffscreenBuffer *buf, u64 xOffset, u64 yOffset)
 {
@@ -23,31 +23,37 @@ static void renderGradient(struct GameOffscreenBuffer *buf, u64 xOffset, u64 yOf
     }
 }
 
-void updateGameAndRender(struct GameOffscreenBuffer *buff)
+void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *buff)
 {
-  static u64 xOff = 0;
-  static u64 yOff = 0;
+  ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
+  GameState *gameState = (GameState *) memory->permanentStorage;
+  if (!memory->isInitialized)
+  {
+    memory->isInitialized = 1;
+    // do initialization here as needed
+  }
+
   if (!soundPlaying)
   {
     initAudio();
     soundPlaying = playAudio();
   }
 
-  pthread_mutex_lock(&mutex);
+  lock();
   if (gcInput.isAnalog)
   {
     s16 normalized = gcInput.endX - 127;
 //    fprintf(stderr, "%d\n", normalized);
-    xOff += normalized >> 2;
+    gameState->xOff += normalized >> 2;
 
     normalized = gcInput.endY - 127;
     s32 toneHzModifier = (s32) (256.f * (normalized / 255.f));
     soundState.toneHz = 512 + toneHzModifier;
-    yOff += normalized >> 2;
+    gameState->yOff += normalized >> 2;
   }
-  pthread_mutex_unlock(&mutex);
+  unlock();
 
-  renderGradient(buff, xOff, yOff);
+  renderGradient(buff, gameState->xOff, gameState->yOff);
 }
 
 void fillSoundBuffer(struct SoundState *soundState)

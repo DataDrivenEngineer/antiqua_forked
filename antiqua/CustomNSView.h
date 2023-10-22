@@ -8,8 +8,6 @@
 #import <CoreVideo/CVReturn.h>
 #import "antiqua.h"
 
-extern struct GameOffscreenBuffer framebuffer;
-
 @interface CustomNSView : NSView
 
 - (void) resumeDisplayLink;

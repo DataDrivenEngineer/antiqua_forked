@@ -1,5 +1,5 @@
 #include "osx_audio.h"
-#include "types.h"
+#include "osx_lock.h"
 
 u8 soundPlaying = 0;
 struct SoundState soundState = {0};
@@ -15,10 +15,10 @@ static OSStatus appIOProc(AudioObjectID inDevice,
                         void* __nullable        inClientData)
 {
   struct SoundState *soundState = (struct SoundState *) inClientData;
-  pthread_mutex_lock(&mutex);
+  lock();
   soundState->frames = (r32 *) outOutputData->mBuffers[0].mData;
   fillSoundBuffer(soundState);
-  pthread_mutex_unlock(&mutex);
+  unlock();
 
   return kAudioHardwareNoError;     
 }

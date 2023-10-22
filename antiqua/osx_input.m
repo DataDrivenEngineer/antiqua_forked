@@ -1,8 +1,8 @@
 #include "osx_input.h"
+#include "osx_lock.h"
 
 #define INPUT_NOT_INITIALIZED -9999
 #define DEAD_ZONE 15
-#define ARRAY_COUNT(arr) sizeof(arr) / sizeof((arr)[0])
 
 IOHIDManagerRef __nullable ioHIDManager;
 struct GameControllerInput gcInput;
@@ -18,9 +18,9 @@ static void inIOHIDDeviceRegistrationCallback(
     if (isGamepad)
     {
       fprintf(stderr, "Gamepad found\n!");
-      pthread_mutex_lock(&mutex);
+      lock();
       resetInputState();
-      pthread_mutex_unlock(&mutex);
+      unlock();
     }
 }
 
@@ -53,7 +53,7 @@ void resetInputState(void)
 
 static void inputValueCallback(void * _Nullable context, IOReturn result, void * _Nullable sender, IOHIDValueRef __nullable value)
 {
-  pthread_mutex_lock(&mutex);
+  lock();
   gcInput.isAnalog = 1;
 
   // TODO: support controllers other than PS5 DualSense
@@ -144,7 +144,7 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
     circleButton = usage == kHIDUsage_Button_3 ? intValue : INPUT_NOT_INITIALIZED;
     crossButton = usage == kHIDUsage_Button_2 ? intValue : INPUT_NOT_INITIALIZED;
   }
-  pthread_mutex_unlock(&mutex);
+  unlock();
 }
 
 /**

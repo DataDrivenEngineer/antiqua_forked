@@ -7,7 +7,6 @@
 #include "antiqua.h"
 
 extern IOHIDManagerRef ioHIDManager;
-extern struct GameControllerInput gcInput;
 
 u8 initControllerInput(void);
 IOReturn resetInput(void);

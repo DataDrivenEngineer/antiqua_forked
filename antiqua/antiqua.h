@@ -2,11 +2,27 @@
 #define _ANTIQUA_H_
 
 #include "types.h"
-#include <pthread.h>
+
+#if ANTIQUA_SLOW
+#define ASSERT(expression) if (!(expression)) { *(u8 *) 0 = 0; }
+#else
+#define ASSERT(expression)
+#endif
 
 #define PI32 3.14159265359f
+#define ARRAY_COUNT(arr) sizeof(arr) / sizeof((arr)[0])
+#define KB(Value) ((Value) * 1024LL)
+#define MB(Value) (KB(Value) * 1024LL)
+#define GB(Value) (MB(Value) * 1024LL)
 
-extern pthread_mutex_t mutex;
+extern struct GameOffscreenBuffer framebuffer;
+
+extern struct GameMemory memory;
+
+extern u8 soundPlaying;
+extern struct SoundState soundState;
+
+extern struct GameControllerInput gcInput;
 
 struct SoundState
 {
@@ -65,13 +81,28 @@ struct GameControllerInput
   };
 };
 
+struct GameState
+{
+  u64 xOff;
+  u64 yOff;
+};
+
+struct GameMemory
+{
+  u8 isInitialized;
+  u64 permanentStorageSize;
+  void *permanentStorage;
+  u64 transientStorageSize;
+  void *transientStorage;
+};
+
 #if !defined(__cplusplus)
 #define MONExternC extern
 #else
 #define MONExternC extern "C"
 #endif
 
-MONExternC void updateGameAndRender(struct GameOffscreenBuffer *buff);
+MONExternC void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *buff);
 MONExternC void fillSoundBuffer(struct SoundState *soundState);
 
 #endif

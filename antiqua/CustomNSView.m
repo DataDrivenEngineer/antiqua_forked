@@ -7,6 +7,9 @@
 #import <QuartzCore/CALayer.h>
 #import <mach/mach_time.h>
 #import <math.h>
+#import <sys/types.h>
+#import <sys/mman.h>
+#import <time.h>
 
 #import "osx_audio.h"
 #import "types.h"
@@ -15,6 +18,7 @@
 #import "antiqua.h"
 
 struct GameOffscreenBuffer framebuffer;
+struct GameMemory gameMemory = {0};
 
 static struct mach_timebase_info mti;
 static CustomCALayer *layer;
@@ -75,7 +79,7 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   }
   else
   {
-    updateGameAndRender(&framebuffer);
+    updateGameAndRender(&gameMemory, &framebuffer);
 
     dispatch_sync(dispatch_get_main_queue(), ^{
       [self setNeedsDisplay:YES];
@@ -106,6 +110,25 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   CVDisplayLinkStart(displayLink);
   
   initTimebaseInfo();
+
+  // init game memory
+  gameMemory.permanentStorageSize = MB(64);
+  gameMemory.transientStorageSize = GB(2);
+  u64 totalStorageSize = gameMemory.permanentStorageSize + gameMemory.transientStorageSize;
+  // allocate physical memory
+  // equivalent of VirtualAlloc(addr, size, MEM_COMMIT, PAGE_READWRITE) - except that memory is going to be committed on as-needed basis when we write to it
+#if ANTIQUA_INTERNAL
+  gameMemory.permanentStorage = mmap((void *) GB(10), totalStorageSize, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
+#else
+  gameMemory.permanentStorage = mmap(0, totalStorageSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+#endif
+  msync(0, gameMemory.permanentStorageSize, MS_SYNC | MS_INVALIDATE);
+  if (gameMemory.permanentStorage == MAP_FAILED)
+  {
+    fprintf(stderr, "Failed to allocate permanentStorage - error: %d\n", errno);
+    return 0;
+  }
+  gameMemory.transientStorage = (u8 *) gameMemory.permanentStorage + gameMemory.permanentStorageSize;
 
   // init game specific state
   framebuffer.width = 1024;
