@@ -1,8 +1,8 @@
 build:
 	# Compile all Obj-C files
-	cc -c -g -DANTIQUA_SLOW=1 -DANTIQUA_INTERNAL=1 -O0 -Wall -pedantic -Wno-null-dereference -Wno-unused-but-set-variable -Wno-gnu-anonymous-struct -Wno-nested-anon-types antiqua/antiqua.m -o m.o
+	cc -c -g -DANTIQUA_SLOW=1 -DANTIQUA_INTERNAL=1 -ffast-math -fno-rtti -fno-exceptions -O0 -Wall -pedantic -Wno-null-dereference -Wno-unused-but-set-variable -Wno-gnu-anonymous-struct -Wno-nested-anon-types antiqua/antiqua.m -o m.o
 	# Compile all C++ files
-	cc -c -g -DANTIQUA_SLOW=1 -DANTIQUA_INTERNAL=1 -O0 -std=c++17 -Wall -pedantic -Wno-null-dereference -Wno-unused-but-set-variable -Wno-gnu-anonymous-struct -Wno-nested-anon-types antiqua/antiqua.cpp -o cpp.o
+	cc -c -g -DANTIQUA_SLOW=1 -DANTIQUA_INTERNAL=1 -ffast-math -fno-rtti -fno-exceptions -O0 -std=c++17 -Wall -pedantic -Wno-null-dereference -Wno-unused-but-set-variable -Wno-gnu-anonymous-struct -Wno-nested-anon-types antiqua/antiqua.cpp -o cpp.o
 	# Link
 	cc -g -O0 -framework Carbon -framework AppKit -framework CoreVideo -framework QuartzCore -framework CoreAudio -framework IOKit m.o cpp.o -o antiqua.o
 	# Generate debug symbols
