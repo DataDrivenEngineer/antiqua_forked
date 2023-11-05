@@ -47,19 +47,21 @@ void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *
     soundPlaying = playAudio();
   }
 
-  lock();
+  lockThread(runThreadAudio, runMutexAudio, runConditionAudio);
+  lockThread(runThreadInput, runMutexInput, runConditionInput);
   if (gcInput.isAnalog)
   {
-    s16 normalized = gcInput.endX - 127;
+    s16 normalized = gcInput.averageX - 127;
 //    fprintf(stderr, "%d\n", normalized);
     gameState->xOff += normalized >> 2;
 
-    normalized = gcInput.endY - 127;
+    normalized = gcInput.averageY - 127;
     s32 toneHzModifier = (s32) (256.f * (normalized / 255.f));
     soundState.toneHz = 512 + toneHzModifier;
     gameState->yOff += normalized >> 2;
   }
-  unlock();
+  unlockThread(runThreadInput, runMutexInput, runConditionInput);
+  unlockThread(runThreadAudio, runMutexAudio, runConditionAudio);
 
   renderGradient(buff, gameState->xOff, gameState->yOff);
 }

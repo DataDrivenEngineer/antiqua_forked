@@ -46,7 +46,7 @@ static void logFrameTime(const CVTimeStamp *inNow, const CVTimeStamp *inOutputTi
 
 static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext)
 {
-  logFrameTime(inNow, inOutputTime);
+//  logFrameTime(inNow, inOutputTime);
   CVReturn error = [(__bridge CustomNSView *) displayLinkContext displayFrame:inOutputTime];
   return error;
 }

@@ -15,10 +15,9 @@ static OSStatus appIOProc(AudioObjectID inDevice,
                         void* __nullable        inClientData)
 {
   struct SoundState *soundState = (struct SoundState *) inClientData;
-  lock();
+  waitIfBlocked(runThreadAudio, runMutexAudio, runConditionAudio);
   soundState->frames = (r32 *) outOutputData->mBuffers[0].mData;
   fillSoundBuffer(soundState);
-  unlock();
 
   return kAudioHardwareNoError;     
 }

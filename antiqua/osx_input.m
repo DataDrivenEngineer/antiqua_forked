@@ -18,9 +18,8 @@ static void inIOHIDDeviceRegistrationCallback(
     if (isGamepad)
     {
       fprintf(stderr, "Gamepad found\n!");
-      lock();
-      resetInputState();
-      unlock();
+      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      gcInput.isAnalog = 1;
     }
 }
 
@@ -30,19 +29,18 @@ static void inIOHIDDeviceRemovalCallback(
                 IOReturn inResult,        // the result of the removing operation
                 void * __nullable inSender,        // the IOHIDManagerRef for the device being removed
                 IOHIDDeviceRef __nullable inIOHIDDeviceRef // the removed HID device
-) {}
+)
+{
+    fprintf(stderr, "Gamepad disconnected\n!");
+    waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+    gcInput.isAnalog = 0;
+}
 
 void resetInputState(void)
 {
   gcInput.isAnalog = 0;
-  gcInput.startX = INPUT_NOT_INITIALIZED;
-  gcInput.startY = INPUT_NOT_INITIALIZED;
-  gcInput.minX = INPUT_NOT_INITIALIZED;
-  gcInput.minY = INPUT_NOT_INITIALIZED;
-  gcInput.maxX = INPUT_NOT_INITIALIZED;
-  gcInput.maxY = INPUT_NOT_INITIALIZED;
-  gcInput.endX = 127.f;
-  gcInput.endY = 127.f;
+  gcInput.averageX = 127.f;
+  gcInput.averageY = 127.f;
 
   for (s32 i = 0; i < ARRAY_COUNT(gcInput.Buttons); i++)
   {
@@ -53,8 +51,7 @@ void resetInputState(void)
 
 static void inputValueCallback(void * _Nullable context, IOReturn result, void * _Nullable sender, IOHIDValueRef __nullable value)
 {
-  lock();
-  gcInput.isAnalog = 1;
+  waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
 
   // TODO: support controllers other than PS5 DualSense
   s32 up;
@@ -87,49 +84,26 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
 
     if (lStickX != INPUT_NOT_INITIALIZED)
     {
-      if (gcInput.startX != INPUT_NOT_INITIALIZED)
-      {
-	gcInput.startX = lStickX;
-      }
-      if (lStickX < gcInput.minX)
-      {
-	gcInput.minX = lStickX;
-      }
-      if (lStickX > gcInput.maxX)
-      {
-	gcInput.maxX = lStickX;
-      }
-//      fprintf(stderr, "lStickX raw: %f\n", lStickX);
+      fprintf(stderr, "lStickX raw: %f\n", lStickX);
       if (lStickX >= 127 - DEAD_ZONE && lStickX <= 127 + DEAD_ZONE)
       {
-	gcInput.endX = 127;
+	gcInput.averageX = 127;
       }
       else
       {
-	gcInput.endX = lStickX;
+	gcInput.averageX = lStickX;
       }
     }
     if (lStickY != INPUT_NOT_INITIALIZED)
     {
-      if (gcInput.startY != INPUT_NOT_INITIALIZED)
-      {
-	gcInput.startY = lStickY;
-      }
-      if (lStickY < gcInput.minY)
-      {
-	gcInput.minY = lStickY;
-      }
-      if (lStickY > gcInput.maxY)
-      {
-	gcInput.maxY = lStickY;
-      }
+      fprintf(stderr, "lStickY raw: %f\n", lStickY);
       if (lStickY >= 127 - DEAD_ZONE && lStickY <= 127 + DEAD_ZONE)
       {
-	gcInput.endY = 127;
+	gcInput.averageY = 127;
       }
       else
       {
-	gcInput.endY = lStickY;
+	gcInput.averageY = lStickY;
       }
     }
   }
@@ -144,7 +118,6 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
     circleButton = usage == kHIDUsage_Button_3 ? intValue : INPUT_NOT_INITIALIZED;
     crossButton = usage == kHIDUsage_Button_2 ? intValue : INPUT_NOT_INITIALIZED;
   }
-  unlock();
 }
 
 /**

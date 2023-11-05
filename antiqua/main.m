@@ -162,6 +162,7 @@ int main(int argc, const char * argv[]) {
     [NSApp activateIgnoringOtherApps:YES];
     [NSApp finishLaunching];
 
+    resetInputState();
     s32 result = initControllerInput();
     if (result)
     {

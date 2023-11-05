@@ -4,9 +4,18 @@
 #include "types.h"
 #include <pthread.h>
 
-extern pthread_mutex_t mutex;
+// audio thread
+extern int runThreadAudio;
+extern pthread_mutex_t runMutexAudio;
+extern pthread_cond_t runConditionAudio;
 
-MONExternC void lock(void);
-MONExternC void unlock(void);
+// input thread
+extern int runThreadInput;
+extern pthread_mutex_t runMutexInput;
+extern pthread_cond_t runConditionInput;
+
+MONExternC void lockThread(int conditionVariable, pthread_mutex_t mutex, pthread_cond_t condition);
+MONExternC void unlockThread(int conditionVariable, pthread_mutex_t mutex, pthread_cond_t condition);
+MONExternC void waitIfBlocked(int conditionVariable, pthread_mutex_t mutex, pthread_cond_t condition);
 
 #endif

@@ -52,17 +52,8 @@ struct GameControllerInput
 {
   u8 isAnalog;
 
-  r32 startX;
-  r32 startY;
-
-  r32 minX;
-  r32 minY;
-
-  r32 maxX;
-  r32 maxY;
-
-  r32 endX;
-  r32 endY;
+  r32 averageX;
+  r32 averageY;
 
   union
   {
@@ -98,6 +89,7 @@ struct GameMemory
 
 MONExternC void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *buff);
 MONExternC void fillSoundBuffer(struct SoundState *soundState);
+MONExternC void resetInputState(void);
 
 // Services that the platform provides to the game
 #if ANTIQUA_INTERNAL
