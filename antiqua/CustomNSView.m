@@ -25,6 +25,8 @@ static CustomCALayer *layer;
 static CVDisplayLinkRef displayLink;
 static u8 shouldStopDL = 0;
 
+static u8 skipCurrentFrame = 1;
+
 static void initTimebaseInfo(void)
 {
   kern_return_t result;
@@ -40,15 +42,20 @@ static void logFrameTime(const CVTimeStamp *inNow, const CVTimeStamp *inOutputTi
   // Divide by 1000000 to convert from ns to ms
   NSLog(@"inNow frame time: %f ms", (r32)inNowDiff / 1000000);
 
-  u64 processingWindowNs = (inOutputTime->hostTime - inNow->hostTime) * mti.numer / mti.denom;
-  NSLog(@"processingWindow: %f ms", (r32)processingWindowNs / 1000000);
+//  u64 processingWindowNs = (inOutputTime->hostTime - inNow->hostTime) * mti.numer / mti.denom;
+//  NSLog(@"processingWindow: %f ms", (r32)processingWindowNs / 1000000);
 }
 
 static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext)
 {
-//  logFrameTime(inNow, inOutputTime);
-  CVReturn error = [(__bridge CustomNSView *) displayLinkContext displayFrame:inOutputTime];
-  return error;
+  skipCurrentFrame = !skipCurrentFrame;
+  if (!skipCurrentFrame)
+  {
+    logFrameTime(inNow, inOutputTime);
+    CVReturn error = [(__bridge CustomNSView *) displayLinkContext displayFrame:inOutputTime];
+    return error;
+  }
+  return kCVReturnSuccess;
 }
 
 @implementation CustomNSView
