@@ -47,6 +47,7 @@ void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *
     soundPlaying = playAudio();
   }
 
+  // TODO(dima): switch to non-blocking way after HMH multithreading is studied
   lockThread(runThreadAudio, runMutexAudio, runConditionAudio);
   lockThread(runThreadInput, runMutexInput, runConditionInput);
   if (gcInput.isAnalog)
