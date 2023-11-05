@@ -51,6 +51,7 @@ void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *
   // TODO(dima): switch to non-blocking way after HMH multithreading is studied
   lockThread(runThreadAudio, runMutexAudio, runConditionAudio);
   lockThread(runThreadInput, runMutexInput, runConditionInput);
+
   if (gcInput.isAnalog)
   {
     s16 normalized = gcInput.stickAverageX - 127;
