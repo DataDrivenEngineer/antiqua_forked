@@ -52,22 +52,25 @@ struct GameControllerInput
 {
   u8 isAnalog;
 
-  r32 averageX;
-  r32 averageY;
+  r32 stickAverageX;
+  r32 stickAverageY;
 
   union
   {
-    struct GameButtonState Buttons[8];
+    struct GameButtonState buttons[8];
     struct
     {
-      struct GameButtonState Up;
-      struct GameButtonState Down;
-      struct GameButtonState Left;
-      struct GameButtonState Right;
-      struct GameButtonState LeftShoulder;
-      struct GameButtonState RightShoulder;
-      struct GameButtonState LeftBumper;
-      struct GameButtonState RightBumper;
+      struct GameButtonState up;
+      struct GameButtonState down;
+      struct GameButtonState left;
+      struct GameButtonState right;
+      struct GameButtonState leftShoulder;
+      struct GameButtonState rightShoulder;
+      struct GameButtonState leftBumper;
+      struct GameButtonState rightBumper;
+
+      // Add new buttons above
+      struct GameButtonState terminator;
     };
   };
 };
@@ -89,7 +92,8 @@ struct GameMemory
 
 MONExternC void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *buff);
 MONExternC void fillSoundBuffer(struct SoundState *soundState);
-MONExternC void resetInputState(void);
+MONExternC void resetInputStateAll(void);
+MONExternC void resetInputStateButtons(void);
 
 // Services that the platform provides to the game
 #if ANTIQUA_INTERNAL

@@ -25,6 +25,7 @@ static void renderGradient(struct GameOffscreenBuffer *buf, u64 xOffset, u64 yOf
 
 void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *buff)
 {
+  ASSERT(&gcInput.terminator - &gcInput.buttons[0] == ARRAY_COUNT(gcInput.buttons));
   ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
   GameState *gameState = (GameState *) memory->permanentStorage;
   if (!memory->isInitialized)
@@ -52,15 +53,37 @@ void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *
   lockThread(runThreadInput, runMutexInput, runConditionInput);
   if (gcInput.isAnalog)
   {
-    s16 normalized = gcInput.averageX - 127;
+    s16 normalized = gcInput.stickAverageX - 127;
 //    fprintf(stderr, "%d\n", normalized);
     gameState->xOff += normalized >> 2;
 
-    normalized = gcInput.averageY - 127;
+    normalized = gcInput.stickAverageY - 127;
     s32 toneHzModifier = (s32) (256.f * (normalized / 255.f));
     soundState.toneHz = 512 + toneHzModifier;
     gameState->yOff += normalized >> 2;
   }
+  else
+  {
+    if (gcInput.right.endedDown)
+    {
+      gameState->xOff += 2;
+    }
+    if (gcInput.left.endedDown)
+    {
+      gameState->xOff -= 2;
+    }
+    if (gcInput.up.endedDown)
+    {
+      gameState->yOff -= 2;
+    }
+    if (gcInput.down.endedDown)
+    {
+      gameState->yOff += 2;
+    }
+  }
+
+  resetInputStateButtons();
+
   unlockThread(runThreadInput, runMutexInput, runConditionInput);
   unlockThread(runThreadAudio, runMutexAudio, runConditionAudio);
 

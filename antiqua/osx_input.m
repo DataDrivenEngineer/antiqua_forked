@@ -36,16 +36,24 @@ static void inIOHIDDeviceRemovalCallback(
     gcInput.isAnalog = 0;
 }
 
-void resetInputState(void)
+void resetInputStateAll(void)
 {
   gcInput.isAnalog = 0;
-  gcInput.averageX = 127.f;
-  gcInput.averageY = 127.f;
+  gcInput.stickAverageX = 127.f;
+  gcInput.stickAverageY = 127.f;
 
-  for (s32 i = 0; i < ARRAY_COUNT(gcInput.Buttons); i++)
+  for (s32 i = 0; i < ARRAY_COUNT(gcInput.buttons); i++)
   {
-    gcInput.Buttons[i].halfTransitionCount = INPUT_NOT_INITIALIZED;
-    gcInput.Buttons[i].endedDown = 0;
+    gcInput.buttons[i].halfTransitionCount = INPUT_NOT_INITIALIZED;
+    gcInput.buttons[i].endedDown = 0;
+  }
+}
+
+void resetInputStateButtons(void)
+{
+  for (s32 i = 0; i < ARRAY_COUNT(gcInput.buttons); i++)
+  {
+    gcInput.buttons[i].halfTransitionCount = INPUT_NOT_INITIALIZED;
   }
 }
 
@@ -87,11 +95,11 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
       fprintf(stderr, "lStickX raw: %f\n", lStickX);
       if (lStickX >= 127 - DEAD_ZONE && lStickX <= 127 + DEAD_ZONE)
       {
-	gcInput.averageX = 127;
+	gcInput.stickAverageX = 127;
       }
       else
       {
-	gcInput.averageX = lStickX;
+	gcInput.stickAverageX = lStickX;
       }
     }
     if (lStickY != INPUT_NOT_INITIALIZED)
@@ -99,11 +107,11 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
       fprintf(stderr, "lStickY raw: %f\n", lStickY);
       if (lStickY >= 127 - DEAD_ZONE && lStickY <= 127 + DEAD_ZONE)
       {
-	gcInput.averageY = 127;
+	gcInput.stickAverageY = 127;
       }
       else
       {
-	gcInput.averageY = lStickY;
+	gcInput.stickAverageY = lStickY;
       }
     }
   }

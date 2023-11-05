@@ -16,6 +16,7 @@
 #include "types.h"
 #include "osx_audio.h"
 #include "osx_input.h"
+#include "osx_lock.h"
 
 static u8 shouldKeepRunning = 1;
 
@@ -27,11 +28,56 @@ static void processEvent(NSEvent *e)
     {
       shouldKeepRunning = 0;
     }
+    if (e.keyCode == kVK_ANSI_S && !gcInput.down.endedDown)
+    {
+      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      gcInput.down.halfTransitionCount++;
+      gcInput.down.endedDown = 1;
+    }
+    if (e.keyCode == kVK_ANSI_D && !gcInput.right.endedDown)
+    {
+      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      gcInput.right.halfTransitionCount++;
+      gcInput.right.endedDown = 1;
+    }
+    if (e.keyCode == kVK_ANSI_A && !gcInput.left.endedDown)
+    {
+      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      gcInput.left.halfTransitionCount++;
+      gcInput.left.endedDown = 1;
+    }
+    if (e.keyCode == kVK_ANSI_W && !gcInput.up.endedDown)
+    {
+      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      gcInput.up.halfTransitionCount++;
+      gcInput.up.endedDown = 1;
+    }
+  }
+  else if (e.type == NSEventTypeKeyUp)
+  {
     if (e.keyCode == kVK_ANSI_S)
     {
+      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      gcInput.down.halfTransitionCount++;
+      gcInput.down.endedDown = 0;
     }
     if (e.keyCode == kVK_ANSI_D)
     {
+      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      gcInput.right.halfTransitionCount++;
+      gcInput.right.endedDown = 0;
+    }
+    if (e.keyCode == kVK_ANSI_A)
+    {
+      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      gcInput.left.halfTransitionCount++;
+      gcInput.left.endedDown = 0;
+    }
+    if (e.keyCode == kVK_ANSI_W)
+    {
+      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      gcInput.up.halfTransitionCount++;
+      gcInput.up.endedDown = 0;
     }
   }
 }
@@ -162,7 +208,7 @@ int main(int argc, const char * argv[]) {
     [NSApp activateIgnoringOtherApps:YES];
     [NSApp finishLaunching];
 
-    resetInputState();
+    resetInputStateAll();
     s32 result = initControllerInput();
     if (result)
     {

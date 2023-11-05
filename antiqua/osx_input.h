@@ -10,6 +10,7 @@ extern IOHIDManagerRef ioHIDManager;
 
 u8 initControllerInput(void);
 IOReturn resetInput(void);
-void resetInputState(void);
+void resetInputStateAll(void);
+void resetAllInputStateButtons(void);
 
 #endif

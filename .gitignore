@@ -75,3 +75,6 @@ iOSInjectionProject/
 
 # MacOS
 *.app/
+
+#Antiqua
+data/
