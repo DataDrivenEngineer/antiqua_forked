@@ -5,13 +5,13 @@
 #import <CoreVideo/CVDisplayLink.h>
 #import <AppKit/NSApplication.h>
 #import <QuartzCore/CALayer.h>
-#import <mach/mach_time.h>
 #import <math.h>
 #import <sys/types.h>
 #import <sys/mman.h>
 #import <time.h>
 
 #import "osx_audio.h"
+#import "osx_time.h"
 #import "types.h"
 #import "CustomNSView.h"
 #import "CustomCALayer.h"
@@ -20,23 +20,16 @@
 struct GameOffscreenBuffer framebuffer;
 struct GameMemory gameMemory = {0};
 
-static struct mach_timebase_info mti;
 static CustomCALayer *layer;
 static CVDisplayLinkRef displayLink;
 static u8 shouldStopDL = 0;
 
 static u8 skipCurrentFrame = 1;
 
-static void initTimebaseInfo(void)
-{
-  kern_return_t result;
-  if ((result = mach_timebase_info(&mti)) != KERN_SUCCESS) printf("Failed to initialize timebase info. Error code: %d", result);
-}
-
 static void logFrameTime(const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime)
 {
   static u64 previousNowNs = 0;
-  u64 currentNowNs = inNow->hostTime * mti.numer / mti.denom;
+  u64 currentNowNs = TIMESTAMP_TO_NS(inNow->hostTime);
   u64 inNowDiff = currentNowNs - previousNowNs;
   previousNowNs = currentNowNs;
   // Divide by 1000000 to convert from ns to ms

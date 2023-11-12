@@ -20,37 +20,55 @@
 
 static u8 shouldKeepRunning = 1;
 
-static void processEvent(NSEvent *e)
+static u8 processEvent(NSEvent *e)
 {
+  u8 handled = 0;
   if (e.type == NSEventTypeKeyDown)
   {
     if (e.keyCode == kVK_Escape)
     {
+      handled = 1;
       shouldKeepRunning = 0;
     }
-    if (e.keyCode == kVK_ANSI_S && !gcInput.down.endedDown)
+    if (e.keyCode == kVK_ANSI_S)
     {
-      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
-      gcInput.down.halfTransitionCount++;
-      gcInput.down.endedDown = 1;
+      handled = 1;
+      if (!gcInput.down.endedDown)
+      {
+	waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+	gcInput.down.halfTransitionCount++;
+	gcInput.down.endedDown = 1;
+      }
     }
-    if (e.keyCode == kVK_ANSI_D && !gcInput.right.endedDown)
+    if (e.keyCode == kVK_ANSI_D)
     {
-      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
-      gcInput.right.halfTransitionCount++;
-      gcInput.right.endedDown = 1;
+      handled = 1;
+      if (!gcInput.right.endedDown)
+      {
+	waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+	gcInput.right.halfTransitionCount++;
+	gcInput.right.endedDown = 1;
+      }
     }
-    if (e.keyCode == kVK_ANSI_A && !gcInput.left.endedDown)
+    if (e.keyCode == kVK_ANSI_A)
     {
-      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
-      gcInput.left.halfTransitionCount++;
-      gcInput.left.endedDown = 1;
+      handled = 1;
+      if (!gcInput.left.endedDown)
+      {
+	waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+	gcInput.left.halfTransitionCount++;
+	gcInput.left.endedDown = 1;
+      }
     }
-    if (e.keyCode == kVK_ANSI_W && !gcInput.up.endedDown)
+    if (e.keyCode == kVK_ANSI_W)
     {
-      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
-      gcInput.up.halfTransitionCount++;
-      gcInput.up.endedDown = 1;
+      handled = 1;
+      if (!gcInput.up.endedDown)
+      {
+	waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+	gcInput.up.halfTransitionCount++;
+	gcInput.up.endedDown = 1;
+      }
     }
   }
   else if (e.type == NSEventTypeKeyUp)
@@ -58,28 +76,34 @@ static void processEvent(NSEvent *e)
     if (e.keyCode == kVK_ANSI_S)
     {
       waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      handled = 1;
       gcInput.down.halfTransitionCount++;
       gcInput.down.endedDown = 0;
     }
     if (e.keyCode == kVK_ANSI_D)
     {
       waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      handled = 1;
       gcInput.right.halfTransitionCount++;
       gcInput.right.endedDown = 0;
     }
     if (e.keyCode == kVK_ANSI_A)
     {
       waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      handled = 1;
       gcInput.left.halfTransitionCount++;
       gcInput.left.endedDown = 0;
     }
     if (e.keyCode == kVK_ANSI_W)
     {
       waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      handled = 1;
       gcInput.up.halfTransitionCount++;
       gcInput.up.endedDown = 0;
     }
   }
+
+  return handled;
 }
 
 inline static u32 safeTruncateUInt64(u64 value)
@@ -229,9 +253,12 @@ int main(int argc, const char * argv[]) {
 	  inMode:NSDefaultRunLoopMode
 	  dequeue:YES];
 
-	processEvent(event);
+	u8 handled = processEvent(event);
 
-	[NSApp sendEvent:event];
+	if (!handled)
+	{
+	  [NSApp sendEvent:event];
+	}
 	[NSApp updateWindows];
       }
     }

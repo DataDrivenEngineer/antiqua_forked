@@ -1,4 +1,5 @@
 #include "osx_lock.cpp"
+#include "osx_time.cpp"
 
 #include "antiqua.h"
 #include "osx_audio.h"
@@ -127,6 +128,10 @@ void fillSoundBuffer(struct SoundState *soundState)
       *bufferPos++ = sample;
       *bufferPos++ = sample;
       soundState->tSine += 2.f * PI32 * 1.f / framesPerCycle;
+      if (soundState->tSine > 2.f * PI32)
+      {
+	soundState->tSine -= 2.f * PI32;
+      }
     }
   }
 

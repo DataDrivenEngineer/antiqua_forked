@@ -1,5 +1,7 @@
+#include "types.h"
 #include "osx_audio.h"
 #include "osx_lock.h"
+#include "osx_time.h"
 
 u8 soundPlaying = 0;
 struct SoundState soundState = {0};
@@ -14,8 +16,12 @@ static OSStatus appIOProc(AudioObjectID inDevice,
                         const AudioTimeStamp*   _Nonnull inOutputTime,
                         void* __nullable        inClientData)
 {
+  // TODO(dima): tighten up audio sync when we start mixing sounds
   struct SoundState *soundState = (struct SoundState *) inClientData;
   waitIfBlocked(runThreadAudio, runMutexAudio, runConditionAudio);
+  // TODO(dima): do we need to account for cases when there is >1 buffer?
+  // # of frames needed = total # of bytes / num of channels in frame (2) / size of sample (4 = float)
+  soundState->needFrames = outOutputData->mBuffers->mDataByteSize / 2 /4;
   soundState->frames = (r32 *) outOutputData->mBuffers[0].mData;
   fillSoundBuffer(soundState);
 
@@ -81,15 +87,10 @@ void initAudio(void)
   u32 tempSize;
   AudioObjectPropertyAddress tempPropertyAddress = {0};
   AudioObjectPropertyAddress devicePropertyAddress = {0};
-  u32 newBufferSize;
 
   soundState.sampleRate = 48000;
   soundState.toneHz = 256;
-  // Num of frames enough for playing audio for 1/30th of a second
-  soundState.needFrames = soundState.sampleRate / 30;
   soundState.tSine = 0;
-  // Each frame has 2 samples, each sample is a float (4 bytes)
-  newBufferSize = soundState.needFrames * 2 * 4;
  
   // get the default output device for the HAL
   devicePropertyAddress.mSelector = kAudioHardwarePropertyDefaultOutputDevice;
@@ -119,15 +120,6 @@ void initAudio(void)
       fprintf(stderr, "failed to add listener for kAudioHardwarePropertyDefaultOutputDevice property, error: %d\n", err);
   }
 
-  tempPropertyAddress.mSelector = kAudioDevicePropertyBufferSize;
-  tempPropertyAddress.mScope = kAudioObjectPropertyScopeOutput;
-  tempPropertyAddress.mElement = kAudioObjectPropertyElementMain;
-  err = AudioObjectSetPropertyData(device, &tempPropertyAddress, 0, 0, sizeof(newBufferSize), &newBufferSize);
-  if (err != kAudioHardwareNoError) {
-      fprintf(stderr, "failed to update buffer size, error: %d\n", err);
-      return;
-  }
-
   AudioStreamBasicDescription audioDataFormat = {0};
   tempSize = sizeof(audioDataFormat);				// it is required to pass the size of the data to be returned
   tempPropertyAddress.mSelector = kAudioDevicePropertyStreamFormat;
@@ -148,6 +140,45 @@ void initAudio(void)
   {
       fprintf(stderr, "set kAudioDevicePropertyStreamFormat error %d\n", err);
   }
+
+#if ANTIQUA_INTERNAL
+  // latency test
+  tempPropertyAddress.mSelector = kAudioStreamPropertyLatency;
+  tempPropertyAddress.mScope = kAudioObjectPropertyScopeGlobal;
+  tempPropertyAddress.mElement = kAudioObjectPropertyElementMain;
+  if (AudioObjectHasProperty(device, &tempPropertyAddress))
+  {
+    u32 streamLatency;
+    tempSize = sizeof(streamLatency);
+    err = AudioObjectGetPropertyData(device, &tempPropertyAddress, 0, 0, &tempSize, (void *)&streamLatency);
+    if (err != kAudioHardwareNoError)
+    {
+      fprintf(stderr, "Failed to get kAudioStreamPropertyLatency, error: %d\n", err);
+    }
+    else
+    {
+      fprintf(stderr, "kAudioStreamPropertyLatency: %d\n", streamLatency);
+    }
+  }
+
+  tempPropertyAddress.mSelector = kAudioDevicePropertyLatency;
+  tempPropertyAddress.mScope = kAudioObjectPropertyScopeOutput;
+  tempPropertyAddress.mElement = kAudioObjectPropertyElementMain;
+  if (AudioObjectHasProperty(device, &tempPropertyAddress))
+  {
+    u32 deviceLatency;
+    tempSize = sizeof(deviceLatency);
+    err = AudioObjectGetPropertyData(device, &tempPropertyAddress, 0, 0, &tempSize, (void *) &deviceLatency);
+    if (err != kAudioHardwareNoError)
+    {
+      fprintf(stderr, "Failed to get kAudioDevicePropertyLatency, error: %d\n", err);
+    }
+    else
+    {
+      fprintf(stderr, "kAudioDevicePropertyLatency: %d\n", deviceLatency);
+    }
+  }
+#endif
 }
 
 OSStatus resetAudio(void)
