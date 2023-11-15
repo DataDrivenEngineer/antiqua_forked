@@ -14,6 +14,7 @@
 #import "CustomCALayer.h"
 
 #include "types.h"
+#include "antiqua.h"
 #include "osx_audio.h"
 #include "osx_input.h"
 #include "osx_lock.h"
@@ -35,7 +36,7 @@ static u8 processEvent(NSEvent *e)
       handled = 1;
       if (!gcInput.down.endedDown)
       {
-	waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+	waitIfInputBlocked();
 	gcInput.down.halfTransitionCount++;
 	gcInput.down.endedDown = 1;
       }
@@ -45,7 +46,7 @@ static u8 processEvent(NSEvent *e)
       handled = 1;
       if (!gcInput.right.endedDown)
       {
-	waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+	waitIfInputBlocked();
 	gcInput.right.halfTransitionCount++;
 	gcInput.right.endedDown = 1;
       }
@@ -55,7 +56,7 @@ static u8 processEvent(NSEvent *e)
       handled = 1;
       if (!gcInput.left.endedDown)
       {
-	waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+	waitIfInputBlocked();
 	gcInput.left.halfTransitionCount++;
 	gcInput.left.endedDown = 1;
       }
@@ -65,7 +66,7 @@ static u8 processEvent(NSEvent *e)
       handled = 1;
       if (!gcInput.up.endedDown)
       {
-	waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+	waitIfInputBlocked();
 	gcInput.up.halfTransitionCount++;
 	gcInput.up.endedDown = 1;
       }
@@ -75,28 +76,28 @@ static u8 processEvent(NSEvent *e)
   {
     if (e.keyCode == kVK_ANSI_S)
     {
-      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      waitIfInputBlocked();
       handled = 1;
       gcInput.down.halfTransitionCount++;
       gcInput.down.endedDown = 0;
     }
     if (e.keyCode == kVK_ANSI_D)
     {
-      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      waitIfInputBlocked();
       handled = 1;
       gcInput.right.halfTransitionCount++;
       gcInput.right.endedDown = 0;
     }
     if (e.keyCode == kVK_ANSI_A)
     {
-      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      waitIfInputBlocked();
       handled = 1;
       gcInput.left.halfTransitionCount++;
       gcInput.left.endedDown = 0;
     }
     if (e.keyCode == kVK_ANSI_W)
     {
-      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      waitIfInputBlocked();
       handled = 1;
       gcInput.up.halfTransitionCount++;
       gcInput.up.endedDown = 0;
@@ -113,7 +114,13 @@ inline static u32 safeTruncateUInt64(u64 value)
   return result;
 }
 
-u8 debug_platformReadEntireFile(struct debug_ReadFileResult *outFile, const char *filename)
+MONExternC DEBUG_PLATFORM_FREE_FILE_MEMORY(debug_platformFreeFileMemory)
+{
+  msync(file->contents, file->contentsSize, MS_SYNC);
+  munmap(file->contents, file->contentsSize);
+}
+
+MONExternC DEBUG_PLATFORM_READ_ENTIRE_FILE(debug_platformReadEntireFile)
 {
   u8 result = 0;
   s32 fd = open(filename, O_RDONLY | O_SHLOCK);
@@ -163,13 +170,7 @@ u8 debug_platformReadEntireFile(struct debug_ReadFileResult *outFile, const char
   return result;
 }
 
-void debug_platformFreeFileMemory(struct debug_ReadFileResult *file)
-{
-  msync(file->contents, file->contentsSize, MS_SYNC);
-  munmap(file->contents, file->contentsSize);
-}
-
-u8 debug_platformWriteEntireFile(const char *filename, u32 memorySize, void *memory)
+MONExternC DEBUG_PLATFORM_WRITE_ENTIRE_FILE(debug_platformWriteEntireFile)
 {
   u8 result = 0;
 
@@ -244,6 +245,12 @@ int main(int argc, const char * argv[]) {
     {
       @autoreleasepool
       {
+	if (!soundState.soundPlaying)
+	{
+	  initAudio();
+	  soundState.soundPlaying = playAudio();
+	}
+
 	NSEvent *event = [NSApp
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"

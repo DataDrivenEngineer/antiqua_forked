@@ -7,6 +7,8 @@
 #define MONExternC extern "C"
 #endif
 
+#define EXPORT __attribute__((visibility("default")))
+
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;

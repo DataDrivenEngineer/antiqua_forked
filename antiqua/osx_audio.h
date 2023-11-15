@@ -6,8 +6,10 @@
 #include "types.h"
 #include "antiqua.h"
 
-MONExternC void initAudio(void);
-MONExternC u8 playAudio(void);
+extern struct SoundState soundState;
+
+void initAudio(void);
+u8 playAudio(void);
 
 u8 stopAudio(void);
 OSStatus resetAudio(void);

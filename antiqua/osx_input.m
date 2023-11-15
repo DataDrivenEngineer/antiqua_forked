@@ -1,5 +1,4 @@
 #include "osx_input.h"
-#include "osx_lock.h"
 
 #define INPUT_NOT_INITIALIZED -9999
 #define DEAD_ZONE 15
@@ -18,7 +17,7 @@ static void inIOHIDDeviceRegistrationCallback(
     if (isGamepad)
     {
       fprintf(stderr, "Gamepad found\n!");
-      waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+      waitIfInputBlocked();
       gcInput.isAnalog = 1;
     }
 }
@@ -32,7 +31,7 @@ static void inIOHIDDeviceRemovalCallback(
 )
 {
     fprintf(stderr, "Gamepad disconnected\n!");
-    waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+    waitIfInputBlocked();
     gcInput.isAnalog = 0;
 }
 
@@ -49,7 +48,7 @@ void resetInputStateAll(void)
   }
 }
 
-void resetInputStateButtons(void)
+MONExternC RESET_INPUT_STATE_BUTTONS(resetInputStateButtons)
 {
   for (s32 i = 0; i < ARRAY_COUNT(gcInput.buttons); i++)
   {
@@ -59,7 +58,7 @@ void resetInputStateButtons(void)
 
 static void inputValueCallback(void * _Nullable context, IOReturn result, void * _Nullable sender, IOHIDValueRef __nullable value)
 {
-  waitIfBlocked(runThreadInput, runMutexInput, runConditionInput);
+  waitIfInputBlocked();
 
   // TODO: support controllers other than PS5 DualSense
   s32 up;

@@ -2,5 +2,8 @@
 #import "CustomNSView.m"
 #import "osx_audio.m"
 #import "osx_input.m"
+#import "osx_time.m"
+#import "osx_lock.m"
+#import "osx_dynamic_loader.m"
 #import "CustomWindowDelegate.m"
 #import "CustomCALayer.m"

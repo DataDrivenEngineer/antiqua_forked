@@ -1,9 +1,8 @@
 #include "types.h"
 #include "osx_audio.h"
-#include "osx_lock.h"
 #include "osx_time.h"
+#include "osx_dynamic_loader.h"
 
-u8 soundPlaying = 0;
 struct SoundState soundState = {0};
 static AudioObjectID device = kAudioObjectUnknown;
 static _Nullable AudioDeviceIOProcID procID;
@@ -18,12 +17,12 @@ static OSStatus appIOProc(AudioObjectID inDevice,
 {
   // TODO(dima): tighten up audio sync when we start mixing sounds
   struct SoundState *soundState = (struct SoundState *) inClientData;
-  waitIfBlocked(runThreadAudio, runMutexAudio, runConditionAudio);
   // TODO(dima): do we need to account for cases when there is >1 buffer?
   // # of frames needed = total # of bytes / num of channels in frame (2) / size of sample (4 = float)
-  soundState->needFrames = outOutputData->mBuffers->mDataByteSize / 2 /4;
+  waitIfAudioBlocked();
+  soundState->needFrames = outOutputData->mBuffers->mDataByteSize / 2 / 4;
   soundState->frames = (r32 *) outOutputData->mBuffers[0].mData;
-  fillSoundBuffer(soundState);
+  gameCode.fillSoundBuffer(soundState);
 
   return kAudioHardwareNoError;     
 }
@@ -32,7 +31,7 @@ u8 playAudio(void)
 {
   OSStatus err = kAudioHardwareNoError;
 
-  if (soundPlaying) return 0;
+  if (soundState.soundPlaying) return 0;
   
   err = AudioDeviceCreateIOProcID(device, appIOProc, (void *) &soundState, &procID);
   if (err != kAudioHardwareNoError) return 0;
@@ -40,7 +39,7 @@ u8 playAudio(void)
   err = AudioDeviceStart(device, procID);				// start playing sound through the device
   if (err != kAudioHardwareNoError) return 0;
 
-  soundPlaying = 1; // set the playing status global to true
+  soundState.soundPlaying = 1; // set the playing status global to true
   return 1;
 }
 
@@ -48,7 +47,7 @@ u8 stopAudio(void)
 {
     OSStatus err = kAudioHardwareNoError;
     
-    if (!soundPlaying) return 0;
+    if (!soundState.soundPlaying) return 0;
     
     err = AudioDeviceStop(device, procID);				// stop playing sound through the device
     if (err != kAudioHardwareNoError) 
@@ -56,7 +55,7 @@ u8 stopAudio(void)
       if (err == kAudioHardwareBadDeviceError)
       {
 	// Device not found, could be because e.g. headphones got unplugged - still must set sound to not playing
-	soundPlaying = 0;
+	soundState.soundPlaying = 0;
       }
       return 0;
     }
@@ -64,7 +63,7 @@ u8 stopAudio(void)
     err = AudioDeviceDestroyIOProcID(device, procID);
     if (err != kAudioHardwareNoError) return 0;
 
-    soundPlaying = 0;						// set the playing status global to false
+    soundState.soundPlaying = 0;						// set the playing status global to false
     return 1;
 }
 

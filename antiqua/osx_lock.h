@@ -1,21 +1,14 @@
 #ifndef _OSX_LOCK_H_
 #define _OSX_LOCK_H_
 
-#include "types.h"
-#include <pthread.h>
+#include "antiqua.h"
 
-// audio thread
-extern int runThreadAudio;
-extern pthread_mutex_t runMutexAudio;
-extern pthread_cond_t runConditionAudio;
+LOCK_AUDIO_THREAD(lockAudioThread);
+UNLOCK_AUDIO_THREAD(unlockAudioThread);
+WAIT_IF_AUDIO_BLOCKED(waitIfAudioBlocked);
 
-// input thread
-extern int runThreadInput;
-extern pthread_mutex_t runMutexInput;
-extern pthread_cond_t runConditionInput;
-
-MONExternC void lockThread(int conditionVariable, pthread_mutex_t mutex, pthread_cond_t condition);
-MONExternC void unlockThread(int conditionVariable, pthread_mutex_t mutex, pthread_cond_t condition);
-MONExternC void waitIfBlocked(int conditionVariable, pthread_mutex_t mutex, pthread_cond_t condition);
+LOCK_INPUT_THREAD(lockInputThread);
+UNLOCK_INPUT_THREAD(unlockInputThread);
+WAIT_IF_INPUT_BLOCKED(waitIfInputBlocked);
 
 #endif

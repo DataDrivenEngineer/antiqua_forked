@@ -1,9 +1,6 @@
-#include "osx_lock.cpp"
-#include "osx_time.cpp"
+#include <cmath>
 
 #include "antiqua.h"
-#include "osx_audio.h"
-#include "osx_input.h"
 #include "types.h"
 
 static void renderGradient(struct GameOffscreenBuffer *buf, u64 xOffset, u64 yOffset)
@@ -24,9 +21,9 @@ static void renderGradient(struct GameOffscreenBuffer *buf, u64 xOffset, u64 yOf
     }
 }
 
-void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *buff)
+EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
 {
-  ASSERT(&gcInput.terminator - &gcInput.buttons[0] == ARRAY_COUNT(gcInput.buttons));
+  ASSERT(&gcInput->terminator - &gcInput->buttons[0] == ARRAY_COUNT(gcInput->buttons));
   ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
   GameState *gameState = (GameState *) memory->permanentStorage;
   if (!memory->isInitialized)
@@ -34,65 +31,58 @@ void updateGameAndRender(struct GameMemory *memory, struct GameOffscreenBuffer *
     // do initialization here as needed
     const char *filename = __FILE__;
     struct debug_ReadFileResult file;
-    if (debug_platformReadEntireFile(&file, filename))
+    if (memory->debug_platformReadEntireFile(&file, filename))
     {
-      debug_platformWriteEntireFile("/opt/projects/antiqua/data/test.out", file.contentsSize, file.contents);
-      debug_platformFreeFileMemory(&file);
+      memory->debug_platformWriteEntireFile("/opt/projects/antiqua/data/test.out", file.contentsSize, file.contents);
+      memory->debug_platformFreeFileMemory(&file);
     }
 
     memory->isInitialized = 1;
   }
 
-  if (!soundPlaying)
+  if (gcInput->isAnalog)
   {
-    initAudio();
-    soundPlaying = playAudio();
-  }
-
-  // TODO(dima): switch to non-blocking way after HMH multithreading is studied
-  lockThread(runThreadAudio, runMutexAudio, runConditionAudio);
-  lockThread(runThreadInput, runMutexInput, runConditionInput);
-
-  if (gcInput.isAnalog)
-  {
-    s16 normalized = gcInput.stickAverageX - 127;
+    s16 normalized = gcInput->stickAverageX - 127;
 //    fprintf(stderr, "%d\n", normalized);
     gameState->xOff += normalized >> 2;
 
-    normalized = gcInput.stickAverageY - 127;
+    normalized = gcInput->stickAverageY - 127;
     s32 toneHzModifier = (s32) (256.f * (normalized / 255.f));
-    soundState.toneHz = 512 + toneHzModifier;
+    memory->waitIfAudioBlocked();
+    memory->lockAudioThread();
+    soundState->toneHz = 512 + toneHzModifier;
+    memory->unlockAudioThread();
     gameState->yOff += normalized >> 2;
   }
   else
   {
-    if (gcInput.right.endedDown)
+    if (gcInput->right.endedDown)
     {
       gameState->xOff += 2;
     }
-    if (gcInput.left.endedDown)
+    if (gcInput->left.endedDown)
     {
       gameState->xOff -= 2;
     }
-    if (gcInput.up.endedDown)
+    if (gcInput->up.endedDown)
     {
       gameState->yOff -= 2;
     }
-    if (gcInput.down.endedDown)
+    if (gcInput->down.endedDown)
     {
       gameState->yOff += 2;
     }
   }
 
-  resetInputStateButtons();
-
-  unlockThread(runThreadInput, runMutexInput, runConditionInput);
-  unlockThread(runThreadAudio, runMutexAudio, runConditionAudio);
+  memory->waitIfInputBlocked();
+  memory->lockInputThread();
+  memory->resetInputStateButtons();
+  memory->unlockInputThread();
 
   renderGradient(buff, gameState->xOff, gameState->yOff);
 }
 
-void fillSoundBuffer(struct SoundState *soundState)
+EXPORT MONExternC FILL_SOUND_BUFFER(fillSoundBuffer)
 {
   // we're just filling the entire buffer here
   // In a real game we might only fill part of the buffer and set the mAudioDataBytes

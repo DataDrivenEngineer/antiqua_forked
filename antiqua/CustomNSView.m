@@ -8,14 +8,16 @@
 #import <math.h>
 #import <sys/types.h>
 #import <sys/mman.h>
-#import <time.h>
+#import <sys/stat.h>
 
 #import "osx_audio.h"
 #import "osx_time.h"
+#import "osx_input.h"
 #import "types.h"
 #import "CustomNSView.h"
 #import "CustomCALayer.h"
 #import "antiqua.h"
+#import "osx_dynamic_loader.h"
 
 struct GameOffscreenBuffer framebuffer;
 struct GameMemory gameMemory = {0};
@@ -44,7 +46,7 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   skipCurrentFrame = !skipCurrentFrame;
   if (!skipCurrentFrame)
   {
-    logFrameTime(inNow, inOutputTime);
+//    logFrameTime(inNow, inOutputTime);
     CVReturn error = [(__bridge CustomNSView *) displayLinkContext displayFrame:inOutputTime];
     return error;
   }
@@ -73,13 +75,29 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 }
 
 - (CVReturn)displayFrame:(const CVTimeStamp *)inOutputTime {
+  struct stat st;
+  if (stat(GAME_CODE_LIB_NAME, &st) != -1)
+  {
+    IF_IS_GAME_CODE_MODIFIED(st.st_mtimespec, gameCode.lastModified)
+    {
+      waitIfInputBlocked();
+      lockInputThread();
+      waitIfAudioBlocked();
+      lockAudioThread();
+      unloadGameCode();
+      loadGameCode(st.st_mtimespec);
+      unlockAudioThread();
+      unlockInputThread();
+    }
+  }
+
   if (shouldStopDL)
   {
     [self doStop];
   }
   else
   {
-    updateGameAndRender(&gameMemory, &framebuffer);
+    gameCode.updateGameAndRender(&gcInput, &soundState, &gameMemory, &framebuffer);
 
     dispatch_sync(dispatch_get_main_queue(), ^{
       [self setNeedsDisplay:YES];
@@ -131,6 +149,19 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
     return 0;
   }
   gameMemory.transientStorage = (u8 *) gameMemory.permanentStorage + gameMemory.permanentStorageSize;
+
+  gameMemory.resetInputStateButtons = resetInputStateButtons;
+
+  gameMemory.lockAudioThread = lockAudioThread;
+  gameMemory.unlockAudioThread = unlockAudioThread;
+  gameMemory.waitIfAudioBlocked = waitIfAudioBlocked;
+  gameMemory.lockInputThread = lockInputThread;
+  gameMemory.unlockInputThread = unlockInputThread;
+  gameMemory.waitIfInputBlocked = waitIfInputBlocked;
+
+  gameMemory.debug_platformFreeFileMemory = debug_platformFreeFileMemory;
+  gameMemory.debug_platformReadEntireFile = debug_platformReadEntireFile;
+  gameMemory.debug_platformWriteEntireFile = debug_platformWriteEntireFile;
 
   // init game specific state
   framebuffer.width = 1024;
