@@ -1,3 +1,4 @@
+#import <stdio.h>
 #import <dlfcn.h>
 #import <copyfile.h>
 
@@ -8,8 +9,10 @@ struct AntiquaCode gameCode = {0};
 u8 loadGameCode(struct timespec newLastModified)
 {
   u8 result = 1;
-  gameCode.updateGameAndRender = updateGameAndRenderStub;
-  gameCode.fillSoundBuffer = fillSoundBufferStub;
+#if !XCODE_BUILD
+  gameCode.updateGameAndRender = 0;
+  gameCode.fillSoundBuffer = 0;
+#endif
   copyfile(GAME_CODE_LIB_NAME, GAME_CODE_TMPLIB_NAME, 0, COPYFILE_ALL);
   gameCode.gameCodeDylib = dlopen(GAME_CODE_TMPLIB_NAME, RTLD_LAZY);
   if (gameCode.gameCodeDylib)

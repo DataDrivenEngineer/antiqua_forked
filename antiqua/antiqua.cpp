@@ -5,23 +5,45 @@
 
 static void renderGradient(struct GameOffscreenBuffer *buf, u64 xOffset, u64 yOffset)
 {
-    int pitch = buf->width * 4;
     u8 *row = buf->memory;
     for (u32 y = 0; y < buf->height; y++)
     {
       u8 *pixel = row;
       for (u32 x = 0; x < buf->width; x++)
       {
-	*pixel++ = 0;
+	*pixel++ = 1;
 	*pixel++ = y + yOffset;
 	*pixel++ = x + xOffset;
 	pixel++;
       }
-      row += pitch;
+      row += buf->pitch;
     }
 }
 
+static void renderPlayer(struct GameOffscreenBuffer *buf, s32 playerX, s32 playerY)
+{
+  s32 top = playerY;
+  s32 bottom = playerY + 10;
+  u32 color = 0xFFFFFFFF;
+  for (s32 x = playerX; x < playerX + 10; x++)
+  {
+    u8 *pixel = buf->memory + x * buf->bytesPerPixel + top * buf->pitch;
+    for (s32 y = top; y < bottom; y++)
+    {
+      if (pixel >= buf->memory - 4 && pixel < buf->memory + buf->sizeBytes - 4)
+      {
+	*(u32 *)pixel = color;
+	pixel += buf->pitch;
+      }
+    }
+  }
+}
+
+#if !XCODE_BUILD
 EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
+#else
+UPDATE_GAME_AND_RENDER(updateGameAndRender)
+#endif
 {
   ASSERT(&gcInput->terminator - &gcInput->buttons[0] == ARRAY_COUNT(gcInput->buttons));
   ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
@@ -33,26 +55,40 @@ EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
     struct debug_ReadFileResult file;
     if (memory->debug_platformReadEntireFile(&file, filename))
     {
-      memory->debug_platformWriteEntireFile("/opt/projects/antiqua/data/test.out", file.contentsSize, file.contents);
+      memory->debug_platformWriteEntireFile("data/test.out", file.contentsSize, file.contents);
       memory->debug_platformFreeFileMemory(&file);
     }
+
+    gameState->playerX = 100;
+    gameState->playerY = 100;
 
     memory->isInitialized = 1;
   }
 
   if (gcInput->isAnalog)
   {
-    s16 normalized = gcInput->stickAverageX - 127;
+    s16 normalizedX = gcInput->stickAverageX - 127;
 //    fprintf(stderr, "%d\n", normalized);
-    gameState->xOff += normalized >> 2;
+    gameState->xOff += normalizedX >> 2;
 
-    normalized = gcInput->stickAverageY - 127;
-    s32 toneHzModifier = (s32) (256.f * (normalized / 255.f));
+    s16 normalizedY = gcInput->stickAverageY - 127;
+    s32 toneHzModifier = (s32) (256.f * (normalizedY / 255.f));
     memory->waitIfAudioBlocked();
     memory->lockAudioThread();
     soundState->toneHz = 512 + toneHzModifier;
     memory->unlockAudioThread();
-    gameState->yOff += normalized >> 2;
+    gameState->yOff += normalizedY >> 2;
+
+    gameState->playerX += ((s32) (normalizedX) >> 3);
+    gameState->playerY += ((s32) (normalizedY) >> 3);
+    if (gameState->tJump > 0)
+    {
+      gameState->playerY -= ((s32) (normalizedY) >> 5) - 10.f * sinf(2.f * PI32 * gameState->tJump);
+    }
+    if (gcInput->actionUp.endedDown)
+    {
+      gameState->tJump = 1.f;
+    }
   }
   else
   {
@@ -74,15 +110,22 @@ EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
     }
   }
 
+  gameState->tJump -= 0.033f;
+
   memory->waitIfInputBlocked();
   memory->lockInputThread();
   memory->resetInputStateButtons();
   memory->unlockInputThread();
 
   renderGradient(buff, gameState->xOff, gameState->yOff);
+  renderPlayer(buff, gameState->playerX, gameState->playerY);
 }
 
+#if !XCODE_BUILD
 EXPORT MONExternC FILL_SOUND_BUFFER(fillSoundBuffer)
+#else
+FILL_SOUND_BUFFER(fillSoundBuffer)
+#endif
 {
   // we're just filling the entire buffer here
   // In a real game we might only fill part of the buffer and set the mAudioDataBytes
@@ -113,7 +156,11 @@ EXPORT MONExternC FILL_SOUND_BUFFER(fillSoundBuffer)
     
     // simply put the samples in
     for (u32 x = 0; x < frames; ++x) {
+#if 1
       r32 sineValue = sinf(soundState->tSine);
+#else
+      r32 sineValue = 0;
+#endif
       r32 sample = sineValue;
       *bufferPos++ = sample;
       *bufferPos++ = sample;

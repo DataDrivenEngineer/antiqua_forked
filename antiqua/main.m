@@ -71,6 +71,19 @@ static u8 processEvent(NSEvent *e)
 	gcInput.up.endedDown = 1;
       }
     }
+    if (e.keyCode == kVK_ANSI_L)
+    {
+      handled = 1;
+      if (state.inputRecordingIndex == 0)
+      {
+	beginRecordingInput(&state, 1);
+      }
+      else
+      {
+	endRecordingInput(&state);
+	beginInputPlayBack(&state, 1);
+      }
+    }
   }
   else if (e.type == NSEventTypeKeyUp)
   {
@@ -174,7 +187,7 @@ MONExternC DEBUG_PLATFORM_WRITE_ENTIRE_FILE(debug_platformWriteEntireFile)
 {
   u8 result = 0;
 
-  s32 fd = open(filename, O_WRONLY | O_EXLOCK | O_CREAT);
+  s32 fd = open(filename, O_WRONLY | O_EXLOCK | O_CREAT, 0777);
   if (fd != -1)
   {
     if (write(fd, memory, memorySize) != -1)
@@ -211,18 +224,28 @@ int main(int argc, const char * argv[]) {
     [appMenu addItem:quitMenuItem];
     [appMenuItem setSubmenu:appMenu];
 
+#if !ANTIQUA_INTERNAL
     NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1000, 600)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    styleMask:NSTitledWindowMask | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
-#pragma clang diagnostic pop
+    styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable | NSWindowStyleMaskNonactivatingPanel
     backing:NSBackingStoreBuffered defer:NO];
+    [window setCollectionBehavior: NSWindowCollectionBehaviorMoveToActiveSpace | NSWindowCollectionBehaviorFullScreenPrimary];
+    // Uncomment the code below for looped live code editing
+//    [window setFloatingPanel:YES];
+//    [window setCollectionBehavior: NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary];
+//    [window setLevel: NSStatusWindowLevel];
+#else
+    NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1000, 600)
+    styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
+    backing:NSBackingStoreBuffered defer:NO];
+    [window setCollectionBehavior: NSWindowCollectionBehaviorMoveToActiveSpace | NSWindowCollectionBehaviorFullScreenPrimary];
+#endif
+
     // Center the window
     CGFloat xPos = NSWidth([[window screen] frame]) / 2 - NSWidth([window frame]) / 2;
     CGFloat yPos = NSHeight([[window screen] frame]) / 2 + NSHeight([window frame]) / 2;
+    [window makeKeyAndOrderFront:nil];
     [window cascadeTopLeftFromPoint:NSMakePoint(xPos,yPos)];
     [window setTitle:@"Antiqua"];
-    [window makeKeyAndOrderFront:nil];
 
     CustomNSView *view = [[CustomNSView alloc]initWithFrame:[window frame]];
     window.contentView = view;

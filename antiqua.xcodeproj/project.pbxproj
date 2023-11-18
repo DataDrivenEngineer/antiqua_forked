@@ -35,6 +35,12 @@
 /* Begin PBXFileReference section */
 		9F1D09F02A86C1A100263859 /* CustomWindowDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomWindowDelegate.h; sourceTree = "<group>"; };
 		9F6E25E32A7D7559006DF7A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9F8AC8C42B0926B100AC9757 /* osx_lock.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_lock.m; sourceTree = "<group>"; };
+		9F8AC8C52B0926B100AC9757 /* osx_time.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_time.h; sourceTree = "<group>"; };
+		9F8AC8C62B0926B100AC9757 /* osx_lock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_lock.h; sourceTree = "<group>"; };
+		9F8AC8C72B0926B100AC9757 /* osx_dynamic_loader.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_dynamic_loader.m; sourceTree = "<group>"; };
+		9F8AC8C82B0926B100AC9757 /* osx_dynamic_loader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_dynamic_loader.h; sourceTree = "<group>"; };
+		9F8AC8C92B0926B100AC9757 /* osx_time.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_time.m; sourceTree = "<group>"; };
 		9FBB7D732A80BA17001EA2E0 /* CustomCALayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomCALayer.h; sourceTree = "<group>"; };
 		9FC718E42A7D5E44007ADAA1 /* antiqua.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = antiqua.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -97,6 +103,12 @@
 		9FC718E62A7D5E44007ADAA1 /* antiqua */ = {
 			isa = PBXGroup;
 			children = (
+				9F8AC8C82B0926B100AC9757 /* osx_dynamic_loader.h */,
+				9F8AC8C72B0926B100AC9757 /* osx_dynamic_loader.m */,
+				9F8AC8C62B0926B100AC9757 /* osx_lock.h */,
+				9F8AC8C42B0926B100AC9757 /* osx_lock.m */,
+				9F8AC8C52B0926B100AC9757 /* osx_time.h */,
+				9F8AC8C92B0926B100AC9757 /* osx_time.m */,
 				9FCE027D2AD9174900BB84CA /* antiqua.m */,
 				9FCE027F2AD9174900BB84CA /* CustomCALayer.m */,
 				9FCE027C2AD9174900BB84CA /* CustomNSView.m */,
@@ -343,6 +355,11 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				OTHER_CFLAGS = (
+					"-DANTIQUA_SLOW=1",
+					"-DANTIQUA_INTERNAL=1",
+					"-DXCODE_BUILD=1",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = dimatheprogrammer.antiqua;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -370,6 +387,11 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				OTHER_CFLAGS = (
+					"-DANTIQUA_SLOW=1",
+					"-DANTIQUA_INTERNAL=1",
+					"-DXCODE_BUILD=1",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = dimatheprogrammer.antiqua;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

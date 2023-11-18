@@ -36,7 +36,9 @@ static void releaseBytePointerCallback(void *info, const void *pointer) {}
 {
   @autoreleasepool
   {
-    CGRect dirtyRect = CGContextGetClipBoundingBox(ctx);
+//    CGRect dirtyRect = CGContextGetClipBoundingBox(ctx);
+    // Do not scale the image when window is resized
+    CGRect framebufferRect = CGRectMake(0, 0, framebuffer.width, framebuffer.height);
     
     CGDataProviderRef dataProvider = CGDataProviderCreateDirect(framebuffer.memory, framebuffer.sizeBytes, &callbacks);
 
@@ -47,7 +49,7 @@ static void releaseBytePointerCallback(void *info, const void *pointer) {}
 #pragma clang diagnostic pop
     dataProvider, NULL, false, kCGRenderingIntentDefault);
 
-    CGContextDrawImage(ctx, dirtyRect, image);
+    CGContextDrawImage(ctx, framebufferRect, image);
 
     CGDataProviderRelease(dataProvider);
     CGImageRelease(image);

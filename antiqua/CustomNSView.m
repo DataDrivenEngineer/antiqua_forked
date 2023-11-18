@@ -9,6 +9,8 @@
 #import <sys/types.h>
 #import <sys/mman.h>
 #import <sys/stat.h>
+#import <unistd.h>
+#import <sys/types.h>
 
 #import "osx_audio.h"
 #import "osx_time.h"
@@ -19,14 +21,72 @@
 #import "antiqua.h"
 #import "osx_dynamic_loader.h"
 
+#define LOOP_EDIT_FILENAME "tmp/loop_edit.atqi"
+
 struct GameOffscreenBuffer framebuffer;
-struct GameMemory gameMemory = {0};
+struct GameMemory gameMemory;
 
 static CustomCALayer *layer;
 static CVDisplayLinkRef displayLink;
 static u8 shouldStopDL = 0;
 
 static u8 skipCurrentFrame = 1;
+
+struct State state = {0};
+
+void beginRecordingInput(struct State *state, s32 inputRecordingIndex)
+{
+  state->inputRecordingIndex = inputRecordingIndex;
+  const char *filename = LOOP_EDIT_FILENAME;
+  state->recordingHandle = open(filename, O_WRONLY | O_EXLOCK | O_CREAT, 0777);
+
+  u32 bytesToWrite = (u32) state->totalMemorySize;
+  ASSERT(bytesToWrite < 0xFFFFFFFF);
+  write(state->recordingHandle, state->gameMemoryBlock, bytesToWrite);
+}
+
+void endRecordingInput(struct State *state)
+{
+  if (close(state->recordingHandle) == -1)
+  {
+    fprintf(stderr, "Failed to close recording handle, error: %d\n", errno);
+  }
+  state->inputRecordingIndex = 0;
+}
+
+void beginInputPlayBack(struct State *state, s32 inputPlayingIndex)
+{
+  state->inputPlayingIndex = inputPlayingIndex;
+  const char *filename = LOOP_EDIT_FILENAME;
+  state->playBackHandle = open(filename, O_RDONLY | O_SHLOCK);
+
+  u32 bytesToRead = (u32) state->totalMemorySize;
+  ASSERT(bytesToRead < 0xFFFFFFFF);
+  read(state->playBackHandle, state->gameMemoryBlock, state->totalMemorySize);
+}
+
+void endInputPlayBack(struct State *state)
+{
+  close(state->playBackHandle);
+  state->inputPlayingIndex = 0;
+}
+
+static void recordInput(struct State *state, struct GameControllerInput *gcInput)
+{
+  write(state->recordingHandle, gcInput, sizeof(*gcInput));
+}
+
+static void playBackInput(struct State *state, struct GameControllerInput *gcInput)
+{
+  s32 bytesRead = read(state->playBackHandle, gcInput, sizeof(*gcInput));
+  if (bytesRead == 0)
+  {
+    s32 playingIndex = state->inputPlayingIndex;
+    endInputPlayBack(state);
+    beginInputPlayBack(state, playingIndex);
+    bytesRead = read(state->playBackHandle, gcInput, sizeof(*gcInput));
+  }
+}
 
 static void logFrameTime(const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime)
 {
@@ -46,7 +106,7 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   skipCurrentFrame = !skipCurrentFrame;
   if (!skipCurrentFrame)
   {
-//    logFrameTime(inNow, inOutputTime);
+    logFrameTime(inNow, inOutputTime);
     CVReturn error = [(__bridge CustomNSView *) displayLinkContext displayFrame:inOutputTime];
     return error;
   }
@@ -75,6 +135,8 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 }
 
 - (CVReturn)displayFrame:(const CVTimeStamp *)inOutputTime {
+#if !XCODE_BUILD
+
   struct stat st;
   if (stat(GAME_CODE_LIB_NAME, &st) != -1)
   {
@@ -90,6 +152,7 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
       unlockInputThread();
     }
   }
+#endif
 
   if (shouldStopDL)
   {
@@ -97,7 +160,22 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   }
   else
   {
-    gameCode.updateGameAndRender(&gcInput, &soundState, &gameMemory, &framebuffer);
+    if (state.inputRecordingIndex)
+    {
+      recordInput(&state, &gcInput);
+    }
+    if (state.inputPlayingIndex)
+    {
+      playBackInput(&state, &gcInput);
+    }
+#if !XCODE_BUILD
+    if (gameCode.updateGameAndRender)
+    {
+      gameCode.updateGameAndRender(&gcInput, &soundState, &gameMemory, &framebuffer);
+    }
+#else
+    updateGameAndRender(&gcInput, &soundState, &gameMemory, &framebuffer);
+#endif
 
     dispatch_sync(dispatch_get_main_queue(), ^{
       [self setNeedsDisplay:YES];
@@ -131,13 +209,14 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 
   // init game memory
   gameMemory.permanentStorageSize = MB(64);
-  gameMemory.transientStorageSize = GB(2);
-  u64 totalStorageSize = gameMemory.permanentStorageSize + gameMemory.transientStorageSize;
+  gameMemory.transientStorageSize = GB(1);
+  state.totalMemorySize = gameMemory.permanentStorageSize + gameMemory.transientStorageSize;
   // allocate physical memory
   // equivalent of VirtualAlloc(addr, size, MEM_COMMIT, PAGE_READWRITE) - except that memory is going to be committed on as-needed basis when we write to it
 #if ANTIQUA_INTERNAL
   u64 baseAddress = GB(10);
-  gameMemory.permanentStorage = mmap((void *) baseAddress, totalStorageSize, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
+  state.gameMemoryBlock = mmap((void *) baseAddress, state.totalMemorySize, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
+  gameMemory.permanentStorage = state.gameMemoryBlock;
   msync((void *) baseAddress, gameMemory.permanentStorageSize, MS_SYNC | MS_INVALIDATE);
 #else
   gameMemory.permanentStorage = mmap(0, totalStorageSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
@@ -148,6 +227,7 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
     fprintf(stderr, "Failed to allocate permanentStorage - error: %d\n", errno);
     return 0;
   }
+  state.gameMemoryBlock = gameMemory.permanentStorage;
   gameMemory.transientStorage = (u8 *) gameMemory.permanentStorage + gameMemory.permanentStorageSize;
 
   gameMemory.resetInputStateButtons = resetInputStateButtons;
@@ -166,6 +246,8 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   // init game specific state
   framebuffer.width = 1024;
   framebuffer.height = 640;
+  framebuffer.bytesPerPixel = 4;
+  framebuffer.pitch = framebuffer.width * framebuffer.bytesPerPixel;
   framebuffer.sizeBytes = sizeof(u8) * framebuffer.width * 4 * framebuffer.height;
   framebuffer.memory = malloc(framebuffer.sizeBytes);
   

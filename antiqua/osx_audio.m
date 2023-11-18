@@ -22,7 +22,14 @@ static OSStatus appIOProc(AudioObjectID inDevice,
   waitIfAudioBlocked();
   soundState->needFrames = outOutputData->mBuffers->mDataByteSize / 2 / 4;
   soundState->frames = (r32 *) outOutputData->mBuffers[0].mData;
-  gameCode.fillSoundBuffer(soundState);
+#if !XCODE_BUILD
+  if (gameCode.fillSoundBuffer)
+  {
+    gameCode.fillSoundBuffer(soundState);
+  }
+#else
+  fillSoundBuffer(soundState);
+#endif
 
   return kAudioHardwareNoError;     
 }

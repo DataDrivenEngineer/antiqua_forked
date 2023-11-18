@@ -11,9 +11,11 @@ build:
 package:
 	cp -f antiqua.o antiqua.app/Contents/MacOS/antiqua
 	cp -rf antiqua.o.dSYM antiqua.app/Contents/MacOS/antiqua.dSYM
+	mv libantiqua.dylib.dSYM libantiquatmp.dylib.dSYM
 run:
 	open antiqua.app
 clean:
+	rm -rf build
 	rm -rf libantiqua*
 	# Remove executable and debug symbols from the app's bundle
 	rm -rf antiqua.app/Contents/MacOS/*

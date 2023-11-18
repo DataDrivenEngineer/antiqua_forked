@@ -30,6 +30,8 @@ struct GameOffscreenBuffer
 {
   u32 width;
   u32 height;
+  u32 bytesPerPixel;
+  u32 pitch;
   u32 sizeBytes;
   u8 *memory;
 };
@@ -49,13 +51,17 @@ struct GameControllerInput
 
   union
   {
-    struct GameButtonState buttons[8];
+    struct GameButtonState buttons[12];
     struct
     {
       struct GameButtonState up;
       struct GameButtonState down;
       struct GameButtonState left;
       struct GameButtonState right;
+      struct GameButtonState actionUp;
+      struct GameButtonState actionDown;
+      struct GameButtonState actionLeft;
+      struct GameButtonState actionRight;
       struct GameButtonState leftShoulder;
       struct GameButtonState rightShoulder;
       struct GameButtonState leftBumper;
@@ -71,6 +77,11 @@ struct GameState
 {
   u64 xOff;
   u64 yOff;
+
+  s32 playerX;
+  s32 playerY;
+
+  r32 tJump;
 };
 
 // Services that the platform provides to the game
@@ -131,13 +142,13 @@ struct GameMemory
 
 #define UPDATE_GAME_AND_RENDER(name) void name(struct GameControllerInput *gcInput, struct SoundState *soundState, struct GameMemory *memory, struct GameOffscreenBuffer *buff)
 typedef UPDATE_GAME_AND_RENDER(UpdateGameAndRender);
-UPDATE_GAME_AND_RENDER(updateGameAndRenderStub)
-{
-}
+#if XCODE_BUILD
+MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender);
+#endif
 #define FILL_SOUND_BUFFER(name) void name(struct SoundState *soundState)
 typedef FILL_SOUND_BUFFER(FillSoundBuffer);
-FILL_SOUND_BUFFER(fillSoundBufferStub)
-{
-}
+#if XCODE_BUILD
+MONExternC FILL_SOUND_BUFFER(fillSoundBuffer);
+#endif
 
 #endif

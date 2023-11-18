@@ -69,10 +69,10 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
   s32 rightBumper;
   s32 leftShoulder;
   s32 rightShoulder;
-  s32 squareButton; //Xbox: X
-  s32 triangleButton; //Xbox: Y
-  s32 circleButton; //Xbox: B
-  s32 crossButton; //Xbox: A
+  s32 actionLeft; //Xbox: X
+  s32 actionUp; //Xbox: Y
+  s32 actionRight; //Xbox: B
+  s32 actionDown; //Xbox: A
   r32 lStickX;
   r32 lStickY;
 
@@ -91,7 +91,7 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
 
     if (lStickX != INPUT_NOT_INITIALIZED)
     {
-      fprintf(stderr, "lStickX raw: %f\n", lStickX);
+//      fprintf(stderr, "lStickX raw: %f\n", lStickX);
       if (lStickX >= 127 - DEAD_ZONE && lStickX <= 127 + DEAD_ZONE)
       {
 	gcInput.stickAverageX = 127;
@@ -103,7 +103,7 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
     }
     if (lStickY != INPUT_NOT_INITIALIZED)
     {
-      fprintf(stderr, "lStickY raw: %f\n", lStickY);
+//     fprintf(stderr, "lStickY raw: %f\n", lStickY);
       if (lStickY >= 127 - DEAD_ZONE && lStickY <= 127 + DEAD_ZONE)
       {
 	gcInput.stickAverageY = 127;
@@ -120,10 +120,27 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
     rightBumper = usage == kHIDUsage_Button_6 ? intValue : INPUT_NOT_INITIALIZED;
     leftShoulder = usage == kHIDUsage_Button_7 ? intValue : INPUT_NOT_INITIALIZED;
     rightShoulder = usage == kHIDUsage_Button_8 ? intValue : INPUT_NOT_INITIALIZED;
-    squareButton = usage == kHIDUsage_Button_1 ? intValue : INPUT_NOT_INITIALIZED;
-    triangleButton = usage == kHIDUsage_Button_4 ? intValue : INPUT_NOT_INITIALIZED;
-    circleButton = usage == kHIDUsage_Button_3 ? intValue : INPUT_NOT_INITIALIZED;
-    crossButton = usage == kHIDUsage_Button_2 ? intValue : INPUT_NOT_INITIALIZED;
+    actionLeft = usage == kHIDUsage_Button_1 ? intValue : INPUT_NOT_INITIALIZED;
+    actionUp = usage == kHIDUsage_Button_4 ? intValue : INPUT_NOT_INITIALIZED;
+    actionRight = usage == kHIDUsage_Button_3 ? intValue : INPUT_NOT_INITIALIZED;
+    actionDown = usage == kHIDUsage_Button_2 ? intValue : INPUT_NOT_INITIALIZED;
+
+    if (actionUp != INPUT_NOT_INITIALIZED)
+    {
+      gcInput.actionUp.halfTransitionCount++;
+      if (actionUp == 1)
+      {
+	gcInput.actionUp.endedDown = 1;
+      }
+      else if (actionUp == 0)
+      {
+	gcInput.actionUp.endedDown = 0;
+      }
+      else
+      {
+	fprintf(stderr, "Unknown value for actionUp button: %d\n", actionUp);
+      }
+    }
   }
 }
 
