@@ -21,9 +21,57 @@
 
 static u8 shouldKeepRunning = 1;
 
+static void processButtonDown(struct GameButtonState *btn)
+{
+  if (!btn->endedDown)
+  {
+    waitIfInputBlocked(&thread);
+    btn->halfTransitionCount++;
+    btn->endedDown = 1;
+  }
+}
+
+static void processButtonUp(struct GameButtonState *btn)
+{
+  waitIfInputBlocked(&thread);
+  btn->halfTransitionCount++;
+  btn->endedDown = 0;
+}
+
 static u8 processEvent(NSEvent *e)
 {
   u8 handled = 0;
+
+  NSWindow *window = [[NSApplication sharedApplication] mainWindow];
+  NSView *view = [window contentView];
+  NSPoint mouseLocScreen = [NSEvent mouseLocation];
+  NSPoint mouseLocWindow = [window convertPointFromScreen:mouseLocScreen];
+  NSPoint mouseLocView = [view convertPoint:mouseLocWindow fromView:nil];
+  gcInput.mouseX = mouseLocView.x;
+  gcInput.mouseY = mouseLocView.y;
+  gcInput.mouseZ = 0;
+
+  if (e.type == NSEventTypeLeftMouseDown)
+  {
+    handled = 1;
+    processButtonDown(&gcInput.mouseButtons[0]);
+  }
+  if (e.type == NSEventTypeLeftMouseUp)
+  {
+    handled = 1;
+    processButtonUp(&gcInput.mouseButtons[0]);
+  }
+  if (e.type == NSEventTypeRightMouseDown)
+  {
+    handled = 1;
+    processButtonDown(&gcInput.mouseButtons[1]);
+  }
+  if (e.type == NSEventTypeRightMouseUp)
+  {
+    handled = 1;
+    processButtonUp(&gcInput.mouseButtons[1]);
+  }
+
   if (e.type == NSEventTypeKeyDown)
   {
     if (e.keyCode == kVK_Escape)
@@ -34,42 +82,22 @@ static u8 processEvent(NSEvent *e)
     if (e.keyCode == kVK_ANSI_S)
     {
       handled = 1;
-      if (!gcInput.down.endedDown)
-      {
-	waitIfInputBlocked();
-	gcInput.down.halfTransitionCount++;
-	gcInput.down.endedDown = 1;
-      }
+      processButtonDown(&gcInput.down);
     }
     if (e.keyCode == kVK_ANSI_D)
     {
       handled = 1;
-      if (!gcInput.right.endedDown)
-      {
-	waitIfInputBlocked();
-	gcInput.right.halfTransitionCount++;
-	gcInput.right.endedDown = 1;
-      }
+      processButtonDown(&gcInput.right);
     }
     if (e.keyCode == kVK_ANSI_A)
     {
       handled = 1;
-      if (!gcInput.left.endedDown)
-      {
-	waitIfInputBlocked();
-	gcInput.left.halfTransitionCount++;
-	gcInput.left.endedDown = 1;
-      }
+      processButtonDown(&gcInput.left);
     }
     if (e.keyCode == kVK_ANSI_W)
     {
       handled = 1;
-      if (!gcInput.up.endedDown)
-      {
-	waitIfInputBlocked();
-	gcInput.up.halfTransitionCount++;
-	gcInput.up.endedDown = 1;
-      }
+      processButtonDown(&gcInput.up);
     }
     if (e.keyCode == kVK_ANSI_L)
     {
@@ -89,31 +117,23 @@ static u8 processEvent(NSEvent *e)
   {
     if (e.keyCode == kVK_ANSI_S)
     {
-      waitIfInputBlocked();
+      processButtonUp(&gcInput.down);
       handled = 1;
-      gcInput.down.halfTransitionCount++;
-      gcInput.down.endedDown = 0;
     }
     if (e.keyCode == kVK_ANSI_D)
     {
-      waitIfInputBlocked();
       handled = 1;
-      gcInput.right.halfTransitionCount++;
-      gcInput.right.endedDown = 0;
+      processButtonUp(&gcInput.right);
     }
     if (e.keyCode == kVK_ANSI_A)
     {
-      waitIfInputBlocked();
       handled = 1;
-      gcInput.left.halfTransitionCount++;
-      gcInput.left.endedDown = 0;
+      processButtonUp(&gcInput.left);
     }
     if (e.keyCode == kVK_ANSI_W)
     {
-      waitIfInputBlocked();
       handled = 1;
-      gcInput.up.halfTransitionCount++;
-      gcInput.up.endedDown = 0;
+      processButtonUp(&gcInput.up);
     }
   }
 
@@ -156,7 +176,7 @@ MONExternC DEBUG_PLATFORM_READ_ENTIRE_FILE(debug_platformReadEntireFile)
 	else
 	{
 	  fprintf(stderr, "Failed to read from a file %s, bytesRead: %d, error: %d\n", filename, bytesRead, errno);
-	  debug_platformFreeFileMemory(outFile);
+	  debug_platformFreeFileMemory(thread, outFile);
 	  result = 0;
 	}
       }
@@ -239,6 +259,7 @@ int main(int argc, const char * argv[]) {
     backing:NSBackingStoreBuffered defer:NO];
     [window setCollectionBehavior: NSWindowCollectionBehaviorMoveToActiveSpace | NSWindowCollectionBehaviorFullScreenPrimary];
 #endif
+    [window setAcceptsMouseMovedEvents:YES];
 
     // Center the window
     CGFloat xPos = NSWidth([[window screen] frame]) / 2 - NSWidth([window frame]) / 2;

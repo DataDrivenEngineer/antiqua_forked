@@ -44,6 +44,10 @@ struct GameButtonState
 
 struct GameControllerInput
 {
+  // Index 0 = LMB, index 1 = RMB
+  struct GameButtonState mouseButtons[2];
+  s32 mouseX, mouseY, mouseZ;
+
   u8 isAnalog;
 
   r32 stickAverageX;
@@ -84,6 +88,11 @@ struct GameState
   r32 tJump;
 };
 
+struct ThreadContext
+{
+  s32 placeholder;
+};
+
 // Services that the platform provides to the game
 #if ANTIQUA_INTERNAL
 struct debug_ReadFileResult
@@ -91,29 +100,29 @@ struct debug_ReadFileResult
   u32 contentsSize;
   void *contents;
 };
-#define DEBUG_PLATFORM_READ_ENTIRE_FILE(name) u8 name(struct debug_ReadFileResult *outFile, const char *filename)
+#define DEBUG_PLATFORM_READ_ENTIRE_FILE(name) u8 name(struct ThreadContext *thread, struct debug_ReadFileResult *outFile, const char *filename)
 typedef DEBUG_PLATFORM_READ_ENTIRE_FILE(Debug_PlatformReadEntireFile);
-#define DEBUG_PLATFORM_FREE_FILE_MEMORY(name) void name(struct debug_ReadFileResult *file)
+#define DEBUG_PLATFORM_FREE_FILE_MEMORY(name) void name(struct ThreadContext *thread, struct debug_ReadFileResult *file)
 typedef DEBUG_PLATFORM_FREE_FILE_MEMORY(Debug_PlatformFreeFileMemory);
-#define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) u8 name(const char *filename, u32 memorySize, void *memory)
+#define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) u8 name(struct ThreadContext *thread, const char *filename, u32 memorySize, void *memory)
 typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE(Debug_PlatformWriteEntireFile);
 #endif
 
-#define RESET_INPUT_STATE_BUTTONS(name) void name(void)
+#define RESET_INPUT_STATE_BUTTONS(name) void name(struct ThreadContext *thread)
 typedef RESET_INPUT_STATE_BUTTONS(ResetInputStateButtons);
 
-#define LOCK_AUDIO_THREAD(name) void name(void)
+#define LOCK_AUDIO_THREAD(name) void name(struct ThreadContext *thread)
 typedef LOCK_AUDIO_THREAD(LockAudioThread);
-#define UNLOCK_AUDIO_THREAD(name) void name(void)
+#define UNLOCK_AUDIO_THREAD(name) void name(struct ThreadContext *thread)
 typedef UNLOCK_AUDIO_THREAD(UnlockAudioThread);
-#define WAIT_IF_AUDIO_BLOCKED(name) void name(void)
+#define WAIT_IF_AUDIO_BLOCKED(name) void name(struct ThreadContext *thread)
 typedef WAIT_IF_AUDIO_BLOCKED(WaitIfAudioBlocked);
 
-#define LOCK_INPUT_THREAD(name) void name(void)
+#define LOCK_INPUT_THREAD(name) void name(struct ThreadContext *thread)
 typedef LOCK_INPUT_THREAD(LockInputThread);
-#define UNLOCK_INPUT_THREAD(name) void name(void)
+#define UNLOCK_INPUT_THREAD(name) void name(struct ThreadContext *thread)
 typedef UNLOCK_INPUT_THREAD(UnlockInputThread);
-#define WAIT_IF_INPUT_BLOCKED(name) void name(void)
+#define WAIT_IF_INPUT_BLOCKED(name) void name(struct ThreadContext *thread)
 typedef WAIT_IF_INPUT_BLOCKED(WaitIfInputBlocked);
 
 struct GameMemory
@@ -140,12 +149,12 @@ struct GameMemory
 #endif
 };
 
-#define UPDATE_GAME_AND_RENDER(name) void name(struct GameControllerInput *gcInput, struct SoundState *soundState, struct GameMemory *memory, struct GameOffscreenBuffer *buff)
+#define UPDATE_GAME_AND_RENDER(name) void name(struct ThreadContext *thread, struct GameControllerInput *gcInput, struct SoundState *soundState, struct GameMemory *memory, struct GameOffscreenBuffer *buff)
 typedef UPDATE_GAME_AND_RENDER(UpdateGameAndRender);
 #if XCODE_BUILD
 MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender);
 #endif
-#define FILL_SOUND_BUFFER(name) void name(struct SoundState *soundState)
+#define FILL_SOUND_BUFFER(name) void name(struct ThreadContext *thread, struct SoundState *soundState)
 typedef FILL_SOUND_BUFFER(FillSoundBuffer);
 #if XCODE_BUILD
 MONExternC FILL_SOUND_BUFFER(fillSoundBuffer);

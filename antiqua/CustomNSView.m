@@ -32,6 +32,7 @@ static u8 shouldStopDL = 0;
 
 static u8 skipCurrentFrame = 1;
 
+struct ThreadContext thread = {0};
 struct State state = {0};
 
 void beginRecordingInput(struct State *state, s32 inputRecordingIndex)
@@ -106,7 +107,7 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   skipCurrentFrame = !skipCurrentFrame;
   if (!skipCurrentFrame)
   {
-    logFrameTime(inNow, inOutputTime);
+//    logFrameTime(inNow, inOutputTime);
     CVReturn error = [(__bridge CustomNSView *) displayLinkContext displayFrame:inOutputTime];
     return error;
   }
@@ -114,6 +115,11 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 }
 
 @implementation CustomNSView
+
+- (BOOL) isFlipped
+{
+  return YES;
+}
 
 -(void) resumeDisplayLink
 {
@@ -142,14 +148,14 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   {
     IF_IS_GAME_CODE_MODIFIED(st.st_mtimespec, gameCode.lastModified)
     {
-      waitIfInputBlocked();
-      lockInputThread();
-      waitIfAudioBlocked();
-      lockAudioThread();
+      waitIfInputBlocked(&thread);
+      lockInputThread(&thread);
+      waitIfAudioBlocked(&thread);
+      lockAudioThread(&thread);
       unloadGameCode();
       loadGameCode(st.st_mtimespec);
-      unlockAudioThread();
-      unlockInputThread();
+      unlockAudioThread(&thread);
+      unlockInputThread(&thread);
     }
   }
 #endif
@@ -171,10 +177,10 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 #if !XCODE_BUILD
     if (gameCode.updateGameAndRender)
     {
-      gameCode.updateGameAndRender(&gcInput, &soundState, &gameMemory, &framebuffer);
+      gameCode.updateGameAndRender(&thread, &gcInput, &soundState, &gameMemory, &framebuffer);
     }
 #else
-    updateGameAndRender(&gcInput, &soundState, &gameMemory, &framebuffer);
+    updateGameAndRender(&thread, &gcInput, &soundState, &gameMemory, &framebuffer);
 #endif
 
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -243,9 +249,10 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   gameMemory.debug_platformReadEntireFile = debug_platformReadEntireFile;
   gameMemory.debug_platformWriteEntireFile = debug_platformWriteEntireFile;
 
+  CGSize viewSize = [self frame].size;
   // init game specific state
-  framebuffer.width = 1024;
-  framebuffer.height = 640;
+  framebuffer.width = viewSize.width;
+  framebuffer.height = viewSize.height;
   framebuffer.bytesPerPixel = 4;
   framebuffer.pitch = framebuffer.width * framebuffer.bytesPerPixel;
   framebuffer.sizeBytes = sizeof(u8) * framebuffer.width * 4 * framebuffer.height;

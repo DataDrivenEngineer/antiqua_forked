@@ -2,6 +2,7 @@
 #include "osx_audio.h"
 #include "osx_time.h"
 #include "osx_dynamic_loader.h"
+#include "CustomNSView.h"
 
 struct SoundState soundState = {0};
 static AudioObjectID device = kAudioObjectUnknown;
@@ -19,16 +20,16 @@ static OSStatus appIOProc(AudioObjectID inDevice,
   struct SoundState *soundState = (struct SoundState *) inClientData;
   // TODO(dima): do we need to account for cases when there is >1 buffer?
   // # of frames needed = total # of bytes / num of channels in frame (2) / size of sample (4 = float)
-  waitIfAudioBlocked();
+  waitIfAudioBlocked(&thread);
   soundState->needFrames = outOutputData->mBuffers->mDataByteSize / 2 / 4;
   soundState->frames = (r32 *) outOutputData->mBuffers[0].mData;
 #if !XCODE_BUILD
   if (gameCode.fillSoundBuffer)
   {
-    gameCode.fillSoundBuffer(soundState);
+    gameCode.fillSoundBuffer(&thread, soundState);
   }
 #else
-  fillSoundBuffer(soundState);
+  fillSoundBuffer(&thread, soundState);
 #endif
 
   return kAudioHardwareNoError;     

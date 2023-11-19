@@ -5,7 +5,7 @@
 
 static void renderGradient(struct GameOffscreenBuffer *buf, u64 xOffset, u64 yOffset)
 {
-    u8 *row = buf->memory;
+    u8 *row = buf->memory + buf->height * buf->pitch - buf->pitch;
     for (u32 y = 0; y < buf->height; y++)
     {
       u8 *pixel = row;
@@ -16,7 +16,7 @@ static void renderGradient(struct GameOffscreenBuffer *buf, u64 xOffset, u64 yOf
 	*pixel++ = x + xOffset;
 	pixel++;
       }
-      row += buf->pitch;
+      row -= buf->pitch;
     }
 }
 
@@ -27,13 +27,14 @@ static void renderPlayer(struct GameOffscreenBuffer *buf, s32 playerX, s32 playe
   u32 color = 0xFFFFFFFF;
   for (s32 x = playerX; x < playerX + 10; x++)
   {
-    u8 *pixel = buf->memory + x * buf->bytesPerPixel + top * buf->pitch;
-    for (s32 y = top; y < bottom; y++)
+    u8 *row = buf->memory + buf->height * buf->pitch - buf->pitch;
+    u8 *pixel = row + x * buf->bytesPerPixel - top * buf->pitch;
+    for (s32 y = bottom; y > top; y--)
     {
-      if (pixel >= buf->memory - 4 && pixel < buf->memory + buf->sizeBytes - 4)
+      if (pixel >= buf->memory && pixel <= buf->memory + buf->sizeBytes - 4)
       {
 	*(u32 *)pixel = color;
-	pixel += buf->pitch;
+	pixel -= buf->pitch;
       }
     }
   }
@@ -53,10 +54,10 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     // do initialization here as needed
     const char *filename = __FILE__;
     struct debug_ReadFileResult file;
-    if (memory->debug_platformReadEntireFile(&file, filename))
+    if (memory->debug_platformReadEntireFile(thread, &file, filename))
     {
-      memory->debug_platformWriteEntireFile("data/test.out", file.contentsSize, file.contents);
-      memory->debug_platformFreeFileMemory(&file);
+      memory->debug_platformWriteEntireFile(thread, "data/test.out", file.contentsSize, file.contents);
+      memory->debug_platformFreeFileMemory(thread, &file);
     }
 
     gameState->playerX = 100;
@@ -73,10 +74,10 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
     s16 normalizedY = gcInput->stickAverageY - 127;
     s32 toneHzModifier = (s32) (256.f * (normalizedY / 255.f));
-    memory->waitIfAudioBlocked();
-    memory->lockAudioThread();
+    memory->waitIfAudioBlocked(thread);
+    memory->lockAudioThread(thread);
     soundState->toneHz = 512 + toneHzModifier;
-    memory->unlockAudioThread();
+    memory->unlockAudioThread(thread);
     gameState->yOff += normalizedY >> 2;
 
     gameState->playerX += ((s32) (normalizedX) >> 3);
@@ -112,13 +113,23 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
   gameState->tJump -= 0.033f;
 
-  memory->waitIfInputBlocked();
-  memory->lockInputThread();
-  memory->resetInputStateButtons();
-  memory->unlockInputThread();
+  memory->waitIfInputBlocked(thread);
+  memory->lockInputThread(thread);
+  memory->resetInputStateButtons(thread);
+  memory->unlockInputThread(thread);
 
   renderGradient(buff, gameState->xOff, gameState->yOff);
   renderPlayer(buff, gameState->playerX, gameState->playerY);
+
+  for (u8 buttonIndex = 0; buttonIndex < ARRAY_COUNT(gcInput->mouseButtons); buttonIndex++)
+  {
+    if (gcInput->mouseButtons[buttonIndex].endedDown)
+    {
+      renderPlayer(buff, 10 + 20 * buttonIndex, 10);
+    }
+  }
+
+  renderPlayer(buff, gcInput->mouseX, gcInput->mouseY);
 }
 
 #if !XCODE_BUILD

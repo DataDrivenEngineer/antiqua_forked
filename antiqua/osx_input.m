@@ -17,7 +17,7 @@ static void inIOHIDDeviceRegistrationCallback(
     if (isGamepad)
     {
       fprintf(stderr, "Gamepad found\n!");
-      waitIfInputBlocked();
+      waitIfInputBlocked(&thread);
       gcInput.isAnalog = 1;
     }
 }
@@ -31,7 +31,7 @@ static void inIOHIDDeviceRemovalCallback(
 )
 {
     fprintf(stderr, "Gamepad disconnected\n!");
-    waitIfInputBlocked();
+    waitIfInputBlocked(&thread);
     gcInput.isAnalog = 0;
 }
 
@@ -50,6 +50,11 @@ void resetInputStateAll(void)
 
 MONExternC RESET_INPUT_STATE_BUTTONS(resetInputStateButtons)
 {
+  for (s32 i = 0; i < ARRAY_COUNT(gcInput.mouseButtons); i++)
+  {
+    gcInput.mouseButtons[i].halfTransitionCount = INPUT_NOT_INITIALIZED;
+  }
+
   for (s32 i = 0; i < ARRAY_COUNT(gcInput.buttons); i++)
   {
     gcInput.buttons[i].halfTransitionCount = INPUT_NOT_INITIALIZED;
@@ -58,7 +63,7 @@ MONExternC RESET_INPUT_STATE_BUTTONS(resetInputStateButtons)
 
 static void inputValueCallback(void * _Nullable context, IOReturn result, void * _Nullable sender, IOHIDValueRef __nullable value)
 {
-  waitIfInputBlocked();
+  waitIfInputBlocked(&thread);
 
   // TODO: support controllers other than PS5 DualSense
   s32 up;
