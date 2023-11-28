@@ -48,6 +48,8 @@ struct GameControllerInput
   struct GameButtonState mouseButtons[2];
   s32 mouseX, mouseY, mouseZ;
 
+  r32 dtForFrame;
+
   u8 isAnalog;
 
   r32 stickAverageX;
@@ -79,7 +81,8 @@ struct GameControllerInput
 
 struct GameState
 {
-  s32 placeholder;
+  r32 playerX;
+  r32 playerY;
 };
 
 struct ThreadContext

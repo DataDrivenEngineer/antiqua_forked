@@ -37,6 +37,8 @@ static void inIOHIDDeviceRemovalCallback(
 
 void resetInputStateAll(void)
 {
+  // TODO(dima): make this dynamic depending on current frame rate
+  gcInput.dtForFrame = 1.f / 30.f;
   gcInput.isAnalog = 0;
   gcInput.stickAverageX = 127.f;
   gcInput.stickAverageY = 127.f;

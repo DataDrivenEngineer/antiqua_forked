@@ -244,20 +244,18 @@ int main(int argc, const char * argv[]) {
     [appMenu addItem:quitMenuItem];
     [appMenuItem setSubmenu:appMenu];
 
-#if !ANTIQUA_INTERNAL
-    NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 960, 512)
+#if ANTIQUA_INTERNAL
+    NSPanel *window = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 960, 540)
     styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable | NSWindowStyleMaskNonactivatingPanel
     backing:NSBackingStoreBuffered defer:NO];
-    [window setCollectionBehavior: NSWindowCollectionBehaviorMoveToActiveSpace | NSWindowCollectionBehaviorFullScreenPrimary];
     // Uncomment the code below for looped live code editing
-//    [window setFloatingPanel:YES];
-//    [window setCollectionBehavior: NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary];
-//    [window setLevel: NSStatusWindowLevel];
+    [window setFloatingPanel:YES];
+    [window setCollectionBehavior: NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary];
+    [window setLevel: NSStatusWindowLevel];
 #else
-    NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 960, 512)
+    NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 960, 540)
     styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
     backing:NSBackingStoreBuffered defer:NO];
-    [window setCollectionBehavior: NSWindowCollectionBehaviorMoveToActiveSpace | NSWindowCollectionBehaviorFullScreenPrimary];
 #endif
     [window setAcceptsMouseMovedEvents:YES];
 

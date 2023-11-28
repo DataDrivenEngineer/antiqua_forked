@@ -9,7 +9,13 @@ static s32 roundReal32ToInt32(r32 v)
   return result;
 }
 
-static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 realMinY, r32 realMaxX, r32 realMaxY, u32 color)
+static u32 roundReal32ToUInt32(r32 v)
+{
+  u32 result = (u32) (v + 0.5f);
+  return result;
+}
+
+static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 realMinY, r32 realMaxX, r32 realMaxY, r32 r, r32 g, r32 b)
 {
   s32 minX = roundReal32ToInt32(realMinX);
   s32 minY = roundReal32ToInt32(realMinY);
@@ -35,6 +41,9 @@ static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 rea
   {
     maxY = buf->height;
   }
+
+  // BGRA
+  u32 color = (roundReal32ToUInt32(b * 255.f) << 16) | (roundReal32ToUInt32(g * 255.f) << 8) | roundReal32ToUInt32(r * 255.f);
 
   u8 *lastRow = (u8 *) buf->memory + buf->sizeBytes - buf->pitch;
   u8 *row = lastRow + minX * buf->bytesPerPixel - maxY * buf->pitch;
@@ -70,10 +79,78 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
   }
   else
   {
+    r32 dPlayerX = 0.f;
+    r32 dPlayerY = 0.f;
+    if (gcInput->up.endedDown)
+    {
+      dPlayerY = -1.f;
+    }
+    if (gcInput->down.endedDown)
+    {
+      dPlayerY = 1.f;
+    }
+    if (gcInput->left.endedDown)
+    {
+      dPlayerX = -1.f;
+    }
+    if (gcInput->right.endedDown)
+    {
+      dPlayerX = 1.f;
+    }
+    dPlayerX *= 128.f;
+    dPlayerY *= 128.f;
+
+    gameState->playerX += gcInput->dtForFrame * dPlayerX;
+    gameState->playerY += gcInput->dtForFrame * dPlayerY;
   }
 
-  drawRectangle(buff, 0, 0, buff->width, buff->height, 0x00FF00FF);
-  drawRectangle(buff, 10, 10.f, 30.f, 30.f, 0x0000FFFF);
+  u32 tileMap[9][17] =
+  {
+    {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1,  1},
+    {1, 1, 0, 0,  0, 1, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,  1},
+    {1, 1, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 1, 0,  1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0,  1},
+    {0, 0, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0,  0},
+    {1, 1, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  1},
+    {1, 0, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0,  1},
+    {1, 1, 1, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,  1},
+    {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1,  1}
+  };
+
+  drawRectangle(buff, 0, 0, buff->width, buff->height, 1.f, 0.f, 1.f);
+
+  r32 upperLeftX = -30;
+  r32 upperLeftY = 0;
+  r32 tileWidth = 60;
+  r32 tileHeight = 60;
+
+  for (s32 row = 0; row < 9; ++row)
+  {
+    for (s32 column = 0; column < 17; column++)
+    {
+      u32 tileID = tileMap[row][column];
+      r32 gray = 0.5f;
+      if (tileID == 1)
+      {
+	gray = 1.f;
+      }
+
+      r32 minX = upperLeftX + ((r32) column) * tileWidth;
+      r32 minY = upperLeftY + ((r32) row) * tileHeight;
+      r32 maxX = minX + tileWidth;
+      r32 maxY = minY + tileHeight;
+      drawRectangle(buff, minX, minY, maxX, maxY, gray, gray, gray);
+    }
+  }
+
+  r32 playerR = 1.f;
+  r32 playerG = 1.f;
+  r32 playerB = 0.f;
+  r32 playerWidth = 0.75f * tileWidth;
+  r32 playerHeight = tileHeight;
+  r32 playerLeft = gameState->playerX - 0.5f * playerWidth;
+  r32 playerTop = gameState->playerY - playerHeight;
+  drawRectangle(buff, playerLeft, playerTop, playerLeft + playerWidth, playerTop + playerHeight, playerR, playerG, playerB);
 
   memory->waitIfInputBlocked(thread);
   memory->lockInputThread(thread);
