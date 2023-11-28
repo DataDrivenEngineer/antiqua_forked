@@ -79,13 +79,7 @@ struct GameControllerInput
 
 struct GameState
 {
-  u64 xOff;
-  u64 yOff;
-
-  s32 playerX;
-  s32 playerY;
-
-  r32 tJump;
+  s32 placeholder;
 };
 
 struct ThreadContext

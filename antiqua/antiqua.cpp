@@ -3,40 +3,50 @@
 #include "antiqua.h"
 #include "types.h"
 
-static void renderGradient(struct GameOffscreenBuffer *buf, u64 xOffset, u64 yOffset)
+static s32 roundReal32ToInt32(r32 v)
 {
-    u8 *row = buf->memory + buf->height * buf->pitch - buf->pitch;
-    for (u32 y = 0; y < buf->height; y++)
-    {
-      u8 *pixel = row;
-      for (u32 x = 0; x < buf->width; x++)
-      {
-	*pixel++ = 1;
-	*pixel++ = y + yOffset;
-	*pixel++ = x + xOffset;
-	pixel++;
-      }
-      row -= buf->pitch;
-    }
+  s32 result = (s32) (v + 0.5f);
+  return result;
 }
 
-static void renderPlayer(struct GameOffscreenBuffer *buf, s32 playerX, s32 playerY)
+static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 realMinY, r32 realMaxX, r32 realMaxY, u32 color)
 {
-  s32 top = playerY;
-  s32 bottom = playerY + 10;
-  u32 color = 0xFFFFFFFF;
-  for (s32 x = playerX; x < playerX + 10; x++)
+  s32 minX = roundReal32ToInt32(realMinX);
+  s32 minY = roundReal32ToInt32(realMinY);
+  s32 maxX = roundReal32ToInt32(realMaxX);
+  s32 maxY = roundReal32ToInt32(realMaxY);
+
+  if (minX < 0)
   {
-    u8 *row = buf->memory + buf->height * buf->pitch - buf->pitch;
-    u8 *pixel = row + x * buf->bytesPerPixel - top * buf->pitch;
-    for (s32 y = bottom; y > top; y--)
+    minX = 0;
+  }
+
+  if (minY < 0)
+  {
+    minY = 0;
+  }
+
+  if (maxX > buf->width)
+  {
+    maxX = buf->width;
+  }
+
+  if (maxY > buf->height)
+  {
+    maxY = buf->height;
+  }
+
+  u8 *lastRow = (u8 *) buf->memory + buf->sizeBytes - buf->pitch;
+  u8 *row = lastRow + minX * buf->bytesPerPixel - maxY * buf->pitch;
+  for (s32 y = minY; y < maxY; ++y)
+  {
+    u32 *pixel = (u32 *) row;
+    for (s32 x = minX; x < maxX; ++x)
     {
-      if (pixel >= buf->memory && pixel <= buf->memory + buf->sizeBytes - 4)
-      {
-	*(u32 *)pixel = color;
-	pixel -= buf->pitch;
-      }
+      *pixel++ = color;
     }
+
+    row += buf->pitch;
   }
 }
 
@@ -52,84 +62,23 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
   if (!memory->isInitialized)
   {
     // do initialization here as needed
-    const char *filename = __FILE__;
-    struct debug_ReadFileResult file;
-    if (memory->debug_platformReadEntireFile(thread, &file, filename))
-    {
-      memory->debug_platformWriteEntireFile(thread, "data/test.out", file.contentsSize, file.contents);
-      memory->debug_platformFreeFileMemory(thread, &file);
-    }
-
-    gameState->playerX = 100;
-    gameState->playerY = 100;
-
     memory->isInitialized = 1;
   }
 
   if (gcInput->isAnalog)
   {
-    s16 normalizedX = gcInput->stickAverageX - 127;
-//    fprintf(stderr, "%d\n", normalized);
-    gameState->xOff += normalizedX >> 2;
-
-    s16 normalizedY = gcInput->stickAverageY - 127;
-    s32 toneHzModifier = (s32) (256.f * (normalizedY / 255.f));
-    memory->waitIfAudioBlocked(thread);
-    memory->lockAudioThread(thread);
-    soundState->toneHz = 512 + toneHzModifier;
-    memory->unlockAudioThread(thread);
-    gameState->yOff += normalizedY >> 2;
-
-    gameState->playerX += ((s32) (normalizedX) >> 3);
-    gameState->playerY += ((s32) (normalizedY) >> 3);
-    if (gameState->tJump > 0)
-    {
-      gameState->playerY -= ((s32) (normalizedY) >> 5) - 10.f * sinf(2.f * PI32 * gameState->tJump);
-    }
-    if (gcInput->actionUp.endedDown)
-    {
-      gameState->tJump = 1.f;
-    }
   }
   else
   {
-    if (gcInput->right.endedDown)
-    {
-      gameState->xOff += 2;
-    }
-    if (gcInput->left.endedDown)
-    {
-      gameState->xOff -= 2;
-    }
-    if (gcInput->up.endedDown)
-    {
-      gameState->yOff -= 2;
-    }
-    if (gcInput->down.endedDown)
-    {
-      gameState->yOff += 2;
-    }
   }
 
-  gameState->tJump -= 0.033f;
+  drawRectangle(buff, 0, 0, buff->width, buff->height, 0x00FF00FF);
+  drawRectangle(buff, 10, 10.f, 30.f, 30.f, 0x0000FFFF);
 
   memory->waitIfInputBlocked(thread);
   memory->lockInputThread(thread);
   memory->resetInputStateButtons(thread);
   memory->unlockInputThread(thread);
-
-  renderGradient(buff, gameState->xOff, gameState->yOff);
-  renderPlayer(buff, gameState->playerX, gameState->playerY);
-
-  for (u8 buttonIndex = 0; buttonIndex < ARRAY_COUNT(gcInput->mouseButtons); buttonIndex++)
-  {
-    if (gcInput->mouseButtons[buttonIndex].endedDown)
-    {
-      renderPlayer(buff, 10 + 20 * buttonIndex, 10);
-    }
-  }
-
-  renderPlayer(buff, gcInput->mouseX, gcInput->mouseY);
 }
 
 #if !XCODE_BUILD
@@ -167,7 +116,7 @@ FILL_SOUND_BUFFER(fillSoundBuffer)
     
     // simply put the samples in
     for (u32 x = 0; x < frames; ++x) {
-#if 1
+#if 0
       r32 sineValue = sinf(soundState->tSine);
 #else
       r32 sineValue = 0;
@@ -185,3 +134,44 @@ FILL_SOUND_BUFFER(fillSoundBuffer)
 
   soundState->frameOffset = frameOffset;
 }
+
+#if 0
+static void renderGradient(struct GameOffscreenBuffer *buf, u64 xOffset, u64 yOffset)
+{
+    u8 *row = buf->memory + buf->height * buf->pitch - buf->pitch;
+    for (u32 y = 0; y < buf->height; y++)
+    {
+      u8 *pixel = row;
+      for (u32 x = 0; x < buf->width; x++)
+      {
+	*pixel++ = 1;
+	*pixel++ = y + yOffset;
+	*pixel++ = x + xOffset;
+	pixel++;
+      }
+      row -= buf->pitch;
+    }
+}
+
+static void renderPlayer(struct GameOffscreenBuffer *buf, s32 playerX, s32 playerY)
+{
+  s32 top = playerY;
+  s32 bottom = playerY + 10;
+  u32 color = 0xFFFFFFFF;
+  for (s32 x = playerX; x < playerX + 10; x++)
+  {
+    u8 *row = buf->memory + buf->height * buf->pitch - buf->pitch;
+    u8 *pixel = row + x * buf->bytesPerPixel - top * buf->pitch;
+    for (s32 y = bottom; y > top; y--)
+    {
+      if (pixel >= buf->memory && pixel <= buf->memory + buf->sizeBytes - 4)
+      {
+	*(u32 *)pixel = color;
+	pixel -= buf->pitch;
+      }
+    }
+  }
+}
+
+#endif
+
