@@ -51,24 +51,22 @@ static u8 processEvent(NSEvent *e)
   gcInput.mouseY = mouseLocView.y;
   gcInput.mouseZ = 0;
 
+  // NOTE(dima): we don't set handled = 1 for mouse events, because
+  // we want to propagate the event downstream for OS to handle it
   if (e.type == NSEventTypeLeftMouseDown)
   {
-    handled = 1;
     processButtonDown(&gcInput.mouseButtons[0]);
   }
   if (e.type == NSEventTypeLeftMouseUp)
   {
-    handled = 1;
     processButtonUp(&gcInput.mouseButtons[0]);
   }
   if (e.type == NSEventTypeRightMouseDown)
   {
-    handled = 1;
     processButtonDown(&gcInput.mouseButtons[1]);
   }
   if (e.type == NSEventTypeRightMouseUp)
   {
-    handled = 1;
     processButtonUp(&gcInput.mouseButtons[1]);
   }
 
@@ -245,7 +243,7 @@ int main(int argc, const char * argv[]) {
     [appMenuItem setSubmenu:appMenu];
 
 #if ANTIQUA_INTERNAL
-    NSPanel *window = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 960, 540)
+    NSPanel *window = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 1000, 700)
     styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable | NSWindowStyleMaskNonactivatingPanel
     backing:NSBackingStoreBuffered defer:NO];
     // Uncomment the code below for looped live code editing
@@ -253,7 +251,7 @@ int main(int argc, const char * argv[]) {
     [window setCollectionBehavior: NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary];
     [window setLevel: NSStatusWindowLevel];
 #else
-    NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 960, 540)
+    NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1000, 700)
     styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
     backing:NSBackingStoreBuffered defer:NO];
 #endif

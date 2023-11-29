@@ -116,6 +116,8 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 
 @implementation CustomNSView
 
+// NOTE(dima): this ensures that view's top left corner is at window's top left corner
+// By default, view's top left corner is at bottom left corner of a window
 - (BOOL) isFlipped
 {
   return YES;
@@ -249,10 +251,8 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   gameMemory.debug_platformReadEntireFile = debug_platformReadEntireFile;
   gameMemory.debug_platformWriteEntireFile = debug_platformWriteEntireFile;
 
-  CGSize viewSize = [self frame].size;
-  // init game specific state
-  framebuffer.width = viewSize.width;
-  framebuffer.height = viewSize.height;
+  framebuffer.width = 960;
+  framebuffer.height = 540;
   framebuffer.bytesPerPixel = 4;
   framebuffer.pitch = framebuffer.width * framebuffer.bytesPerPixel;
   framebuffer.sizeBytes = sizeof(u8) * framebuffer.width * 4 * framebuffer.height;

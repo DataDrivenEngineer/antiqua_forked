@@ -17,6 +17,11 @@ static u32 roundReal32ToUInt32(r32 v)
 
 static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 realMinY, r32 realMaxX, r32 realMaxY, r32 r, r32 g, r32 b)
 {
+  if (realMaxX < 0 || realMaxY < 0)
+  {
+    return;
+  }
+
   s32 minX = roundReal32ToInt32(realMinX);
   s32 minY = roundReal32ToInt32(realMinY);
   s32 maxX = roundReal32ToInt32(realMaxX);
@@ -45,8 +50,7 @@ static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 rea
   // BGRA
   u32 color = (roundReal32ToUInt32(b * 255.f) << 16) | (roundReal32ToUInt32(g * 255.f) << 8) | roundReal32ToUInt32(r * 255.f);
 
-  u8 *lastRow = (u8 *) buf->memory + buf->sizeBytes - buf->pitch;
-  u8 *row = lastRow + minX * buf->bytesPerPixel - maxY * buf->pitch;
+  u8 *row = (u8 *) buf->memory + minX * buf->bytesPerPixel + minY * buf->pitch;
   for (s32 y = minY; y < maxY; ++y)
   {
     u32 *pixel = (u32 *) row;
@@ -116,8 +120,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     {1, 1, 1, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,  1},
     {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1,  1}
   };
-
-  drawRectangle(buff, 0, 0, buff->width, buff->height, 1.f, 0.f, 1.f);
 
   r32 upperLeftX = -30;
   r32 upperLeftY = 0;

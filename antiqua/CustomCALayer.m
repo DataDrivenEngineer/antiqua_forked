@@ -39,6 +39,12 @@ static void releaseBytePointerCallback(void *info, const void *pointer) {}
 //    CGRect dirtyRect = CGContextGetClipBoundingBox(ctx);
     // Do not scale the image when window is resized
     CGRect framebufferRect = CGRectMake(0, 0, framebuffer.width, framebuffer.height);
+
+    // Clear the screen
+    CGContextClearRect(ctx, framebufferRect);
+
+    // NOTE(dima): y is negative, because we are flipping the Y axis for the image
+    CGRect framebufferRectWithOffset = CGRectMake(10, -10, framebuffer.width, framebuffer.height);
     
     CGDataProviderRef dataProvider = CGDataProviderCreateDirect(framebuffer.memory, framebuffer.sizeBytes, &callbacks);
 
@@ -49,7 +55,12 @@ static void releaseBytePointerCallback(void *info, const void *pointer) {}
 #pragma clang diagnostic pop
     dataProvider, NULL, false, kCGRenderingIntentDefault);
 
-    CGContextDrawImage(ctx, framebufferRect, image);
+    // NOTE(dima): Flip the image upside down, because by default Quartz uses bottom left corner as the origin,
+    // while we want the origin in the top left one
+    CGContextTranslateCTM(ctx, 0, CGImageGetHeight(image));
+    CGContextScaleCTM(ctx, 1.0, -1.0);
+
+    CGContextDrawImage(ctx, framebufferRectWithOffset, image);
 
     CGDataProviderRelease(dataProvider);
     CGImageRelease(image);
