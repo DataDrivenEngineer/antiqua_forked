@@ -2,6 +2,7 @@
 
 #include "antiqua.h"
 #include "types.h"
+#include "stdio.h"
 
 static s32 roundReal32ToInt32(r32 v)
 {
@@ -47,7 +48,7 @@ static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 rea
     maxY = buf->height;
   }
 
-  // BGRA
+  // NOTE(dima): byte ordering here is in BGRA format
   u32 color = (roundReal32ToUInt32(b * 255.f) << 16) | (roundReal32ToUInt32(g * 255.f) << 8) | roundReal32ToUInt32(r * 255.f);
 
   u8 *row = (u8 *) buf->memory + minX * buf->bytesPerPixel + minY * buf->pitch;
@@ -104,8 +105,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     dPlayerX *= 128.f;
     dPlayerY *= 128.f;
 
-    gameState->playerX += gcInput->dtForFrame * dPlayerX;
-    gameState->playerY += gcInput->dtForFrame * dPlayerY;
+    gameState->playerX += deltaTimeSec * dPlayerX;
+    gameState->playerY += deltaTimeSec * dPlayerY;
   }
 
   u32 tileMap[9][17] =

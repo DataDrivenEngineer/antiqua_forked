@@ -33,7 +33,7 @@ void endInputPlayBack(struct State *state);
 
 - (void) resumeDisplayLink;
 - (void) stopDisplayLink;
-- (CVReturn)displayFrame:(const CVTimeStamp *)inOutputTime;
+- (CVReturn)displayFrame:(r32)deltaTimeSec;
 - (void)updateLayer;
 
 @end

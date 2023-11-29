@@ -48,8 +48,6 @@ struct GameControllerInput
   struct GameButtonState mouseButtons[2];
   s32 mouseX, mouseY, mouseZ;
 
-  r32 dtForFrame;
-
   u8 isAnalog;
 
   r32 stickAverageX;
@@ -146,7 +144,7 @@ struct GameMemory
 #endif
 };
 
-#define UPDATE_GAME_AND_RENDER(name) void name(struct ThreadContext *thread, struct GameControllerInput *gcInput, struct SoundState *soundState, struct GameMemory *memory, struct GameOffscreenBuffer *buff)
+#define UPDATE_GAME_AND_RENDER(name) void name(struct ThreadContext *thread, r32 deltaTimeSec, struct GameControllerInput *gcInput, struct SoundState *soundState, struct GameMemory *memory, struct GameOffscreenBuffer *buff)
 typedef UPDATE_GAME_AND_RENDER(UpdateGameAndRender);
 #if XCODE_BUILD
 MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender);

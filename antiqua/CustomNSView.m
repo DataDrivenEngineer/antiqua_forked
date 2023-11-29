@@ -89,26 +89,20 @@ static void playBackInput(struct State *state, struct GameControllerInput *gcInp
   }
 }
 
-static void logFrameTime(const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime)
-{
-  static u64 previousNowNs = 0;
-  u64 currentNowNs = TIMESTAMP_TO_NS(inNow->hostTime);
-  u64 inNowDiff = currentNowNs - previousNowNs;
-  previousNowNs = currentNowNs;
-  // Divide by 1000000 to convert from ns to ms
-  NSLog(@"inNow frame time: %f ms", (r32)inNowDiff / 1000000);
-
-//  u64 processingWindowNs = (inOutputTime->hostTime - inNow->hostTime) * mti.numer / mti.denom;
-//  NSLog(@"processingWindow: %f ms", (r32)processingWindowNs / 1000000);
-}
-
 static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext)
 {
   skipCurrentFrame = !skipCurrentFrame;
   if (!skipCurrentFrame)
   {
-//    logFrameTime(inNow, inOutputTime);
-    CVReturn error = [(__bridge CustomNSView *) displayLinkContext displayFrame:inOutputTime];
+    static u64 previousNowNs = 0;
+    u64 currentNowNs = TIMESTAMP_TO_NS(inNow->hostTime);
+    u64 inNowDiff = currentNowNs - previousNowNs;
+    previousNowNs = currentNowNs;
+    // Divide by 1000000 to convert from ns to ms
+//    fprintf(stderr, "inNow frame time: %f ms\n", (r32)inNowDiff / 1000000);
+
+    r32 deltaTimeSec = (r32) inNowDiff / 1000000000;
+    CVReturn error = [(__bridge CustomNSView *) displayLinkContext displayFrame:deltaTimeSec];
     return error;
   }
   return kCVReturnSuccess;
@@ -142,9 +136,8 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   shouldStopDL = 1;
 }
 
-- (CVReturn)displayFrame:(const CVTimeStamp *)inOutputTime {
+- (CVReturn)displayFrame:(r32)deltaTimeSec {
 #if !XCODE_BUILD
-
   struct stat st;
   if (stat(GAME_CODE_LIB_NAME, &st) != -1)
   {
@@ -179,10 +172,10 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 #if !XCODE_BUILD
     if (gameCode.updateGameAndRender)
     {
-      gameCode.updateGameAndRender(&thread, &gcInput, &soundState, &gameMemory, &framebuffer);
+      gameCode.updateGameAndRender(&thread, deltaTimeSec, &gcInput, &soundState, &gameMemory, &framebuffer);
     }
 #else
-    updateGameAndRender(&thread, &gcInput, &soundState, &gameMemory, &framebuffer);
+    updateGameAndRender(&thread, deltaTimeSec, &gcInput, &soundState, &gameMemory, &framebuffer);
 #endif
 
     dispatch_sync(dispatch_get_main_queue(), ^{
