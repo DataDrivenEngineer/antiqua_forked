@@ -178,7 +178,7 @@ static void populateMatchingDictionary(CFMutableDictionaryRef __nonnull matcher,
   }
 }
 
-u8 initControllerInput(void)
+b32 initControllerInput(void)
 {
   ioHIDManager = IOHIDManagerCreate(
 		  0,   // Use default allocator

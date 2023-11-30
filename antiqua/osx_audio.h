@@ -9,9 +9,9 @@
 extern struct SoundState soundState;
 
 void initAudio(void);
-u8 playAudio(void);
+b32 playAudio(void);
 
-u8 stopAudio(void);
+b32 stopAudio(void);
 OSStatus resetAudio(void);
 
 #endif

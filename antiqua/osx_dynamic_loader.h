@@ -22,7 +22,7 @@ struct AntiquaCode
 
 extern struct AntiquaCode gameCode;
 
-u8 loadGameCode(struct timespec newLastModified);
+b32 loadGameCode(struct timespec newLastModified);
 void unloadGameCode(void);
 
 #endif

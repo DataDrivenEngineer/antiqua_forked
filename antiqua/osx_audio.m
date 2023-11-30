@@ -35,7 +35,7 @@ static OSStatus appIOProc(AudioObjectID inDevice,
   return kAudioHardwareNoError;     
 }
 
-u8 playAudio(void)
+b32 playAudio(void)
 {
   OSStatus err = kAudioHardwareNoError;
 
@@ -51,7 +51,7 @@ u8 playAudio(void)
   return 1;
 }
 
-u8 stopAudio(void)
+b32 stopAudio(void)
 {
     OSStatus err = kAudioHardwareNoError;
     

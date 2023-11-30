@@ -28,9 +28,9 @@ struct GameMemory gameMemory;
 
 static CustomCALayer *layer;
 static CVDisplayLinkRef displayLink;
-static u8 shouldStopDL = 0;
+static b32 shouldStopDL = 0;
 
-static u8 skipCurrentFrame = 1;
+static b32 skipCurrentFrame = 1;
 
 struct ThreadContext thread = {0};
 struct State state = {0};

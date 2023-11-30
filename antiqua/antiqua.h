@@ -17,7 +17,7 @@
 
 struct SoundState
 {
-  u8 soundPlaying;
+  b32 soundPlaying;
   u32 sampleRate;
   u32 toneHz;
   r32 frameOffset;
@@ -39,7 +39,7 @@ struct GameOffscreenBuffer
 struct GameButtonState
 {
   u32 halfTransitionCount;
-  u8 endedDown;
+  b32 endedDown;
 };
 
 struct GameControllerInput
@@ -48,7 +48,7 @@ struct GameControllerInput
   struct GameButtonState mouseButtons[2];
   s32 mouseX, mouseY, mouseZ;
 
-  u8 isAnalog;
+  b32 isAnalog;
 
   r32 stickAverageX;
   r32 stickAverageY;
@@ -83,6 +83,19 @@ struct GameState
   r32 playerY;
 };
 
+typedef struct TileMap
+{
+  s32 countX;
+  s32 countY;
+
+  r32 upperLeftX;
+  r32 upperLeftY;
+  r32 tileWidth;
+  r32 tileHeight;
+
+  u32 *tiles;
+} TileMap;
+
 struct ThreadContext
 {
   s32 placeholder;
@@ -95,11 +108,11 @@ struct debug_ReadFileResult
   u32 contentsSize;
   void *contents;
 };
-#define DEBUG_PLATFORM_READ_ENTIRE_FILE(name) u8 name(struct ThreadContext *thread, struct debug_ReadFileResult *outFile, const char *filename)
+#define DEBUG_PLATFORM_READ_ENTIRE_FILE(name) b32 name(struct ThreadContext *thread, struct debug_ReadFileResult *outFile, const char *filename)
 typedef DEBUG_PLATFORM_READ_ENTIRE_FILE(Debug_PlatformReadEntireFile);
 #define DEBUG_PLATFORM_FREE_FILE_MEMORY(name) void name(struct ThreadContext *thread, struct debug_ReadFileResult *file)
 typedef DEBUG_PLATFORM_FREE_FILE_MEMORY(Debug_PlatformFreeFileMemory);
-#define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) u8 name(struct ThreadContext *thread, const char *filename, u32 memorySize, void *memory)
+#define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) b32 name(struct ThreadContext *thread, const char *filename, u32 memorySize, void *memory)
 typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE(Debug_PlatformWriteEntireFile);
 #endif
 
@@ -122,7 +135,7 @@ typedef WAIT_IF_INPUT_BLOCKED(WaitIfInputBlocked);
 
 struct GameMemory
 {
-  u8 isInitialized;
+  b32 isInitialized;
   u64 permanentStorageSize;
   void *permanentStorage;
   u64 transientStorageSize;

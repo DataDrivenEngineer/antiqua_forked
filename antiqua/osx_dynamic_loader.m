@@ -6,9 +6,9 @@
 
 struct AntiquaCode gameCode = {0};
 
-u8 loadGameCode(struct timespec newLastModified)
+b32 loadGameCode(struct timespec newLastModified)
 {
-  u8 result = 1;
+  b32 result = 1;
 #if !XCODE_BUILD
   gameCode.updateGameAndRender = 0;
   gameCode.fillSoundBuffer = 0;

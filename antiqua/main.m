@@ -19,7 +19,7 @@
 #include "osx_input.h"
 #include "osx_lock.h"
 
-static u8 shouldKeepRunning = 1;
+static b32 shouldKeepRunning = 1;
 
 static void processButtonDown(struct GameButtonState *btn)
 {
@@ -38,9 +38,9 @@ static void processButtonUp(struct GameButtonState *btn)
   btn->endedDown = 0;
 }
 
-static u8 processEvent(NSEvent *e)
+static b32 processEvent(NSEvent *e)
 {
-  u8 handled = 0;
+  b32 handled = 0;
 
   NSWindow *window = [[NSApplication sharedApplication] mainWindow];
   NSView *view = [window contentView];
@@ -153,7 +153,7 @@ MONExternC DEBUG_PLATFORM_FREE_FILE_MEMORY(debug_platformFreeFileMemory)
 
 MONExternC DEBUG_PLATFORM_READ_ENTIRE_FILE(debug_platformReadEntireFile)
 {
-  u8 result = 0;
+  b32 result = 0;
   s32 fd = open(filename, O_RDONLY | O_SHLOCK);
   if (fd != -1)
   {
@@ -203,7 +203,7 @@ MONExternC DEBUG_PLATFORM_READ_ENTIRE_FILE(debug_platformReadEntireFile)
 
 MONExternC DEBUG_PLATFORM_WRITE_ENTIRE_FILE(debug_platformWriteEntireFile)
 {
-  u8 result = 0;
+  b32 result = 0;
 
   s32 fd = open(filename, O_WRONLY | O_EXLOCK | O_CREAT, 0777);
   if (fd != -1)
@@ -300,7 +300,7 @@ int main(int argc, const char * argv[]) {
 	  inMode:NSDefaultRunLoopMode
 	  dequeue:YES];
 
-	u8 handled = processEvent(event);
+	b32 handled = processEvent(event);
 
 	if (!handled)
 	{

@@ -9,7 +9,7 @@
 extern struct GameControllerInput gcInput;
 extern IOHIDManagerRef ioHIDManager;
 
-u8 initControllerInput(void);
+b32 initControllerInput(void);
 IOReturn resetInput(void);
 RESET_INPUT_STATE_BUTTONS(resetInputStateButtons);
 void resetInputStateAll(void);
