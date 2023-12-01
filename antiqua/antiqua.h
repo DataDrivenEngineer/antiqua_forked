@@ -79,11 +79,19 @@ struct GameControllerInput
 
 struct GameState
 {
+  s32 playerTileMapX;
+  s32 playerTileMapY;
+
   r32 playerX;
   r32 playerY;
 };
 
 typedef struct TileMap
+{
+  u32 *tiles;
+} TileMap;
+
+typedef struct World
 {
   s32 countX;
   s32 countY;
@@ -93,8 +101,34 @@ typedef struct TileMap
   r32 tileWidth;
   r32 tileHeight;
 
-  u32 *tiles;
-} TileMap;
+  s32 tileMapCountX;
+  s32 tileMapCountY;
+
+  TileMap *tileMaps;
+} World;
+
+typedef struct CanonicalPosition
+{
+  s32 tileMapX;
+  s32 tileMapY;
+
+  s32 tileX;
+  s32 tileY;
+
+  // NOTE(dima): this is tile-relative X and Y
+  r32 x;
+  r32 y;
+} CanonicalPosition;
+
+typedef struct RawPosition
+{
+  s32 tileMapX;
+  s32 tileMapY;
+
+  // NOTE(dima): this is tilemap-relative X and Y
+  r32 x;
+  r32 y;
+} RawPosition;
 
 struct ThreadContext
 {

@@ -248,7 +248,10 @@ int main(int argc, const char * argv[]) {
     backing:NSBackingStoreBuffered defer:NO];
     // Uncomment the code below for looped live code editing
     [window setFloatingPanel:YES];
-    [window setCollectionBehavior: NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary];
+    // This will move app window to currently active space
+//    [window setCollectionBehavior: NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary];
+    // This will keep the app at the space where it was launched
+    [window setCollectionBehavior: NSWindowCollectionBehaviorAuxiliary | NSWindowCollectionBehaviorFullScreenAuxiliary];
     [window setLevel: NSStatusWindowLevel];
 #else
     NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1000, 700)
