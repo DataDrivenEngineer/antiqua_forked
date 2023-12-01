@@ -146,6 +146,23 @@
 		};
 /* End PBXGroup section */
 
+/* Begin PBXLegacyTarget section */
+		9FC1563E2B18157500A59B2B /* antiqua_dbg */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "$(ACTION)";
+			buildConfigurationList = 9FC156412B18157500A59B2B /* Build configuration list for PBXLegacyTarget "antiqua_dbg" */;
+			buildPhases = (
+			);
+			buildToolPath = /opt/homebrew/opt/make/libexec/gnubin/make;
+			buildWorkingDirectory = "";
+			dependencies = (
+			);
+			name = antiqua_dbg;
+			passBuildSettingsInEnvironment = 1;
+			productName = antiqua_dbg;
+		};
+/* End PBXLegacyTarget section */
+
 /* Begin PBXNativeTarget section */
 		9FC718E32A7D5E44007ADAA1 /* antiqua */ = {
 			isa = PBXNativeTarget;
@@ -174,6 +191,9 @@
 				BuildIndependentTargetsInParallel = 1;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					9FC1563E2B18157500A59B2B = {
+						CreatedOnToolsVersion = 15.0.1;
+					};
 					9FC718E32A7D5E44007ADAA1 = {
 						CreatedOnToolsVersion = 14.3.1;
 					};
@@ -193,6 +213,7 @@
 			projectRoot = "";
 			targets = (
 				9FC718E32A7D5E44007ADAA1 /* antiqua */,
+				9FC1563E2B18157500A59B2B /* antiqua_dbg */,
 			);
 		};
 /* End PBXProject section */
@@ -221,6 +242,41 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		9FC1563F2B18157500A59B2B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEBUGGING_SYMBOLS = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = H2VL2PJ39X;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = antiqua_dbg;
+			};
+			name = Debug;
+		};
+		9FC156402B18157500A59B2B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = H2VL2PJ39X;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = antiqua_dbg;
+			};
+			name = Release;
+		};
 		9FC7190B2A7D5E45007ADAA1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -401,6 +457,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		9FC156412B18157500A59B2B /* Build configuration list for PBXLegacyTarget "antiqua_dbg" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9FC1563F2B18157500A59B2B /* Debug */,
+				9FC156402B18157500A59B2B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		9FC718DF2A7D5E44007ADAA1 /* Build configuration list for PBXProject "antiqua" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -18,6 +18,7 @@ clean:
 	# Remove game's state recordings
 	rm -rf tmp/*
 	# Remove XCode's build info
+	rm -rf xcode_build
 	rm -rf build
 	rm -rf libantiqua*
 	# Remove executable and debug symbols from the app's bundle
