@@ -137,9 +137,9 @@ static inline void recanonicalizeCoord(World *world, s32 tileCount, s32 *tileMap
   }
 }
 
-static inline CanonicalPosition recanonicalizePosition(World* world, CanonicalPosition pos)
+static inline WorldPosition recanonicalizePosition(World* world, WorldPosition pos)
 {
-  CanonicalPosition result = pos;
+  WorldPosition result = pos;
 
   recanonicalizeCoord(world, world->countX, &result.tileMapX, &result.tileX, &result.tileRelX);
   recanonicalizeCoord(world, world->countY, &result.tileMapY, &result.tileY, &result.tileRelY);
@@ -147,7 +147,7 @@ static inline CanonicalPosition recanonicalizePosition(World* world, CanonicalPo
   return result;
 }
 
-static b32 isWorldPointEmpty(World *world, CanonicalPosition canPos)
+static b32 isWorldPointEmpty(World *world, WorldPosition canPos)
 {
   b32 empty = 0;
 
@@ -252,8 +252,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
   world.tileMapCountY = 2;
   world.countX = TILE_MAP_COUNT_X;
   world.countY = TILE_MAP_COUNT_Y;
-  world.upperLeftX = -world.tileSideInPixels / 2;
-  world.upperLeftY = 0;
+  world.lowerLeftX = -world.tileSideInPixels / 2;
+  world.lowerLeftY = (r32) buff->height;
 
   world.tileMaps = (TileMap *) tileMaps;
 
@@ -272,11 +272,11 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     r32 dPlayerY = 0.f;
     if (gcInput->up.endedDown)
     {
-      dPlayerY = -1.f;
+      dPlayerY = 1.f;
     }
     if (gcInput->down.endedDown)
     {
-      dPlayerY = 1.f;
+      dPlayerY = -1.f;
     }
     if (gcInput->left.endedDown)
     {
@@ -289,16 +289,16 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     dPlayerX *= 2.f;
     dPlayerY *= 2.f;
 
-    CanonicalPosition newPlayerP = gameState->playerP;
+    WorldPosition newPlayerP = gameState->playerP;
     newPlayerP.tileRelX += deltaTimeSec * dPlayerX;
     newPlayerP.tileRelY += deltaTimeSec * dPlayerY;
     newPlayerP = recanonicalizePosition(&world, newPlayerP);
 
-    CanonicalPosition playerLeft = newPlayerP;
+    WorldPosition playerLeft = newPlayerP;
     playerLeft.tileRelX -= 0.5f * playerWidth;
     playerLeft = recanonicalizePosition(&world, playerLeft);
 
-    CanonicalPosition playerRight = newPlayerP;
+    WorldPosition playerRight = newPlayerP;
     playerRight.tileRelX += 0.5f * playerWidth;
     playerRight = recanonicalizePosition(&world, playerRight);
 
@@ -326,19 +326,19 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 	gray = 0.0f;
       }
 
-      r32 minX = world.upperLeftX + ((r32) column) * world.tileSideInPixels;
-      r32 minY = world.upperLeftY + ((r32) row) * world.tileSideInPixels;
+      r32 minX = world.lowerLeftX + ((r32) column) * world.tileSideInPixels;
+      r32 minY = world.lowerLeftY - ((r32) row) * world.tileSideInPixels;
       r32 maxX = minX + world.tileSideInPixels;
-      r32 maxY = minY + world.tileSideInPixels;
-      drawRectangle(buff, minX, minY, maxX, maxY, gray, gray, gray);
+      r32 maxY = minY - world.tileSideInPixels;
+      drawRectangle(buff, minX, maxY, maxX, minY, gray, gray, gray);
     }
   }
 
   r32 playerR = 1.f;
   r32 playerG = 1.f;
   r32 playerB = 0.f;
-  r32 playerLeft = world.upperLeftX + world.tileSideInPixels * gameState->playerP.tileX + world.metersToPixels * gameState->playerP.tileRelX - 0.5f * world.metersToPixels * playerWidth;
-  r32 playerTop = world.upperLeftY + world.tileSideInPixels * gameState->playerP.tileY + world.metersToPixels * gameState->playerP.tileRelY - world.metersToPixels * playerHeight;
+  r32 playerLeft = world.lowerLeftX + world.tileSideInPixels * gameState->playerP.tileX + world.metersToPixels * gameState->playerP.tileRelX - 0.5f * world.metersToPixels * playerWidth;
+  r32 playerTop = world.lowerLeftY - world.tileSideInPixels * gameState->playerP.tileY - world.metersToPixels * gameState->playerP.tileRelY - world.metersToPixels * playerHeight;
   drawRectangle(buff, playerLeft, playerTop, playerLeft + world.metersToPixels * playerWidth, playerTop + world.metersToPixels * playerHeight, playerR, playerG, playerB);
 
   memory->waitIfInputBlocked(thread);

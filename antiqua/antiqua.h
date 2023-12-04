@@ -77,7 +77,7 @@ struct GameControllerInput
   };
 };
 
-typedef struct CanonicalPosition
+typedef struct WorldPosition
 {
 #if 1
   s32 tileMapX;
@@ -93,11 +93,11 @@ typedef struct CanonicalPosition
   // NOTE(dima): this is tile-relative X and Y
   r32 tileRelX;
   r32 tileRelY;
-} CanonicalPosition;
+} WorldPosition;
 
 struct GameState
 {
-  CanonicalPosition playerP;
+  WorldPosition playerP;
 };
 
 typedef struct TileMap
@@ -114,8 +114,8 @@ typedef struct World
   s32 countX;
   s32 countY;
 
-  r32 upperLeftX;
-  r32 upperLeftY;
+  r32 lowerLeftX;
+  r32 lowerLeftY;
 
   s32 tileMapCountX;
   s32 tileMapCountY;
