@@ -77,13 +77,27 @@ struct GameControllerInput
   };
 };
 
+typedef struct CanonicalPosition
+{
+#if 1
+  s32 tileMapX;
+  s32 tileMapY;
+
+  s32 tileX;
+  s32 tileY;
+#else
+  u32 _tileX;
+  u32 _tileY;
+#endif
+
+  // NOTE(dima): this is tile-relative X and Y
+  r32 tileRelX;
+  r32 tileRelY;
+} CanonicalPosition;
+
 struct GameState
 {
-  s32 playerTileMapX;
-  s32 playerTileMapY;
-
-  r32 playerX;
-  r32 playerY;
+  CanonicalPosition playerP;
 };
 
 typedef struct TileMap
@@ -93,42 +107,21 @@ typedef struct TileMap
 
 typedef struct World
 {
+  r32 tileSideInMeters;
+  s32 tileSideInPixels;
+  r32 metersToPixels;
+
   s32 countX;
   s32 countY;
 
   r32 upperLeftX;
   r32 upperLeftY;
-  r32 tileWidth;
-  r32 tileHeight;
 
   s32 tileMapCountX;
   s32 tileMapCountY;
 
   TileMap *tileMaps;
 } World;
-
-typedef struct CanonicalPosition
-{
-  s32 tileMapX;
-  s32 tileMapY;
-
-  s32 tileX;
-  s32 tileY;
-
-  // NOTE(dima): this is tile-relative X and Y
-  r32 x;
-  r32 y;
-} CanonicalPosition;
-
-typedef struct RawPosition
-{
-  s32 tileMapX;
-  s32 tileMapY;
-
-  // NOTE(dima): this is tilemap-relative X and Y
-  r32 x;
-  r32 y;
-} RawPosition;
 
 struct ThreadContext
 {

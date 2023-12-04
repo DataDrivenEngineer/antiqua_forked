@@ -7,11 +7,12 @@ build:
 	cc -g -O0 -framework Carbon -framework AppKit -framework CoreVideo -framework QuartzCore -framework CoreAudio -framework IOKit m.o -o antiqua.o
 	# Generate debug symbols
 	dsymutil antiqua.o
-	echo ""
+	echo "compile success"
 package:
 	cp -f antiqua.o antiqua.app/Contents/MacOS/antiqua
 	cp -rf antiqua.o.dSYM antiqua.app/Contents/MacOS/antiqua.dSYM
 	mv libantiqua.dylib.dSYM libantiquatmp.dylib.dSYM
+	echo "package success"
 run:
 	open antiqua.app
 clean:
@@ -25,4 +26,4 @@ clean:
 	rm -rf antiqua.app/Contents/MacOS/*
 	# Remove executable and debug symbols from the build location
 	rm -rf *.o*
-	echo ""
+	echo "clean success"
