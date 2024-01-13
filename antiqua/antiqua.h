@@ -2,6 +2,8 @@
 #define _ANTIQUA_H_
 
 #include "types.h"
+#include "antiqua_tile.h"
+#include "antiqua_intrinsics.h"
 
 #if ANTIQUA_SLOW
 #define ASSERT(expression) if (!(expression)) { *(u8 *) 0 = 0; }
@@ -77,51 +79,25 @@ struct GameControllerInput
   };
 };
 
-typedef struct WorldPosition
+typedef struct MemoryArena
 {
-#if 1
-  s32 tileMapX;
-  s32 tileMapY;
-
-  s32 tileX;
-  s32 tileY;
-#else
-  u32 _tileX;
-  u32 _tileY;
-#endif
-
-  // NOTE(dima): this is tile-relative X and Y
-  r32 tileRelX;
-  r32 tileRelY;
-} WorldPosition;
-
-struct GameState
-{
-  WorldPosition playerP;
-};
-
-typedef struct TileMap
-{
-  u32 *tiles;
-} TileMap;
+  MemoryIndex size;
+  u8 *base;
+  MemoryIndex used;
+} MemoryArena;
 
 typedef struct World
 {
-  r32 tileSideInMeters;
-  s32 tileSideInPixels;
-  r32 metersToPixels;
-
-  s32 countX;
-  s32 countY;
-
-  r32 lowerLeftX;
-  r32 lowerLeftY;
-
-  s32 tileMapCountX;
-  s32 tileMapCountY;
-
-  TileMap *tileMaps;
+  TileMap *tileMap;
 } World;
+
+struct GameState
+{
+  MemoryArena worldArena;
+  World *world;
+
+  TileMapPosition playerP;
+};
 
 struct ThreadContext
 {

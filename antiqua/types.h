@@ -1,6 +1,8 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
 
+#include <stddef.h>
+
 #if !defined(__cplusplus)
 #define MONExternC extern
 #else
@@ -20,6 +22,8 @@ typedef signed char s8;
 typedef signed short s16;
 typedef signed int s32;
 typedef signed long long s64;
+
+typedef size_t MemoryIndex;
 
 typedef float r32;
 typedef double r64;

@@ -1,32 +1,9 @@
-#include <cmath>
-
 #include "antiqua.h"
 #include "types.h"
 #include "stdio.h"
+#include "antiqua_tile.h"
 
-static inline s32 roundReal32ToInt32(r32 v)
-{
-  s32 result = (s32) (v + 0.5f);
-  return result;
-}
-
-static inline u32 roundReal32ToUInt32(r32 v)
-{
-  u32 result = (u32) (v + 0.5f);
-  return result;
-}
-
-static inline s32 floorReal32ToInt32(r32 v)
-{
-  s32 result = (s32) floorf(v);
-  return result;
-}
-
-static inline s32 truncateReal32ToInt32(r32 v)
-{
-  s32 result = (s32) v;
-  return result;
-}
+#include "antiqua_tile.cpp"
 
 static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 realMinY, r32 realMaxX, r32 realMaxY, r32 r, r32 g, r32 b)
 {
@@ -76,85 +53,22 @@ static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 rea
   }
 }
 
-inline TileMap * getTileMap(World *world, s32 tileMapX, s32 tileMapY)
+static void initializeArena(MemoryArena *arena, MemoryIndex size, u8 *base)
 {
-  TileMap *tileMap = 0;
-
-  if (tileMapX >= 0 && tileMapX < world->tileMapCountX &&
-    tileMapY >= 0 && tileMapY < world->tileMapCountY)
-  {
-    tileMap = &world->tileMaps[tileMapY * world->tileMapCountX + tileMapX];
-  }
-
-  return tileMap;
+  arena->size = size;
+  arena->base = base;
+  arena->used = 0;
 }
 
-inline u32 getTileValueUnchecked(World *world, TileMap *tileMap, s32 tileX, s32 tileY)
+#define PUSH_STRUCT(arena, Type) (Type *) pushSize_(arena, sizeof(Type))
+#define PUSH_ARRAY(arena, count, Type) (Type *) pushSize_(arena, (count) * sizeof(Type))
+void * pushSize_(MemoryArena *arena, MemoryIndex size)
 {
-  ASSERT(tileMap);
-  ASSERT(tileX >= 0 && tileX < world->countX &&
-    tileY >= 0 && tileY < world->countY);
-
-  u32 tileMapValue = tileMap->tiles[tileY * world->countX + tileX];
-  return tileMapValue;
-}
-
-static b32 isTileMapPointEmpty(World *world, TileMap *tileMap, r32 testTileX, r32 testTileY)
-{
-  b32 empty = 0;
-
-  if (tileMap)
-  {
-    if (testTileX >= 0 && testTileX < world->countX && testTileY >= 0 && testTileY < world->countY)
-    {
-      u32 tileMapValue = getTileValueUnchecked(world, tileMap, testTileX, testTileY);
-      empty = tileMapValue == 0;
-    }
-  }
-
-  return empty;
-}
-
-static inline void recanonicalizeCoord(World *world, s32 tileCount, s32 *tileMap, s32 *tile, r32 *tileRel)
-{
-  s32 offset = floorReal32ToInt32(*tileRel / world->tileSideInMeters);
-  *tile += offset;
-  *tileRel -= offset * world->tileSideInMeters;
-
-  ASSERT(*tileRel >= 0);
-  ASSERT(*tileRel < world->tileSideInMeters);
-
-  if (*tile < 0)
-  {
-    *tile = tileCount + *tile;
-    --*tileMap;
-  }
-
-  if (*tile >= tileCount)
-  {
-    *tile = *tile - tileCount;
-    ++*tileMap;
-  }
-}
-
-static inline WorldPosition recanonicalizePosition(World* world, WorldPosition pos)
-{
-  WorldPosition result = pos;
-
-  recanonicalizeCoord(world, world->countX, &result.tileMapX, &result.tileX, &result.tileRelX);
-  recanonicalizeCoord(world, world->countY, &result.tileMapY, &result.tileY, &result.tileRelY);
+  ASSERT((arena->used + size) <= arena->size);
+  void *result = arena->base + arena->used;
+  arena->used += size;
 
   return result;
-}
-
-static b32 isWorldPointEmpty(World *world, WorldPosition canPos)
-{
-  b32 empty = 0;
-
-  TileMap *tileMap = getTileMap(world, canPos.tileMapX, canPos.tileMapY);
-  empty = isTileMapPointEmpty(world, tileMap, canPos.tileX, canPos.tileY);
-
-  return empty;
 }
 
 #if !XCODE_BUILD
@@ -166,102 +80,75 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
   ASSERT(&gcInput->terminator - &gcInput->buttons[0] == ARRAY_COUNT(gcInput->buttons));
   ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
 
+  r32 playerHeight = 1.4f;
+  r32 playerWidth = 0.75f * playerHeight;
+
   GameState *gameState = (GameState *) memory->permanentStorage;
   if (!memory->isInitialized)
   {
     // do initialization here as needed
-    gameState->playerP.tileMapX = 0;
-    gameState->playerP.tileMapY = 0;
-    gameState->playerP.tileX = 3;
-    gameState->playerP.tileY = 3;
-    gameState->playerP.tileRelX = 0.5f;
-    gameState->playerP.tileRelY = 0.5f;
+    gameState->playerP.absTileX = 1;
+    gameState->playerP.absTileY = 3;
+    gameState->playerP.tileRelX = 5.0f;
+    gameState->playerP.tileRelY = 5.0f;
+    initializeArena(&gameState->worldArena, memory->permanentStorageSize - sizeof(GameState), (u8 *) memory->permanentStorage + sizeof(GameState));
+
+    gameState->world = PUSH_STRUCT(&gameState->worldArena, World);
+    World *world = gameState->world;
+    world->tileMap = PUSH_STRUCT(&gameState->worldArena, TileMap);
+
+    TileMap *tileMap = world->tileMap;
+
+    // NOTE(dima): this is set to using 256x256 tile chunks
+    tileMap->chunkShift = 4;
+    tileMap->chunkMask = (1 << tileMap->chunkShift);
+    tileMap->chunkMask -= 1;
+    tileMap->chunkDim = 1 << tileMap->chunkShift;
+
+    tileMap->tileSideInMeters = 1.4f;
+    tileMap->tileSideInPixels = 60;
+    tileMap->metersToPixels = (r32) tileMap->tileSideInPixels / tileMap->tileSideInMeters;
+
+    tileMap->tileChunkCountX = 128;
+    tileMap->tileChunkCountY = 128;
+
+    tileMap->tileChunks = PUSH_ARRAY(&gameState->worldArena, tileMap->tileChunkCountX * tileMap->tileChunkCountY, TileChunk);
+
+    for (u32 y = 0; y < tileMap->tileChunkCountY; y++)
+    {
+      for (u32 x = 0; x < tileMap->tileChunkCountX; x++)
+      {
+        tileMap->tileChunks[y * tileMap->tileChunkCountX + x].tiles = PUSH_ARRAY(&gameState->worldArena, tileMap->chunkDim * tileMap->chunkDim, u32);
+      }
+    }
+
+    r32 lowerLeftX = -tileMap->tileSideInPixels / 2;
+    r32 lowerLeftY = (r32) buff->height;
+
+    u32 tilesPerWidth = 17;
+    u32 tilesPerHeight = 9;
+    for (u32 screenY = 0; screenY < 32; screenY++)
+    {
+      for (u32 screenX = 0; screenX < 32; screenX++)
+      {
+        for (u32 tileY = 0; tileY < tilesPerHeight; tileY++)
+        {
+          for (u32 tileX = 0; tileX < tilesPerWidth; tileX++)
+          {
+            u32 absTileX = screenX * tilesPerWidth + tileX;
+            u32 absTileY = screenY * tilesPerHeight + tileY;
+
+            setTileValue(&gameState->worldArena, world->tileMap, absTileX, absTileY, tileX == tileY && tileY % 2 ? 1 : 0);
+          }
+        }
+      }
+    }
 
     memory->isInitialized = 1;
   }
 
-#define TILE_MAP_COUNT_X 17
-#define TILE_MAP_COUNT_Y 9
-
-  u32 tiles00[TILE_MAP_COUNT_Y][TILE_MAP_COUNT_X] =
-  {
-    {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1},
-    {1, 1, 0, 0,  0, 1, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,  1},
-    {1, 1, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 1, 0,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 0, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0,  0},
-    {1, 1, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  1},
-    {1, 0, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0,  1},
-    {1, 1, 1, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,  1},
-    {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1,  1}
-  };
-
-  u32 tiles01[TILE_MAP_COUNT_Y][TILE_MAP_COUNT_X] =
-  {
-    {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0},
-    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1}
-  };
-
-  u32 tiles10[TILE_MAP_COUNT_Y][TILE_MAP_COUNT_X] =
-  {
-    {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1},
-    {1, 1, 0, 0,  0, 1, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,  1},
-    {1, 1, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 1, 0,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0,  1},
-    {0, 0, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 1, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  1},
-    {1, 0, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0,  1},
-    {1, 1, 1, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,  1},
-    {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1,  1}
-  };
-
-  u32 tiles11[TILE_MAP_COUNT_Y][TILE_MAP_COUNT_X] =
-  {
-    {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1},
-    {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1},
-    {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1}
-  };
-
-  TileMap tileMaps[2][2];
-
-  tileMaps[0][0].tiles = (u32 *) tiles00;
-  tileMaps[0][1].tiles = (u32 *) tiles10;
-  tileMaps[1][0].tiles = (u32 *) tiles01;
-  tileMaps[1][1].tiles = (u32 *) tiles11;
-
-  World world;
-
-  world.tileSideInMeters = 1.4f;
-  world.tileSideInPixels = 60;
-  world.metersToPixels = (r32) world.tileSideInPixels / world.tileSideInMeters;
-
-  world.tileMapCountX = 2;
-  world.tileMapCountY = 2;
-  world.countX = TILE_MAP_COUNT_X;
-  world.countY = TILE_MAP_COUNT_Y;
-  world.lowerLeftX = -world.tileSideInPixels / 2;
-  world.lowerLeftY = (r32) buff->height;
-
-  world.tileMaps = (TileMap *) tileMaps;
-
-  r32 playerHeight = 1.4f;
-  r32 playerWidth = 0.75f * playerHeight;
-
-  TileMap *tileMap = getTileMap(&world, gameState->playerP.tileMapX, gameState->playerP.tileMapY);
-  ASSERT(tileMap);
+  World *world = gameState->world;
+  TileMap *tileMap = world->tileMap;
 
   if (gcInput->isAnalog)
   {
@@ -286,60 +173,75 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     {
       dPlayerX = 1.f;
     }
-    dPlayerX *= 2.f;
-    dPlayerY *= 2.f;
 
-    WorldPosition newPlayerP = gameState->playerP;
+    r32 playerSpeed = 2.f;
+
+    if (gcInput->actionUp.endedDown)
+    {
+      playerSpeed = 10.f;
+    }
+
+    dPlayerX *= playerSpeed;
+    dPlayerY *= playerSpeed;
+
+    TileMapPosition newPlayerP = gameState->playerP;
     newPlayerP.tileRelX += deltaTimeSec * dPlayerX;
     newPlayerP.tileRelY += deltaTimeSec * dPlayerY;
-    newPlayerP = recanonicalizePosition(&world, newPlayerP);
+    newPlayerP = recanonicalizePosition(tileMap, newPlayerP);
 
-    WorldPosition playerLeft = newPlayerP;
+    TileMapPosition playerLeft = newPlayerP;
     playerLeft.tileRelX -= 0.5f * playerWidth;
-    playerLeft = recanonicalizePosition(&world, playerLeft);
+    playerLeft = recanonicalizePosition(tileMap, playerLeft);
 
-    WorldPosition playerRight = newPlayerP;
+    TileMapPosition playerRight = newPlayerP;
     playerRight.tileRelX += 0.5f * playerWidth;
-    playerRight = recanonicalizePosition(&world, playerRight);
+    playerRight = recanonicalizePosition(tileMap, playerRight);
 
-    if (isWorldPointEmpty(&world, newPlayerP)
-      && isWorldPointEmpty(&world, playerLeft)
-      && isWorldPointEmpty(&world, playerRight))
+    if (isTileMapPointEmpty(tileMap, newPlayerP)
+      && isTileMapPointEmpty(tileMap, playerLeft)
+      && isTileMapPointEmpty(tileMap, playerRight))
     {
       gameState->playerP = newPlayerP;
     }
   }
 
-  for (s32 row = 0; row < 9; ++row)
+  r32 screenCenterX = 0.5f * (r32) buff->width;
+  r32 screenCenterY = 0.5f * (r32) buff->height;
+
+  for (s32 relRow = -10; relRow < 10; ++relRow)
   {
-    for (s32 column = 0; column < 17; column++)
+    for (s32 relColumn = -20; relColumn < 20; relColumn++)
     {
-      u32 tileID = getTileValueUnchecked(&world, tileMap, column, row);
+      u32 column = gameState->playerP.absTileX + relColumn;
+      u32 row = gameState->playerP.absTileY + relRow;
+      u32 tileID = getTileValue(tileMap, column, row);
       r32 gray = 0.5f;
       if (tileID == 1)
       {
 	gray = 1.f;
       }
 
-      if (column == gameState->playerP.tileX && row == gameState->playerP.tileY)
+      if (column == gameState->playerP.absTileX && row == gameState->playerP.absTileY)
       {
 	gray = 0.0f;
       }
 
-      r32 minX = world.lowerLeftX + ((r32) column) * world.tileSideInPixels;
-      r32 minY = world.lowerLeftY - ((r32) row) * world.tileSideInPixels;
-      r32 maxX = minX + world.tileSideInPixels;
-      r32 maxY = minY - world.tileSideInPixels;
-      drawRectangle(buff, minX, maxY, maxX, minY, gray, gray, gray);
+      r32 cenX = screenCenterX - tileMap->metersToPixels * gameState->playerP.tileRelX + ((r32) relColumn) * tileMap->tileSideInPixels;
+      r32 cenY = screenCenterY + tileMap->metersToPixels * gameState->playerP.tileRelY - ((r32) relRow) * tileMap->tileSideInPixels;
+      r32 minX = cenX - 0.5f * tileMap->tileSideInPixels;
+      r32 minY = cenY - 0.5f * tileMap->tileSideInPixels;
+      r32 maxX = cenX + 0.5f * tileMap->tileSideInPixels;
+      r32 maxY = cenY + 0.5f * tileMap->tileSideInPixels;
+      drawRectangle(buff, minX, minY, maxX, maxY, gray, gray, gray);
     }
   }
 
   r32 playerR = 1.f;
   r32 playerG = 1.f;
   r32 playerB = 0.f;
-  r32 playerLeft = world.lowerLeftX + world.tileSideInPixels * gameState->playerP.tileX + world.metersToPixels * gameState->playerP.tileRelX - 0.5f * world.metersToPixels * playerWidth;
-  r32 playerTop = world.lowerLeftY - world.tileSideInPixels * gameState->playerP.tileY - world.metersToPixels * gameState->playerP.tileRelY - world.metersToPixels * playerHeight;
-  drawRectangle(buff, playerLeft, playerTop, playerLeft + world.metersToPixels * playerWidth, playerTop + world.metersToPixels * playerHeight, playerR, playerG, playerB);
+  r32 playerLeft = screenCenterX - 0.5f * tileMap->metersToPixels * playerWidth;
+  r32 playerTop = screenCenterY - tileMap->metersToPixels * playerHeight;
+  drawRectangle(buff, playerLeft, playerTop, playerLeft + tileMap->metersToPixels * playerWidth, playerTop + tileMap->metersToPixels * playerHeight, playerR, playerG, playerB);
 
   memory->waitIfInputBlocked(thread);
   memory->lockInputThread(thread);

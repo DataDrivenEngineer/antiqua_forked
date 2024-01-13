@@ -77,6 +77,11 @@ static b32 processEvent(NSEvent *e)
       handled = 1;
       shouldKeepRunning = 0;
     }
+    if (e.keyCode == kVK_UpArrow)
+    {
+      handled = 1;
+      processButtonDown(&gcInput.actionUp);
+    }
     if (e.keyCode == kVK_ANSI_S)
     {
       handled = 1;
@@ -113,6 +118,11 @@ static b32 processEvent(NSEvent *e)
   }
   else if (e.type == NSEventTypeKeyUp)
   {
+    if (e.keyCode == kVK_UpArrow)
+    {
+      processButtonUp(&gcInput.actionUp);
+      handled = 1;
+    }
     if (e.keyCode == kVK_ANSI_S)
     {
       processButtonUp(&gcInput.down);

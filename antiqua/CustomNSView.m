@@ -220,7 +220,7 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   gameMemory.permanentStorage = state.gameMemoryBlock;
   msync((void *) baseAddress, gameMemory.permanentStorageSize, MS_SYNC | MS_INVALIDATE);
 #else
-  gameMemory.permanentStorage = mmap(0, totalStorageSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+  gameMemory.permanentStorage = mmap(0, state.totalMemorySize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
   msync(gameMemory.permanentStorage, gameMemory.permanentStorageSize, MS_SYNC | MS_INVALIDATE);
 #endif
   if (gameMemory.permanentStorage == MAP_FAILED)
