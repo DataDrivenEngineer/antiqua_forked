@@ -1,23 +1,3 @@
-inline void recanonicalizeCoord(TileMap *tileMap, u32 *tile, r32 *tileRel)
-{
-  s32 offset = roundReal32ToInt32(*tileRel / tileMap->tileSideInMeters);
-  *tile += offset;
-  *tileRel -= offset * tileMap->tileSideInMeters;
-
-  ASSERT(*tileRel >= -0.5f * tileMap->tileSideInMeters);
-  ASSERT(*tileRel <= 0.5f * tileMap->tileSideInMeters);
-}
-
-inline TileMapPosition recanonicalizePosition(TileMap* tileMap, TileMapPosition pos)
-{
-  TileMapPosition result = pos;
-
-  recanonicalizeCoord(tileMap, &result.absTileX, &result.tileRelX);
-  recanonicalizeCoord(tileMap, &result.absTileY, &result.tileRelY);
-
-  return result;
-}
-
 inline TileChunk * getTileChunk(TileMap *tileMap, u32 tileChunkX, u32 tileChunkY, u32 tileChunkZ)
 {
   TileChunk *tileChunk = 0;
@@ -87,7 +67,7 @@ inline TileChunkPosition getChunkPositionFor(TileMap *tileMap, u32 absTileX, u32
   return result;
 }
 
-u32 getTileValue(TileMap *tileMap, u32 absTileX, u32 absTileY, u32 absTileZ)
+static u32 getTileValue(TileMap *tileMap, u32 absTileX, u32 absTileY, u32 absTileZ)
 {
   TileChunkPosition chunkPos = getChunkPositionFor(tileMap, absTileX, absTileY, absTileZ);
   TileChunk *tileChunk = getTileChunk(tileMap, chunkPos.tileChunkX, chunkPos.tileChunkY, chunkPos.tileChunkZ);
@@ -96,15 +76,22 @@ u32 getTileValue(TileMap *tileMap, u32 absTileX, u32 absTileY, u32 absTileZ)
   return tileChunkValue;
 }
 
-b32 isTileMapPointEmpty(TileMap *tileMap, TileMapPosition canPos)
+static u32 getTileValue(TileMap *tileMap, TileMapPosition pos)
 {
-  u32 tileChunkValue = getTileValue(tileMap, canPos.absTileX, canPos.absTileY, canPos.absTileZ);
-  b32 empty = (tileChunkValue == 1);
+  u32 tileChunkValue = getTileValue(tileMap, pos.absTileX, pos.absTileY, pos.absTileZ);
+  
+  return tileChunkValue;
+}
+
+static b32 isTileMapPointEmpty(TileMap *tileMap, TileMapPosition pos)
+{
+  u32 tileChunkValue = getTileValue(tileMap, pos);
+  b32 empty = (tileChunkValue == 1) || (tileChunkValue == 3) || (tileChunkValue == 4);
 
   return empty;
 }
 
-void setTileValue(MemoryArena *arena, TileMap *tileMap, u32 absTileX, u32 absTileY, u32 absTileZ, u32 tileValue)
+static void setTileValue(MemoryArena *arena, TileMap *tileMap, u32 absTileX, u32 absTileY, u32 absTileZ, u32 tileValue)
 {
   TileChunkPosition chunkPos = getChunkPositionFor(tileMap, absTileX, absTileY, absTileZ);
   TileChunk *tileChunk = getTileChunk(tileMap, chunkPos.tileChunkX, chunkPos.tileChunkY, chunkPos.tileChunkZ);
@@ -122,4 +109,35 @@ void setTileValue(MemoryArena *arena, TileMap *tileMap, u32 absTileX, u32 absTil
   }
 
   setTileValue(tileMap, tileChunk, chunkPos.relTileX, chunkPos.relTileY, tileValue);
+}
+
+//
+//
+//
+
+inline void recanonicalizeCoord(TileMap *tileMap, u32 *tile, r32 *tileRel)
+{
+  s32 offset = roundReal32ToInt32(*tileRel / tileMap->tileSideInMeters);
+  *tile += offset;
+  *tileRel -= offset * tileMap->tileSideInMeters;
+
+  ASSERT(*tileRel >= -0.5f * tileMap->tileSideInMeters);
+  ASSERT(*tileRel <= 0.5f * tileMap->tileSideInMeters);
+}
+
+inline TileMapPosition recanonicalizePosition(TileMap* tileMap, TileMapPosition pos)
+{
+  TileMapPosition result = pos;
+
+  recanonicalizeCoord(tileMap, &result.absTileX, &result.offsetX);
+  recanonicalizeCoord(tileMap, &result.absTileY, &result.offsetY);
+
+  return result;
+}
+
+inline b32 areOnTheSameTile(TileMapPosition *a, TileMapPosition *b)
+{
+  b32 result = a->absTileX == b->absTileX && a->absTileY == b->absTileY && a->absTileZ == b->absTileZ;
+
+  return result;
 }

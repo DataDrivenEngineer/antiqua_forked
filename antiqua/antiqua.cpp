@@ -72,8 +72,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     // do initialization here as needed
     gameState->playerP.absTileX = 1;
     gameState->playerP.absTileY = 3;
-    gameState->playerP.tileRelX = 5.0f;
-    gameState->playerP.tileRelY = 5.0f;
+    gameState->playerP.offsetX = 5.0f;
+    gameState->playerP.offsetY = 5.0f;
     initializeArena(&gameState->worldArena, memory->permanentStorageSize - sizeof(GameState), (u8 *) memory->permanentStorage + sizeof(GameState));
 
     gameState->world = PUSH_STRUCT(&gameState->worldArena, World);
@@ -122,8 +122,10 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         randomChoice = randomNumberTable[randomNumberIndex++] % 3;
       }
 
+      b32 createdZDoor = false;
       if (randomChoice == 2)
       {
+        createdZDoor = true;
         if (absTileZ == 0)
         {
           doorUp = 1;
@@ -190,15 +192,10 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
       doorLeft = doorRight;
       doorBottom = doorTop;
 
-      if (doorUp)
+      if (createdZDoor)
       {
-        doorDown = 1;
-        doorUp = 0;
-      }
-      else if (doorDown)
-      {
-        doorDown = 0;
-        doorUp = 1;
+        doorDown = !doorDown;
+        doorUp = !doorUp;
       }
       else
       {
@@ -277,22 +274,36 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     dPlayerY *= playerSpeed;
 
     TileMapPosition newPlayerP = gameState->playerP;
-    newPlayerP.tileRelX += deltaTimeSec * dPlayerX;
-    newPlayerP.tileRelY += deltaTimeSec * dPlayerY;
+    newPlayerP.offsetX += deltaTimeSec * dPlayerX;
+    newPlayerP.offsetY += deltaTimeSec * dPlayerY;
     newPlayerP = recanonicalizePosition(tileMap, newPlayerP);
 
     TileMapPosition playerLeft = newPlayerP;
-    playerLeft.tileRelX -= 0.5f * playerWidth;
+    playerLeft.offsetX -= 0.5f * playerWidth;
     playerLeft = recanonicalizePosition(tileMap, playerLeft);
 
     TileMapPosition playerRight = newPlayerP;
-    playerRight.tileRelX += 0.5f * playerWidth;
+    playerRight.offsetX += 0.5f * playerWidth;
     playerRight = recanonicalizePosition(tileMap, playerRight);
 
     if (isTileMapPointEmpty(tileMap, newPlayerP)
       && isTileMapPointEmpty(tileMap, playerLeft)
       && isTileMapPointEmpty(tileMap, playerRight))
     {
+      if (!areOnTheSameTile(&gameState->playerP, &newPlayerP))
+      {
+        u32 newTileValue = getTileValue(tileMap, newPlayerP);
+
+        if (newTileValue == 3)
+        {
+          ++newPlayerP.absTileZ;
+        }
+        else if (newTileValue == 4)
+        {
+          --newPlayerP.absTileZ;
+        }
+      }
+
       gameState->playerP = newPlayerP;
     }
   }
@@ -328,8 +339,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
           gray = 0.0f;
         }
 
-        r32 cenX = screenCenterX - metersToPixels * gameState->playerP.tileRelX + ((r32) relColumn) * tileSideInPixels;
-        r32 cenY = screenCenterY + metersToPixels * gameState->playerP.tileRelY - ((r32) relRow) * tileSideInPixels;
+        r32 cenX = screenCenterX - metersToPixels * gameState->playerP.offsetX + ((r32) relColumn) * tileSideInPixels;
+        r32 cenY = screenCenterY + metersToPixels * gameState->playerP.offsetY - ((r32) relRow) * tileSideInPixels;
         r32 minX = cenX - 0.5f * tileSideInPixels;
         r32 minY = cenY - 0.5f * tileSideInPixels;
         r32 maxX = cenX + 0.5f * tileSideInPixels;

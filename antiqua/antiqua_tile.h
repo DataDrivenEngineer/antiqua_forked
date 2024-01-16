@@ -7,9 +7,9 @@ typedef struct TileMapPosition
   u32 absTileY;
   u32 absTileZ;
 
-  // NOTE(dima): this is tile-relative X and Y
-  r32 tileRelX;
-  r32 tileRelY;
+  // NOTE(dima): these are offsets from tile center
+  r32 offsetX;
+  r32 offsetY;
 } TileMapPosition;
 
 typedef struct TileChunkPosition
