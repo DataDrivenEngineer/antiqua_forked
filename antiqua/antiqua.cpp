@@ -2,6 +2,7 @@
 #include "types.h"
 #include "stdio.h"
 #include "antiqua_tile.h"
+#include "antiqua_random.h"
 
 #include "antiqua_tile.cpp"
 
@@ -53,24 +54,6 @@ static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 rea
   }
 }
 
-static void initializeArena(MemoryArena *arena, MemoryIndex size, u8 *base)
-{
-  arena->size = size;
-  arena->base = base;
-  arena->used = 0;
-}
-
-#define PUSH_STRUCT(arena, Type) (Type *) pushSize_(arena, sizeof(Type))
-#define PUSH_ARRAY(arena, count, Type) (Type *) pushSize_(arena, (count) * sizeof(Type))
-void * pushSize_(MemoryArena *arena, MemoryIndex size)
-{
-  ASSERT((arena->used + size) <= arena->size);
-  void *result = arena->base + arena->used;
-  arena->used += size;
-
-  return result;
-}
-
 #if !XCODE_BUILD
 EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #else
@@ -106,41 +89,144 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     tileMap->chunkDim = 1 << tileMap->chunkShift;
 
     tileMap->tileSideInMeters = 1.4f;
-    tileMap->tileSideInPixels = 60;
-    tileMap->metersToPixels = (r32) tileMap->tileSideInPixels / tileMap->tileSideInMeters;
 
     tileMap->tileChunkCountX = 128;
     tileMap->tileChunkCountY = 128;
+    tileMap->tileChunkCountZ = 2;
 
-    tileMap->tileChunks = PUSH_ARRAY(&gameState->worldArena, tileMap->tileChunkCountX * tileMap->tileChunkCountY, TileChunk);
+    tileMap->tileChunks = PUSH_ARRAY(&gameState->worldArena, tileMap->tileChunkCountX * tileMap->tileChunkCountY * tileMap->tileChunkCountZ, TileChunk);
 
-    for (u32 y = 0; y < tileMap->tileChunkCountY; y++)
-    {
-      for (u32 x = 0; x < tileMap->tileChunkCountX; x++)
-      {
-        tileMap->tileChunks[y * tileMap->tileChunkCountX + x].tiles = PUSH_ARRAY(&gameState->worldArena, tileMap->chunkDim * tileMap->chunkDim, u32);
-      }
-    }
-
-    r32 lowerLeftX = -tileMap->tileSideInPixels / 2;
-    r32 lowerLeftY = (r32) buff->height;
-
+    u32 randomNumberIndex = 0;
     u32 tilesPerWidth = 17;
     u32 tilesPerHeight = 9;
-    for (u32 screenY = 0; screenY < 32; screenY++)
-    {
-      for (u32 screenX = 0; screenX < 32; screenX++)
-      {
-        for (u32 tileY = 0; tileY < tilesPerHeight; tileY++)
-        {
-          for (u32 tileX = 0; tileX < tilesPerWidth; tileX++)
-          {
-            u32 absTileX = screenX * tilesPerWidth + tileX;
-            u32 absTileY = screenY * tilesPerHeight + tileY;
+    u32 screenX = 0;
+    u32 screenY = 0;
+    u32 absTileZ = 0;
 
-            setTileValue(&gameState->worldArena, world->tileMap, absTileX, absTileY, tileX == tileY && tileY % 2 ? 1 : 0);
-          }
+    b32 doorLeft = 0;
+    b32 doorRight = 0;
+    b32 doorTop = 0;
+    b32 doorBottom = 0;
+    b32 doorUp = 0;
+    b32 doorDown = 0;
+    for (u32 screenIndex = 0; screenIndex < 100; screenIndex++)
+    {
+      ASSERT(randomNumberIndex < ARRAY_COUNT(randomNumberTable));
+      u32 randomChoice;
+      if (doorUp || doorDown)
+      {
+        randomChoice = randomNumberTable[randomNumberIndex++] % 2;
+      }
+      else
+      {
+        randomChoice = randomNumberTable[randomNumberIndex++] % 3;
+      }
+
+      if (randomChoice == 2)
+      {
+        if (absTileZ == 0)
+        {
+          doorUp = 1;
         }
+        else
+        {
+          doorDown = 1;
+        }
+      }
+      else if (randomChoice == 1)
+      {
+        doorRight = 1;
+      }
+      else
+      {
+        doorTop = 1;
+      }
+
+      for (u32 tileY = 0; tileY < tilesPerHeight; tileY++)
+      {
+        for (u32 tileX = 0; tileX < tilesPerWidth; tileX++)
+        {
+          u32 absTileX = screenX * tilesPerWidth + tileX;
+          u32 absTileY = screenY * tilesPerHeight + tileY;
+
+          u32 tileValue = 1;
+          if (tileX == 0 && (!doorLeft || tileY != (tilesPerHeight / 2)))
+          {
+            tileValue = 2;
+          }
+
+          if (tileX == tilesPerWidth - 1 && (!doorRight || tileY != (tilesPerHeight / 2)))
+          {
+              tileValue = 2;
+          }
+
+          if (tileY == 0 && (!doorBottom || tileX != (tilesPerWidth / 2)))
+          {
+              tileValue = 2;
+          }
+
+          if (tileY == tilesPerHeight - 1 && (!doorTop || tileX != (tilesPerWidth / 2)))
+          {
+            tileValue = 2;
+          }
+
+          if (tileX == 10 && tileY == 6)
+          {
+            if (doorUp)
+            {
+              tileValue = 3;
+            }
+
+            if (doorDown)
+            {
+              tileValue = 4;
+            }
+          }
+
+          setTileValue(&gameState->worldArena, world->tileMap, absTileX, absTileY, absTileZ, tileValue);
+        }
+      }
+
+      doorLeft = doorRight;
+      doorBottom = doorTop;
+
+      if (doorUp)
+      {
+        doorDown = 1;
+        doorUp = 0;
+      }
+      else if (doorDown)
+      {
+        doorDown = 0;
+        doorUp = 1;
+      }
+      else
+      {
+        doorDown = 0;
+        doorUp = 0;
+      }
+
+      doorRight = 0;
+      doorTop = 0;
+
+      if (randomChoice == 2)
+      {
+        if (absTileZ == 0)
+        {
+          absTileZ = 1;
+        }
+        else
+        {
+          absTileZ = 0;
+        }
+      }
+      else if (randomChoice == 1)
+      {
+        screenX += 1;
+      }
+      else
+      {
+        screenY += 1;
       }
     }
 
@@ -149,6 +235,12 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
   World *world = gameState->world;
   TileMap *tileMap = world->tileMap;
+
+  s32 tileSideInPixels = 60;
+  r32 metersToPixels = (r32) tileSideInPixels / tileMap->tileSideInMeters;
+
+  r32 lowerLeftX = -tileSideInPixels / 2;
+  r32 lowerLeftY = (r32) buff->height;
 
   if (gcInput->isAnalog)
   {
@@ -205,6 +297,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     }
   }
 
+  drawRectangle(buff, 0, 0, buff->width, buff->height, 0, 1.f, 0);
+
   r32 screenCenterX = 0.5f * (r32) buff->width;
   r32 screenCenterY = 0.5f * (r32) buff->height;
 
@@ -214,34 +308,43 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     {
       u32 column = gameState->playerP.absTileX + relColumn;
       u32 row = gameState->playerP.absTileY + relRow;
-      u32 tileID = getTileValue(tileMap, column, row);
-      r32 gray = 0.5f;
-      if (tileID == 1)
-      {
-	gray = 1.f;
-      }
+      u32 tileID = getTileValue(tileMap, column, row, gameState->playerP.absTileZ);
 
-      if (column == gameState->playerP.absTileX && row == gameState->playerP.absTileY)
+      if (tileID > 0)
       {
-	gray = 0.0f;
-      }
+        r32 gray = 0.5f;
+        if (tileID == 2)
+        {
+          gray = 1.f;
+        }
 
-      r32 cenX = screenCenterX - tileMap->metersToPixels * gameState->playerP.tileRelX + ((r32) relColumn) * tileMap->tileSideInPixels;
-      r32 cenY = screenCenterY + tileMap->metersToPixels * gameState->playerP.tileRelY - ((r32) relRow) * tileMap->tileSideInPixels;
-      r32 minX = cenX - 0.5f * tileMap->tileSideInPixels;
-      r32 minY = cenY - 0.5f * tileMap->tileSideInPixels;
-      r32 maxX = cenX + 0.5f * tileMap->tileSideInPixels;
-      r32 maxY = cenY + 0.5f * tileMap->tileSideInPixels;
-      drawRectangle(buff, minX, minY, maxX, maxY, gray, gray, gray);
+        if (tileID > 2)
+        {
+          gray = 0.25f;
+        }
+
+        if (column == gameState->playerP.absTileX && row == gameState->playerP.absTileY)
+        {
+          gray = 0.0f;
+        }
+
+        r32 cenX = screenCenterX - metersToPixels * gameState->playerP.tileRelX + ((r32) relColumn) * tileSideInPixels;
+        r32 cenY = screenCenterY + metersToPixels * gameState->playerP.tileRelY - ((r32) relRow) * tileSideInPixels;
+        r32 minX = cenX - 0.5f * tileSideInPixels;
+        r32 minY = cenY - 0.5f * tileSideInPixels;
+        r32 maxX = cenX + 0.5f * tileSideInPixels;
+        r32 maxY = cenY + 0.5f * tileSideInPixels;
+        drawRectangle(buff, minX, minY, maxX, maxY, gray, gray, gray);
+      }
     }
   }
 
   r32 playerR = 1.f;
   r32 playerG = 1.f;
   r32 playerB = 0.f;
-  r32 playerLeft = screenCenterX - 0.5f * tileMap->metersToPixels * playerWidth;
-  r32 playerTop = screenCenterY - tileMap->metersToPixels * playerHeight;
-  drawRectangle(buff, playerLeft, playerTop, playerLeft + tileMap->metersToPixels * playerWidth, playerTop + tileMap->metersToPixels * playerHeight, playerR, playerG, playerB);
+  r32 playerLeft = screenCenterX - 0.5f * metersToPixels * playerWidth;
+  r32 playerTop = screenCenterY - metersToPixels * playerHeight;
+  drawRectangle(buff, playerLeft, playerTop, playerLeft + metersToPixels * playerWidth, playerTop + metersToPixels * playerHeight, playerR, playerG, playerB);
 
   memory->waitIfInputBlocked(thread);
   memory->lockInputThread(thread);

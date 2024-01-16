@@ -18,14 +18,18 @@ inline TileMapPosition recanonicalizePosition(TileMap* tileMap, TileMapPosition 
   return result;
 }
 
-inline TileChunk * getTileChunk(TileMap *tileMap, u32 tileChunkX, u32 tileChunkY)
+inline TileChunk * getTileChunk(TileMap *tileMap, u32 tileChunkX, u32 tileChunkY, u32 tileChunkZ)
 {
   TileChunk *tileChunk = 0;
 
   if (tileChunkX >= 0 && tileChunkX < tileMap->tileChunkCountX &&
-    tileChunkY >= 0 && tileChunkY < tileMap->tileChunkCountY)
+    tileChunkY >= 0 && tileChunkY < tileMap->tileChunkCountY &&
+    tileChunkZ >= 0 && tileChunkZ < tileMap->tileChunkCountZ)
   {
-    tileChunk = &tileMap->tileChunks[tileChunkY * tileMap->tileChunkCountX + tileChunkX];
+    tileChunk = &tileMap->tileChunks[
+      tileChunkZ * tileMap->tileChunkCountY * tileMap->tileChunkCountX +
+      tileChunkY * tileMap->tileChunkCountX + 
+      tileChunkX];
   }
 
   return tileChunk;
@@ -54,7 +58,7 @@ inline u32 getTileValue(TileMap *tileMap, TileChunk *tileChunk, u32 testTileX, u
 {
   u32 tileChunkValue = 0;
 
-  if (tileChunk)
+  if (tileChunk && tileChunk->tiles)
   {
     tileChunkValue = getTileValueUnchecked(tileMap, tileChunk, testTileX, testTileY);
   }
@@ -64,28 +68,29 @@ inline u32 getTileValue(TileMap *tileMap, TileChunk *tileChunk, u32 testTileX, u
 
 inline void setTileValue(TileMap *tileMap, TileChunk *tileChunk, u32 testTileX, u32 testTileY, u32 tileValue)
 {
-  if (tileChunk)
+  if (tileChunk && tileChunk->tiles)
   {
     setTileValueUnchecked(tileMap, tileChunk, testTileX, testTileY, tileValue);
   }
 }
 
-inline TileChunkPosition getChunkPositionFor(TileMap *tileMap, u32 absTileX, u32 absTileY)
+inline TileChunkPosition getChunkPositionFor(TileMap *tileMap, u32 absTileX, u32 absTileY, u32 absTileZ)
 {
   TileChunkPosition result;
 
   result.tileChunkX = absTileX >> tileMap->chunkShift;
   result.tileChunkY = absTileY >> tileMap->chunkShift;
+  result.tileChunkZ = absTileZ;
   result.relTileX = absTileX & tileMap->chunkMask;
   result.relTileY = absTileY & tileMap->chunkMask;
 
   return result;
 }
 
-u32 getTileValue(TileMap *tileMap, u32 absTileX, u32 absTileY)
+u32 getTileValue(TileMap *tileMap, u32 absTileX, u32 absTileY, u32 absTileZ)
 {
-  TileChunkPosition chunkPos = getChunkPositionFor(tileMap, absTileX, absTileY);
-  TileChunk *tileChunk = getTileChunk(tileMap, chunkPos.tileChunkX, chunkPos.tileChunkY);
+  TileChunkPosition chunkPos = getChunkPositionFor(tileMap, absTileX, absTileY, absTileZ);
+  TileChunk *tileChunk = getTileChunk(tileMap, chunkPos.tileChunkX, chunkPos.tileChunkY, chunkPos.tileChunkZ);
   u32 tileChunkValue = getTileValue(tileMap, tileChunk, chunkPos.relTileX, chunkPos.relTileY);
 
   return tileChunkValue;
@@ -93,17 +98,28 @@ u32 getTileValue(TileMap *tileMap, u32 absTileX, u32 absTileY)
 
 b32 isTileMapPointEmpty(TileMap *tileMap, TileMapPosition canPos)
 {
-  u32 tileChunkValue = getTileValue(tileMap, canPos.absTileX, canPos.absTileY);
-  b32 empty = (tileChunkValue == 0);
+  u32 tileChunkValue = getTileValue(tileMap, canPos.absTileX, canPos.absTileY, canPos.absTileZ);
+  b32 empty = (tileChunkValue == 1);
 
   return empty;
 }
 
-void setTileValue(MemoryArena *arena, TileMap *tileMap, u32 absTileX, u32 absTileY, u32 tileValue)
+void setTileValue(MemoryArena *arena, TileMap *tileMap, u32 absTileX, u32 absTileY, u32 absTileZ, u32 tileValue)
 {
-  TileChunkPosition chunkPos = getChunkPositionFor(tileMap, absTileX, absTileY);
-  TileChunk *tileChunk = getTileChunk(tileMap, chunkPos.tileChunkX, chunkPos.tileChunkY);
+  TileChunkPosition chunkPos = getChunkPositionFor(tileMap, absTileX, absTileY, absTileZ);
+  TileChunk *tileChunk = getTileChunk(tileMap, chunkPos.tileChunkX, chunkPos.tileChunkY, chunkPos.tileChunkZ);
 
   ASSERT(tileChunk);
+
+  if (!tileChunk->tiles)
+  {
+      u32 tileCount = tileMap->chunkDim * tileMap->chunkDim;
+      tileChunk->tiles = PUSH_ARRAY(arena, tileCount, u32);
+      for (u32 tileIndex = 0; tileIndex < tileCount; tileIndex++)
+      {
+        tileChunk->tiles[tileIndex] = 1;
+      }
+  }
+
   setTileValue(tileMap, tileChunk, chunkPos.relTileX, chunkPos.relTileY, tileValue);
 }

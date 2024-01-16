@@ -86,6 +86,24 @@ typedef struct MemoryArena
   MemoryIndex used;
 } MemoryArena;
 
+void initializeArena(MemoryArena *arena, MemoryIndex size, u8 *base)
+{
+  arena->size = size;
+  arena->base = base;
+  arena->used = 0;
+}
+
+#define PUSH_STRUCT(arena, Type) (Type *) pushSize_(arena, sizeof(Type))
+#define PUSH_ARRAY(arena, count, Type) (Type *) pushSize_(arena, (count) * sizeof(Type))
+void * pushSize_(MemoryArena *arena, MemoryIndex size)
+{
+  ASSERT((arena->used + size) <= arena->size);
+  void *result = arena->base + arena->used;
+  arena->used += size;
+
+  return result;
+}
+
 typedef struct World
 {
   TileMap *tileMap;
