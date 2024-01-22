@@ -38,8 +38,8 @@ static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 rea
     maxY = buf->height;
   }
 
-  // NOTE(dima): byte ordering here is in BGRA format
-  u32 color = (roundReal32ToUInt32(b * 255.f) << 16) | (roundReal32ToUInt32(g * 255.f) << 8) | roundReal32ToUInt32(r * 255.f);
+  // NOTE(dima): byte ordering here is in RGB format
+  u32 color = (roundReal32ToUInt32(r * 255.f) << 16) | (roundReal32ToUInt32(g * 255.f) << 8) | (roundReal32ToUInt32(b * 255.f) << 0);
 
   u8 *row = (u8 *) buf->memory + minX * buf->bytesPerPixel + minY * buf->pitch;
   for (s32 y = minY; y < maxY; ++y)
@@ -52,6 +52,150 @@ static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 rea
 
     row += buf->pitch;
   }
+}
+
+static void drawBitmap(struct GameOffscreenBuffer *buf, LoadedBitmap *bitmap, r32 realX, r32 realY, s32 alignX = 0, s32 alignY = 0)
+{
+  realX -= (r32) alignX;
+  realY -= (r32) alignY;
+
+  s32 minX = roundReal32ToInt32(realX);
+  s32 minY = roundReal32ToInt32(realY);
+  s32 maxX = roundReal32ToInt32(realX + (r32) bitmap->width);
+  s32 maxY = roundReal32ToInt32(realY + (r32) bitmap->height);
+
+  s32 sourceOffsetX = 0;
+  if (minX < 0)
+  {
+    sourceOffsetX = -minX;
+    minX = 0;
+  }
+
+  s32 sourceOffsetY = 0;
+  if (minY < 0)
+  {
+    sourceOffsetY = -minY;
+    minY = 0;
+  }
+
+  if (maxX > buf->width)
+  {
+    maxX = buf->width;
+  }
+
+  if (maxY > buf->height)
+  {
+    maxY = buf->height;
+  }
+
+  u32 *sourceRow = bitmap->pixels + bitmap->width * (bitmap->height - 1);
+  sourceRow += -sourceOffsetY * bitmap->width + sourceOffsetX;
+  u8 *destRow = (u8 *) buf->memory + minX * buf->bytesPerPixel + minY * buf->pitch;
+  for (s32 y = minY; y < maxY; ++y)
+  {
+    u32 *dest = (u32 *) destRow;
+    u32 *source = sourceRow;
+    for (s32 x = minX; x < maxX; ++x)
+    {
+      r32 a = (r32) ((*source >> 24) & 0xFF) / 255.f;
+      r32 sr = (r32) ((*source >> 16) & 0xFF);
+      r32 sg = (r32) ((*source >> 8) & 0xFF);
+      r32 sb = (r32) ((*source >> 0) & 0xFF);
+
+      r32 dr = (r32) ((*dest >> 16) & 0xFF);
+      r32 dg = (r32) ((*dest >> 8) & 0xFF);
+      r32 db = (r32) ((*dest >> 0) & 0xFF);
+
+      r32 r = (1.f - a) * dr + a * sr;
+      r32 g = (1.f - a) * dg + a * sg;
+      r32 b = (1.f - a) * db + a * sb;
+
+      *dest = ((u32) (r + 0.5f) << 16) |
+              ((u32) (g + 0.5f) << 8) |
+              ((u32) (b + 0.5f) << 0);
+
+      ++dest;
+      ++source;
+    }
+
+    destRow += buf->pitch;
+    sourceRow -= bitmap->width;
+  }
+}
+
+typedef struct
+// NOTE(dima): This is to ensure that struct elements are byte-aligned in memory
+// This will only work for clang compiler!
+__attribute__((packed))
+{
+  u16 fileType;
+  u32 fileSize;
+  u16 reserved1;
+  u16 reserved2;
+  u32 bitmapOffset;
+  u32 size;
+  s32 width;
+  s32 height;
+  u16 planes;
+  u16 bitsPerPixel;
+  u32 compression;
+  u32 sizeOfBitmap;
+  s32 horzResolution;
+  s32 vertResolution;
+  u32 colorsUsed;
+  u32 colorsImportant;
+
+  u32 redMask;
+  u32 greenMask;
+  u32 blueMask;
+} BitmapHeader;
+
+static LoadedBitmap Debug_LoadBMP(ThreadContext *thread, Debug_PlatformReadEntireFile *readEntireFile, const char *filename)
+{
+  LoadedBitmap result = {0};
+
+  debug_ReadFileResult readResult = {0};
+  readEntireFile(thread, &readResult, filename);
+  if (readResult.contentsSize != 0)
+  {
+    BitmapHeader *header = (BitmapHeader *) readResult.contents;
+    u32 *pixels = (u32 *) ((u8 *) readResult.contents + header->bitmapOffset);
+    result.pixels = pixels;
+    result.width = header->width;
+    result.height = header->height;
+
+    ASSERT(header->compression == 3);
+
+    u32 redMask = header->redMask;
+    u32 greenMask = header->greenMask;
+    u32 blueMask = header->blueMask;
+    u32 alphaMask = ~(redMask | greenMask | blueMask);
+
+    BitScanResult redShift = findLeastSignificantSetBit(redMask);
+    BitScanResult greenShift = findLeastSignificantSetBit(greenMask);
+    BitScanResult blueShift = findLeastSignificantSetBit(blueMask);
+    BitScanResult alphaShift = findLeastSignificantSetBit(alphaMask);
+
+    ASSERT(redShift.found);
+    ASSERT(greenShift.found);
+    ASSERT(blueShift.found);
+    ASSERT(alphaShift.found);
+
+    u32 *sourceDest = pixels;
+    for (s32 y = 0; y < header->height; ++y)
+    {
+      for (s32 x = 0; x < header->width; ++x)
+      {
+        u32 c = *sourceDest;
+        *sourceDest++ = ((((c >> alphaShift.index) & 0xFF) << 24) |
+                       (((c >> redShift.index) & 0xFF) << 16) |
+                       (((c >> greenShift.index) & 0xFF) << 8) |
+                       (((c >> blueShift.index) & 0xFF) << 0));
+      }
+    }
+  }
+
+  return result;
 }
 
 #if !XCODE_BUILD
@@ -69,6 +213,41 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
   GameState *gameState = (GameState *) memory->permanentStorage;
   if (!memory->isInitialized)
   {
+    gameState->backdrop = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_background.bmp");
+
+    HeroBitmaps *bitmap = gameState->heroBitmaps;
+
+    bitmap->head = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_right_head.bmp");
+    bitmap->cape = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_right_cape.bmp");
+    bitmap->torso = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_right_torso.bmp");
+    bitmap->alignX = 72;
+    bitmap->alignY = 182;
+    ++bitmap;
+
+    bitmap->head = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_back_head.bmp");
+    bitmap->cape = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_back_cape.bmp");
+    bitmap->torso = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_back_torso.bmp");
+    bitmap->alignX = 72;
+    bitmap->alignY = 182;
+    ++bitmap;
+
+    bitmap->head = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_left_head.bmp");
+    bitmap->cape = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_left_cape.bmp");
+    bitmap->torso = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_left_torso.bmp");
+    bitmap->alignX = 72;
+    bitmap->alignY = 182;
+    ++bitmap;
+
+    bitmap->head = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_front_head.bmp");
+    bitmap->cape = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_front_cape.bmp");
+    bitmap->torso = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_front_torso.bmp");
+    bitmap->alignX = 72;
+    bitmap->alignY = 182;
+    ++bitmap;
+
+    gameState->cameraP.absTileX = 17 / 2;
+    gameState->cameraP.absTileY = 9 / 2;
+
     // do initialization here as needed
     gameState->playerP.absTileX = 1;
     gameState->playerP.absTileY = 3;
@@ -248,18 +427,22 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     r32 dPlayerY = 0.f;
     if (gcInput->up.endedDown)
     {
+      gameState->heroFacingDirection = 1;
       dPlayerY = 1.f;
     }
     if (gcInput->down.endedDown)
     {
+      gameState->heroFacingDirection = 3;
       dPlayerY = -1.f;
     }
     if (gcInput->left.endedDown)
     {
+      gameState->heroFacingDirection = 2;
       dPlayerX = -1.f;
     }
     if (gcInput->right.endedDown)
     {
+      gameState->heroFacingDirection = 0;
       dPlayerX = 1.f;
     }
 
@@ -306,9 +489,29 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
       gameState->playerP = newPlayerP;
     }
+
+    gameState->cameraP.absTileZ = gameState->playerP.absTileZ;
+
+    TileMapDifference diff = subtract(tileMap, &gameState->playerP, &gameState->cameraP);
+    if (diff.dx > 9.f * tileMap->tileSideInMeters)
+    {
+      gameState->cameraP.absTileX += 17;
+    }
+    if (diff.dx < -9.f * tileMap->tileSideInMeters)
+    {
+      gameState->cameraP.absTileX -= 17;
+    }
+    if (diff.dy > 5.f * tileMap->tileSideInMeters)
+    {
+      gameState->cameraP.absTileY += 9;
+    }
+    if (diff.dy < -5.f * tileMap->tileSideInMeters)
+    {
+      gameState->cameraP.absTileY -= 9;
+    }
   }
 
-  drawRectangle(buff, 0, 0, buff->width, buff->height, 0, 1.f, 0);
+  drawBitmap(buff, &gameState->backdrop, 0, 0);
 
   r32 screenCenterX = 0.5f * (r32) buff->width;
   r32 screenCenterY = 0.5f * (r32) buff->height;
@@ -317,11 +520,11 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
   {
     for (s32 relColumn = -20; relColumn < 20; relColumn++)
     {
-      u32 column = gameState->playerP.absTileX + relColumn;
-      u32 row = gameState->playerP.absTileY + relRow;
-      u32 tileID = getTileValue(tileMap, column, row, gameState->playerP.absTileZ);
+      u32 column = gameState->cameraP.absTileX + relColumn;
+      u32 row = gameState->cameraP.absTileY + relRow;
+      u32 tileID = getTileValue(tileMap, column, row, gameState->cameraP.absTileZ);
 
-      if (tileID > 0)
+      if (tileID > 1)
       {
         r32 gray = 0.5f;
         if (tileID == 2)
@@ -334,13 +537,13 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
           gray = 0.25f;
         }
 
-        if (column == gameState->playerP.absTileX && row == gameState->playerP.absTileY)
+        if (column == gameState->cameraP.absTileX && row == gameState->cameraP.absTileY)
         {
           gray = 0.0f;
         }
 
-        r32 cenX = screenCenterX - metersToPixels * gameState->playerP.offsetX + ((r32) relColumn) * tileSideInPixels;
-        r32 cenY = screenCenterY + metersToPixels * gameState->playerP.offsetY - ((r32) relRow) * tileSideInPixels;
+        r32 cenX = screenCenterX - metersToPixels * gameState->cameraP.offsetX + ((r32) relColumn) * tileSideInPixels;
+        r32 cenY = screenCenterY + metersToPixels * gameState->cameraP.offsetY - ((r32) relRow) * tileSideInPixels;
         r32 minX = cenX - 0.5f * tileSideInPixels;
         r32 minY = cenY - 0.5f * tileSideInPixels;
         r32 maxX = cenX + 0.5f * tileSideInPixels;
@@ -350,12 +553,21 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     }
   }
 
+  TileMapDifference diff = subtract(tileMap, &gameState->playerP, &gameState->cameraP);
+
   r32 playerR = 1.f;
   r32 playerG = 1.f;
   r32 playerB = 0.f;
-  r32 playerLeft = screenCenterX - 0.5f * metersToPixels * playerWidth;
-  r32 playerTop = screenCenterY - metersToPixels * playerHeight;
+  r32 playerGroundPointX = screenCenterX + metersToPixels * diff.dx;
+  r32 playerGroundPointY = screenCenterY - metersToPixels * diff.dy;
+  r32 playerLeft = playerGroundPointX - 0.5f * metersToPixels * playerWidth;
+  r32 playerTop = playerGroundPointY - metersToPixels * playerHeight;
   drawRectangle(buff, playerLeft, playerTop, playerLeft + metersToPixels * playerWidth, playerTop + metersToPixels * playerHeight, playerR, playerG, playerB);
+
+  HeroBitmaps *heroBitmaps = &gameState->heroBitmaps[gameState->heroFacingDirection];
+  drawBitmap(buff, &heroBitmaps->torso, playerGroundPointX, playerGroundPointY, heroBitmaps->alignX, heroBitmaps->alignY);
+  drawBitmap(buff, &heroBitmaps->cape, playerGroundPointX, playerGroundPointY, heroBitmaps->alignX, heroBitmaps->alignY);
+  drawBitmap(buff, &heroBitmaps->head, playerGroundPointX, playerGroundPointY, heroBitmaps->alignX, heroBitmaps->alignY);
 
   memory->waitIfInputBlocked(thread);
   memory->lockInputThread(thread);
@@ -409,7 +621,7 @@ FILL_SOUND_BUFFER(fillSoundBuffer)
       soundState->tSine += 2.f * PI32 * 1.f / framesPerCycle;
       if (soundState->tSine > 2.f * PI32)
       {
-	soundState->tSine -= 2.f * PI32;
+        soundState->tSine -= 2.f * PI32;
       }
     }
   }

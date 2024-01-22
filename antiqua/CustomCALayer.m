@@ -49,10 +49,7 @@ static void releaseBytePointerCallback(void *info, const void *pointer) {}
     CGDataProviderRef dataProvider = CGDataProviderCreateDirect(framebuffer.memory, framebuffer.sizeBytes, &callbacks);
 
     image = CGImageCreate(framebuffer.width, framebuffer.height, 8, 32, framebuffer.width * 4, colorSpace, 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wenum-conversion"
-    kCGImageAlphaNoneSkipLast,
-#pragma clang diagnostic pop
+    kCGBitmapByteOrder32Little | kCGImageAlphaNoneSkipFirst,
     dataProvider, NULL, false, kCGRenderingIntentDefault);
 
     // NOTE(dima): Flip the image upside down, because by default Quartz uses bottom left corner as the origin,

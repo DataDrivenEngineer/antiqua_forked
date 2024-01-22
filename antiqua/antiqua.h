@@ -109,12 +109,33 @@ typedef struct World
   TileMap *tileMap;
 } World;
 
+typedef struct
+{
+  s32 width;
+  s32 height;
+  u32 *pixels;
+} LoadedBitmap;
+
+typedef struct
+{
+  s32 alignX;
+  s32 alignY;
+  LoadedBitmap head;
+  LoadedBitmap cape;
+  LoadedBitmap torso;
+} HeroBitmaps;
+
 struct GameState
 {
   MemoryArena worldArena;
   World *world;
 
+  TileMapPosition cameraP;
   TileMapPosition playerP;
+
+  LoadedBitmap backdrop;
+  u32 heroFacingDirection;
+  HeroBitmaps heroBitmaps[4];
 };
 
 struct ThreadContext

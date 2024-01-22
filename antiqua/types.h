@@ -1,15 +1,26 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
 
-#include <stddef.h>
-
 #if !defined(__cplusplus)
 #define MONExternC extern
 #else
 #define MONExternC extern "C"
 #endif
 
+#if !defined(COMPILER_LLVM)
+#define COMPILER_LLVM 0
+#endif
+
+#if !COMPILER_LLVM
+#if defined(__clang__)
+#undef COMPILER_LLVM
+#define COMPILER_LLVM 1
+#endif
+#endif
+
 #define EXPORT __attribute__((visibility("default")))
+
+#include <stddef.h>
 
 typedef unsigned int b32;
 

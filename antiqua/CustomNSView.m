@@ -11,6 +11,8 @@
 #import <sys/stat.h>
 #import <unistd.h>
 #import <sys/types.h>
+#import <fcntl.h>
+#import <dlfcn.h>
 
 #import "osx_audio.h"
 #import "osx_time.h"
@@ -87,6 +89,10 @@ static void playBackInput(struct State *state, struct GameControllerInput *gcInp
     beginInputPlayBack(state, playingIndex);
     bytesRead = read(state->playBackHandle, gcInput, sizeof(*gcInput));
   }
+  else if (bytesRead == -1)
+  {
+    fprintf(stderr, "Failed to read input to play back, error: %s\n", dlerror());
+  }
 }
 
 static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext)
@@ -138,19 +144,24 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 
 - (CVReturn)displayFrame:(r32)deltaTimeSec {
 #if !XCODE_BUILD
-  struct stat st;
-  if (stat(GAME_CODE_LIB_NAME, &st) != -1)
+  s32 fd = open("lock.tmp", O_RDONLY);
+  // Do not hot reload game dll if it is currently being compiled
+  if (fd == -1 && errno == ENOENT)
   {
-    IF_IS_GAME_CODE_MODIFIED(st.st_mtimespec, gameCode.lastModified)
+    struct stat st;
+    if (stat(GAME_CODE_LIB_NAME, &st) != -1)
     {
-      waitIfInputBlocked(&thread);
-      lockInputThread(&thread);
-      waitIfAudioBlocked(&thread);
-      lockAudioThread(&thread);
-      unloadGameCode();
-      loadGameCode(st.st_mtimespec);
-      unlockAudioThread(&thread);
-      unlockInputThread(&thread);
+      IF_IS_GAME_CODE_MODIFIED(st.st_mtimespec, gameCode.lastModified)
+      {
+        waitIfInputBlocked(&thread);
+        lockInputThread(&thread);
+        waitIfAudioBlocked(&thread);
+        lockAudioThread(&thread);
+        unloadGameCode();
+        loadGameCode(st.st_mtimespec);
+        unlockAudioThread(&thread);
+        unlockInputThread(&thread);
+      }
     }
   }
 #endif

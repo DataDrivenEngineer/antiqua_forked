@@ -13,6 +13,7 @@ b32 loadGameCode(struct timespec newLastModified)
   gameCode.updateGameAndRender = 0;
   gameCode.fillSoundBuffer = 0;
 #endif
+
   copyfile(GAME_CODE_LIB_NAME, GAME_CODE_TMPLIB_NAME, 0, COPYFILE_ALL);
   gameCode.gameCodeDylib = dlopen(GAME_CODE_TMPLIB_NAME, RTLD_LAZY);
   if (gameCode.gameCodeDylib)
@@ -36,6 +37,7 @@ b32 loadGameCode(struct timespec newLastModified)
     result = 0;
     fprintf(stderr, "Failed to load antiqua dylib, error: %s\n", dlerror());
   }
+
   return result;
 }
 

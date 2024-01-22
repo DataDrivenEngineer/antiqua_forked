@@ -1,6 +1,13 @@
 #ifndef _ANTIQUA_TILE_H_
 #define _ANTIQUA_TILE_H_
 
+typedef struct
+{
+  r32 dx;
+  r32 dy;
+  r32 dz;
+} TileMapDifference;
+
 typedef struct TileMapPosition
 {
   u32 absTileX;

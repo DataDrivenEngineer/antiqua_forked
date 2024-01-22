@@ -34,6 +34,7 @@
 
 /* Begin PBXFileReference section */
 		9F1D09F02A86C1A100263859 /* CustomWindowDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomWindowDelegate.h; sourceTree = "<group>"; };
+		9F3BF0B92B590FE100A6C2B7 /* antiqua_intrinsics.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_intrinsics.h; sourceTree = "<group>"; };
 		9F6E25E32A7D7559006DF7A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9F8AC8C42B0926B100AC9757 /* osx_lock.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_lock.m; sourceTree = "<group>"; };
 		9F8AC8C52B0926B100AC9757 /* osx_time.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_time.h; sourceTree = "<group>"; };
@@ -103,6 +104,7 @@
 		9FC718E62A7D5E44007ADAA1 /* antiqua */ = {
 			isa = PBXGroup;
 			children = (
+				9F3BF0B92B590FE100A6C2B7 /* antiqua_intrinsics.h */,
 				9F8AC8C82B0926B100AC9757 /* osx_dynamic_loader.h */,
 				9F8AC8C72B0926B100AC9757 /* osx_dynamic_loader.m */,
 				9F8AC8C62B0926B100AC9757 /* osx_lock.h */,

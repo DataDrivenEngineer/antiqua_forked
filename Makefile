@@ -1,4 +1,6 @@
 build:
+	# Create lock file to prevent code hot reloading during compilation
+	echo "WAITING FOR COMPILATION" > lock.tmp
 	# Compile all Obj-C files
 	cc -c -g -DANTIQUA_SLOW=1 -DANTIQUA_INTERNAL=1 -ffast-math -fno-rtti -fno-exceptions -O0 -Wall -pedantic -Wno-null-dereference -Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable -Wno-gnu-anonymous-struct -Wno-nested-anon-types -Wno-nullability-completeness antiqua/antiqua.m -o m.o
 	# Compile all C++ files
@@ -7,6 +9,8 @@ build:
 	cc -g -O0 -framework Carbon -framework AppKit -framework CoreVideo -framework QuartzCore -framework CoreAudio -framework IOKit m.o -o antiqua.o
 	# Generate debug symbols
 	dsymutil antiqua.o
+	# Remove lock file when compilation is done to allow code hot reloading
+	rm -rf lock.tmp
 	echo "compile success"
 package:
 	cp -f antiqua.o antiqua.app/Contents/MacOS/antiqua
@@ -17,7 +21,6 @@ run:
 	open antiqua.app
 clean:
 	# Remove game's state recordings
-	rm -rf tmp/*
 	# Remove XCode's build info
 	rm -rf xcode_build
 	rm -rf build
