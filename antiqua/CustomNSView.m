@@ -143,6 +143,10 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 }
 
 - (CVReturn)displayFrame:(r32)deltaTimeSec {
+#if !ANTIQUA_INTERNAL
+  [NSCursor hide];
+#endif
+
 #if !XCODE_BUILD
   s32 fd = open("lock.tmp", O_RDONLY);
   // Do not hot reload game dll if it is currently being compiled
@@ -202,6 +206,10 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   
   layer = [[CustomCALayer alloc] init];
   NSLog(@"layerw x h: %f x %f", layer.bounds.size.width, layer.bounds.size.height);
+#if !ANTIQUA_INTERNAL
+  // NOTE(dima): increase the resolution for awesome quality on Retina screens!
+  layer.contentsScale = [[NSScreen mainScreen] backingScaleFactor];
+#endif
   self.wantsLayer = YES;
   self.layer = layer;
   self.layerContentsRedrawPolicy = NSViewLayerContentsRedrawOnSetNeedsDisplay;

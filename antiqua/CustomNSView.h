@@ -17,6 +17,8 @@ struct State
   s32 inputRecordingIndex;
   s32 playBackHandle;
   s32 inputPlayingIndex;
+
+  b32 toggleFullscreen;
 };
 
 extern struct ThreadContext thread;

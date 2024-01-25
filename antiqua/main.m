@@ -1,4 +1,5 @@
 //
+// Do not hot reload game dll if it is currently being compiled
 
 #import <Cocoa/Cocoa.h>
 #import <Carbon/Carbon.h>
@@ -107,12 +108,21 @@ static b32 processEvent(NSEvent *e)
       handled = 1;
       if (state.inputRecordingIndex == 0)
       {
-	beginRecordingInput(&state, 1);
+        beginRecordingInput(&state, 1);
       }
       else
       {
-	endRecordingInput(&state);
-	beginInputPlayBack(&state, 1);
+        endRecordingInput(&state);
+        beginInputPlayBack(&state, 1);
+      }
+    }
+    if (e.keyCode == kVK_Return)
+    {
+      handled = 1;
+      // NOTE(dima): if Option/Alt key is pressed
+      if (e.modifierFlags & NSEventModifierFlagOption)
+      {
+        state.toggleFullscreen = true;
       }
     }
   }
@@ -175,22 +185,22 @@ MONExternC DEBUG_PLATFORM_READ_ENTIRE_FILE(debug_platformReadEntireFile)
       msync(outFile->contents, outFile->contentsSize, MS_SYNC | MS_INVALIDATE);
       if (outFile->contents != MAP_FAILED)
       {
-	s32 bytesRead = read(fd, outFile->contents, outFile->contentsSize);
-	if (bytesRead != -1 && bytesRead == outFile->contentsSize)
-	{
-	  // TODO: File read successfully. Now do something with it...
-	  result = 1;
-	}
-	else
-	{
-	  fprintf(stderr, "Failed to read from a file %s, bytesRead: %d, error: %d\n", filename, bytesRead, errno);
-	  debug_platformFreeFileMemory(thread, outFile);
-	  result = 0;
-	}
+        s32 bytesRead = read(fd, outFile->contents, outFile->contentsSize);
+        if (bytesRead != -1 && bytesRead == outFile->contentsSize)
+        {
+          // TODO: File read successfully. Now do something with it...
+          result = 1;
+        }
+        else
+        {
+          fprintf(stderr, "Failed to read from a file %s, bytesRead: %d, error: %d\n", filename, bytesRead, errno);
+          debug_platformFreeFileMemory(thread, outFile);
+          result = 0;
+        }
       }
       else
       {
-	fprintf(stderr, "Failed to allocate memory for a file %s - error: %d\n", filename, errno);
+        fprintf(stderr, "Failed to allocate memory for a file %s - error: %d\n", filename, errno);
       }
     }
     else
@@ -252,7 +262,7 @@ int main(int argc, const char * argv[]) {
     [appMenu addItem:quitMenuItem];
     [appMenuItem setSubmenu:appMenu];
 
-#if ANTIQUA_INTERNAL
+#if !ANTIQUA_INTERNAL
     NSPanel *window = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 1000, 700)
     styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable | NSWindowStyleMaskNonactivatingPanel
     backing:NSBackingStoreBuffered defer:NO];
@@ -298,28 +308,35 @@ int main(int argc, const char * argv[]) {
     {
       @autoreleasepool
       {
-	if (!soundState.soundPlaying)
-	{
-	  initAudio();
-	  soundState.soundPlaying = playAudio();
-	}
+        if (!soundState.soundPlaying)
+        {
+          initAudio();
+          soundState.soundPlaying = playAudio();
+        }
 
-	NSEvent *event = [NSApp
+        if (state.toggleFullscreen)
+        {
+          [window toggleFullScreen:window];
+          state.toggleFullscreen = false;
+        }
+
+        NSEvent *event = [NSApp
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-	  nextEventMatchingMask:NSAnyEventMask
+          nextEventMatchingMask:NSAnyEventMask
 #pragma clang diagnostic pop
-	  untilDate:[NSDate distantPast]
-	  inMode:NSDefaultRunLoopMode
-	  dequeue:YES];
+          untilDate:[NSDate distantPast]
+          inMode:NSDefaultRunLoopMode
+          dequeue:YES];
 
-	b32 handled = processEvent(event);
+        b32 handled = processEvent(event);
 
-	if (!handled)
-	{
-	  [NSApp sendEvent:event];
-	}
-	[NSApp updateWindows];
+        if (!handled)
+        {
+          [NSApp sendEvent:event];
+        }
+
+        [NSApp updateWindows];
       }
     }
 

@@ -36,15 +36,33 @@ static void releaseBytePointerCallback(void *info, const void *pointer) {}
 {
   @autoreleasepool
   {
-//    CGRect dirtyRect = CGContextGetClipBoundingBox(ctx);
-    // Do not scale the image when window is resized
-    CGRect framebufferRect = CGRectMake(0, 0, framebuffer.width, framebuffer.height);
+    NSScreen *screen = [NSScreen mainScreen];
+    NSDictionary *description = [screen deviceDescription];
+    // NOTE(dima): maximum resolution of current main display
+    CGSize displayPixelSize = NSSizeToCGSize([[description objectForKey:NSDeviceSize] sizeValue]);
+
+    s32 offsetX = 0;
+    s32 offsetY = 0;
+    CGRect framebufferRect;
+
+    NSWindow *window = [[NSApplication sharedApplication] mainWindow];
+    if (CGSizeEqualToSize(window.frame.size, displayPixelSize))
+    {
+      framebufferRect = CGContextGetClipBoundingBox(ctx);
+    }
+    else
+    {
+      // NOTE(dima): Do not scale the image when not in full-screen
+      framebufferRect = CGRectMake(0, 0, framebuffer.width, framebuffer.height);
+      offsetX = 10;
+      // NOTE(dima): y is negative, because we are flipping the Y axis for the image
+      offsetY = -10;
+    }
 
     // Clear the screen
     CGContextClearRect(ctx, framebufferRect);
 
-    // NOTE(dima): y is negative, because we are flipping the Y axis for the image
-    CGRect framebufferRectWithOffset = CGRectMake(10, -10, framebuffer.width, framebuffer.height);
+    CGRect framebufferRectWithOffset = CGRectMake(offsetX, offsetY, framebufferRect.size.width, framebufferRect.size.height);
     
     CGDataProviderRef dataProvider = CGDataProviderCreateDirect(framebuffer.memory, framebuffer.sizeBytes, &callbacks);
 
@@ -54,7 +72,7 @@ static void releaseBytePointerCallback(void *info, const void *pointer) {}
 
     // NOTE(dima): Flip the image upside down, because by default Quartz uses bottom left corner as the origin,
     // while we want the origin in the top left one
-    CGContextTranslateCTM(ctx, 0, CGImageGetHeight(image));
+    CGContextTranslateCTM(ctx, 0, framebufferRect.size.height);
     CGContextScaleCTM(ctx, 1.0, -1.0);
 
     CGContextDrawImage(ctx, framebufferRectWithOffset, image);

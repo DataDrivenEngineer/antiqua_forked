@@ -99,11 +99,11 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
 //      fprintf(stderr, "lStickX raw: %f\n", lStickX);
       if (lStickX >= 127 - DEAD_ZONE && lStickX <= 127 + DEAD_ZONE)
       {
-	gcInput.stickAverageX = 127;
+        gcInput.stickAverageX = 127;
       }
       else
       {
-	gcInput.stickAverageX = lStickX;
+        gcInput.stickAverageX = lStickX;
       }
     }
     if (lStickY != INPUT_NOT_INITIALIZED)
@@ -111,11 +111,11 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
 //     fprintf(stderr, "lStickY raw: %f\n", lStickY);
       if (lStickY >= 127 - DEAD_ZONE && lStickY <= 127 + DEAD_ZONE)
       {
-	gcInput.stickAverageY = 127;
+        gcInput.stickAverageY = 127;
       }
       else
       {
-	gcInput.stickAverageY = lStickY;
+        gcInput.stickAverageY = lStickY;
       }
     }
   }
@@ -135,15 +135,15 @@ static void inputValueCallback(void * _Nullable context, IOReturn result, void *
       gcInput.actionUp.halfTransitionCount++;
       if (actionUp == 1)
       {
-	gcInput.actionUp.endedDown = 1;
+        gcInput.actionUp.endedDown = 1;
       }
       else if (actionUp == 0)
       {
-	gcInput.actionUp.endedDown = 0;
+        gcInput.actionUp.endedDown = 0;
       }
       else
       {
-	fprintf(stderr, "Unknown value for actionUp button: %d\n", actionUp);
+        fprintf(stderr, "Unknown value for actionUp button: %d\n", actionUp);
       }
     }
   }
