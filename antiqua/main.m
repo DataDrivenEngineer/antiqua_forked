@@ -15,14 +15,13 @@
 #import "CustomCALayer.h"
 
 #include "types.h"
-#include "antiqua.h"
 #include "osx_audio.h"
 #include "osx_input.h"
 #include "osx_lock.h"
 
 static b32 shouldKeepRunning = 1;
 
-static void processButtonDown(struct GameButtonState *btn)
+static void processButtonDown(GameButtonState *btn)
 {
   if (!btn->endedDown)
   {
@@ -32,7 +31,7 @@ static void processButtonDown(struct GameButtonState *btn)
   }
 }
 
-static void processButtonUp(struct GameButtonState *btn)
+static void processButtonUp(GameButtonState *btn)
 {
   waitIfInputBlocked(&thread);
   btn->halfTransitionCount++;

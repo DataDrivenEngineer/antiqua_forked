@@ -4,7 +4,7 @@
 #include "osx_dynamic_loader.h"
 #include "CustomNSView.h"
 
-struct SoundState soundState = {0};
+SoundState soundState = {0};
 static AudioObjectID device = kAudioObjectUnknown;
 static _Nullable AudioDeviceIOProcID procID;
 
@@ -17,7 +17,7 @@ static OSStatus appIOProc(AudioObjectID inDevice,
                         void* __nullable        inClientData)
 {
   // TODO(dima): tighten up audio sync when we start mixing sounds
-  struct SoundState *soundState = (struct SoundState *) inClientData;
+  SoundState *soundState = (SoundState *) inClientData;
   // TODO(dima): do we need to account for cases when there is >1 buffer?
   // # of frames needed = total # of bytes / num of channels in frame (2) / size of sample (4 = float)
   waitIfAudioBlocked(&thread);

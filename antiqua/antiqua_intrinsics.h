@@ -32,6 +32,7 @@ typedef struct
   b32 found;
   u32 index;
 } BitScanResult;
+
 inline BitScanResult findLeastSignificantSetBit(u32 value)
 {
   BitScanResult result = {0};

@@ -20,13 +20,12 @@
 #import "types.h"
 #import "CustomNSView.h"
 #import "CustomCALayer.h"
-#import "antiqua.h"
 #import "osx_dynamic_loader.h"
 
 #define LOOP_EDIT_FILENAME "tmp/loop_edit.atqi"
 
-struct GameOffscreenBuffer framebuffer;
-struct GameMemory gameMemory;
+GameOffscreenBuffer framebuffer;
+GameMemory gameMemory;
 
 static CustomCALayer *layer;
 static CVDisplayLinkRef displayLink;
@@ -34,10 +33,10 @@ static b32 shouldStopDL = 0;
 
 static b32 skipCurrentFrame = 1;
 
-struct ThreadContext thread = {0};
-struct State state = {0};
+ThreadContext thread = {0};
+State state = {0};
 
-void beginRecordingInput(struct State *state, s32 inputRecordingIndex)
+void beginRecordingInput(State *state, s32 inputRecordingIndex)
 {
   state->inputRecordingIndex = inputRecordingIndex;
   const char *filename = LOOP_EDIT_FILENAME;
@@ -48,7 +47,7 @@ void beginRecordingInput(struct State *state, s32 inputRecordingIndex)
   write(state->recordingHandle, state->gameMemoryBlock, bytesToWrite);
 }
 
-void endRecordingInput(struct State *state)
+void endRecordingInput(State *state)
 {
   if (close(state->recordingHandle) == -1)
   {
@@ -57,7 +56,7 @@ void endRecordingInput(struct State *state)
   state->inputRecordingIndex = 0;
 }
 
-void beginInputPlayBack(struct State *state, s32 inputPlayingIndex)
+void beginInputPlayBack(State *state, s32 inputPlayingIndex)
 {
   state->inputPlayingIndex = inputPlayingIndex;
   const char *filename = LOOP_EDIT_FILENAME;
@@ -68,18 +67,18 @@ void beginInputPlayBack(struct State *state, s32 inputPlayingIndex)
   read(state->playBackHandle, state->gameMemoryBlock, state->totalMemorySize);
 }
 
-void endInputPlayBack(struct State *state)
+void endInputPlayBack(State *state)
 {
   close(state->playBackHandle);
   state->inputPlayingIndex = 0;
 }
 
-static void recordInput(struct State *state, struct GameControllerInput *gcInput)
+static void recordInput(State *state, GameControllerInput *gcInput)
 {
   write(state->recordingHandle, gcInput, sizeof(*gcInput));
 }
 
-static void playBackInput(struct State *state, struct GameControllerInput *gcInput)
+static void playBackInput(State *state, GameControllerInput *gcInput)
 {
   s32 bytesRead = read(state->playBackHandle, gcInput, sizeof(*gcInput));
   if (bytesRead == 0)

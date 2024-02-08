@@ -4,7 +4,7 @@
 #define DEAD_ZONE 15
 
 IOHIDManagerRef __nullable ioHIDManager;
-struct GameControllerInput gcInput;
+GameControllerInput gcInput;
 
 // this will be called when the HID Manager matches a new (hot plugged) HID device
 static void inIOHIDDeviceRegistrationCallback(

@@ -1,3 +1,5 @@
+#include "antiqua_tile.h"
+
 inline TileChunk * getTileChunk(TileMap *tileMap, u32 tileChunkX, u32 tileChunkY, u32 tileChunkZ)
 {
   TileChunk *tileChunk = 0;
@@ -129,8 +131,8 @@ inline TileMapPosition recanonicalizePosition(TileMap* tileMap, TileMapPosition 
 {
   TileMapPosition result = pos;
 
-  recanonicalizeCoord(tileMap, &result.absTileX, &result.offsetX);
-  recanonicalizeCoord(tileMap, &result.absTileY, &result.offsetY);
+  recanonicalizeCoord(tileMap, &result.absTileX, &result.offset.x);
+  recanonicalizeCoord(tileMap, &result.absTileY, &result.offset.y);
 
   return result;
 }
@@ -146,12 +148,11 @@ inline TileMapDifference subtract(TileMap *tileMap, TileMapPosition *a, TileMapP
 {
   TileMapDifference result;
 
-  r32 dTileX = (r32) a->absTileX - (r32) b->absTileX;
-  r32 dTileY = (r32) a->absTileY - (r32) b->absTileY;
+  V2 dTileXY = {(r32) a->absTileX - (r32) b->absTileX,
+                (r32) a->absTileY - (r32) b->absTileY};
   r32 dTileZ = (r32) a->absTileZ - (r32) b->absTileZ;
 
-  result.dx = tileMap->tileSideInMeters * dTileX + (a->offsetX - b->offsetX);
-  result.dy = tileMap->tileSideInMeters * dTileY + (a->offsetY - b->offsetY);
+  result.dXY = tileMap->tileSideInMeters * dTileXY + (a->offset- b->offset);
   result.dz = tileMap->tileSideInMeters * dTileZ;
 
   return result;

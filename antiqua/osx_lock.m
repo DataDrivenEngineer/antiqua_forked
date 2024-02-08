@@ -1,7 +1,5 @@
 #include <pthread.h>
 
-#include "antiqua.h"
-
 static int runThreadAudio = 1;
 static pthread_mutex_t runMutexAudio = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t runConditionAudio = PTHREAD_COND_INITIALIZER;

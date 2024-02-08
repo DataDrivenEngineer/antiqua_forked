@@ -4,9 +4,8 @@
 #include <IOKit/hid/IOHIDLib.h>
 
 #include "types.h"
-#include "antiqua.h"
 
-extern struct GameControllerInput gcInput;
+extern GameControllerInput gcInput;
 extern IOHIDManagerRef ioHIDManager;
 
 b32 initControllerInput(void);

@@ -1,8 +1,6 @@
 #ifndef _OSX_LOCK_H_
 #define _OSX_LOCK_H_
 
-#include "antiqua.h"
-
 LOCK_AUDIO_THREAD(lockAudioThread);
 UNLOCK_AUDIO_THREAD(unlockAudioThread);
 WAIT_IF_AUDIO_BLOCKED(waitIfAudioBlocked);

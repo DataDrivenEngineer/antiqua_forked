@@ -4,9 +4,8 @@
 #include <CoreAudio/AudioHardware.h>
 
 #include "types.h"
-#include "antiqua.h"
 
-extern struct SoundState soundState;
+extern SoundState soundState;
 
 void initAudio(void);
 b32 playAudio(void);

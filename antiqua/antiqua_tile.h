@@ -1,25 +1,25 @@
 #ifndef _ANTIQUA_TILE_H_
 #define _ANTIQUA_TILE_H_
 
+#include "antiqua_math.h"
+
 typedef struct
 {
-  r32 dx;
-  r32 dy;
+  V2 dXY;
   r32 dz;
 } TileMapDifference;
 
-typedef struct TileMapPosition
+typedef struct
 {
   u32 absTileX;
   u32 absTileY;
   u32 absTileZ;
 
   // NOTE(dima): these are offsets from tile center
-  r32 offsetX;
-  r32 offsetY;
+  V2 offset;
 } TileMapPosition;
 
-typedef struct TileChunkPosition
+typedef struct
 {
   u32 tileChunkX;
   u32 tileChunkY;
@@ -29,12 +29,12 @@ typedef struct TileChunkPosition
   u32 relTileY;
 } TileChunkPosition;
 
-typedef struct TileChunk
+typedef struct
 {
   u32 *tiles;
 } TileChunk;
 
-typedef struct TileMap
+typedef struct
 {
   u32 chunkShift;
   u32 chunkMask;

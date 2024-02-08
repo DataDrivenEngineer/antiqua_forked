@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9F8A978C2B746643001AC5DB /* antiqua_tile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F8A97872B746643001AC5DB /* antiqua_tile.cpp */; };
 		9FC718EE2A7D5E45007ADAA1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */; };
 		9FC7191C2A7D608E007ADAA1 /* antiqua.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = 9FC718E42A7D5E44007ADAA1 /* antiqua.app */; };
 		9FCE02832AD9174900BB84CA /* antiqua.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FCE027D2AD9174900BB84CA /* antiqua.m */; };
@@ -36,6 +37,11 @@
 		9F1D09F02A86C1A100263859 /* CustomWindowDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomWindowDelegate.h; sourceTree = "<group>"; };
 		9F3BF0B92B590FE100A6C2B7 /* antiqua_intrinsics.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_intrinsics.h; sourceTree = "<group>"; };
 		9F6E25E32A7D7559006DF7A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9F8A97872B746643001AC5DB /* antiqua_tile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = antiqua_tile.cpp; sourceTree = "<group>"; };
+		9F8A97882B746643001AC5DB /* antiqua_random.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_random.h; sourceTree = "<group>"; };
+		9F8A97892B746643001AC5DB /* antiqua_math.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_math.h; sourceTree = "<group>"; };
+		9F8A978A2B746643001AC5DB /* antiqua_platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_platform.h; sourceTree = "<group>"; };
+		9F8A978B2B746643001AC5DB /* antiqua_tile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_tile.h; sourceTree = "<group>"; };
 		9F8AC8C42B0926B100AC9757 /* osx_lock.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_lock.m; sourceTree = "<group>"; };
 		9F8AC8C52B0926B100AC9757 /* osx_time.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_time.h; sourceTree = "<group>"; };
 		9F8AC8C62B0926B100AC9757 /* osx_lock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_lock.h; sourceTree = "<group>"; };
@@ -104,6 +110,11 @@
 		9FC718E62A7D5E44007ADAA1 /* antiqua */ = {
 			isa = PBXGroup;
 			children = (
+				9F8A97892B746643001AC5DB /* antiqua_math.h */,
+				9F8A978A2B746643001AC5DB /* antiqua_platform.h */,
+				9F8A97882B746643001AC5DB /* antiqua_random.h */,
+				9F8A97872B746643001AC5DB /* antiqua_tile.cpp */,
+				9F8A978B2B746643001AC5DB /* antiqua_tile.h */,
 				9F3BF0B92B590FE100A6C2B7 /* antiqua_intrinsics.h */,
 				9F8AC8C82B0926B100AC9757 /* osx_dynamic_loader.h */,
 				9F8AC8C72B0926B100AC9757 /* osx_dynamic_loader.m */,
@@ -238,6 +249,7 @@
 			files = (
 				9FD311FE2AADA0A500C3A9EF /* antiqua.cpp in Sources */,
 				9FCE02832AD9174900BB84CA /* antiqua.m in Sources */,
+				9F8A978C2B746643001AC5DB /* antiqua_tile.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,22 +1,22 @@
 #include "antiqua.h"
 #include "types.h"
 #include "stdio.h"
-#include "antiqua_tile.h"
 #include "antiqua_random.h"
+#include "antiqua_intrinsics.h"
 
 #include "antiqua_tile.cpp"
 
-static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 realMinY, r32 realMaxX, r32 realMaxY, r32 r, r32 g, r32 b)
+static void drawRectangle(GameOffscreenBuffer *buf, V2 vMin, V2 vMax, r32 r, r32 g, r32 b)
 {
-  if (realMaxX < 0 || realMaxY < 0)
+  if (vMax.x < 0 || vMax.y < 0)
   {
     return;
   }
 
-  s32 minX = roundReal32ToInt32(realMinX);
-  s32 minY = roundReal32ToInt32(realMinY);
-  s32 maxX = roundReal32ToInt32(realMaxX);
-  s32 maxY = roundReal32ToInt32(realMaxY);
+  s32 minX = roundReal32ToInt32(vMin.x);
+  s32 minY = roundReal32ToInt32(vMin.y);
+  s32 maxX = roundReal32ToInt32(vMax.x);
+  s32 maxY = roundReal32ToInt32(vMax.y);
 
   if (minX < 0)
   {
@@ -54,7 +54,7 @@ static void drawRectangle(struct GameOffscreenBuffer *buf, r32 realMinX, r32 rea
   }
 }
 
-static void drawBitmap(struct GameOffscreenBuffer *buf, LoadedBitmap *bitmap, r32 realX, r32 realY, s32 alignX = 0, s32 alignY = 0)
+static void drawBitmap(GameOffscreenBuffer *buf, LoadedBitmap *bitmap, r32 realX, r32 realY, s32 alignX = 0, s32 alignY = 0)
 {
   realX -= (r32) alignX;
   realY -= (r32) alignY;
@@ -251,8 +251,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     // do initialization here as needed
     gameState->playerP.absTileX = 1;
     gameState->playerP.absTileY = 3;
-    gameState->playerP.offsetX = 5.0f;
-    gameState->playerP.offsetY = 5.0f;
+    gameState->playerP.offset.x = 5.0f;
+    gameState->playerP.offset.y = 5.0f;
     initializeArena(&gameState->worldArena, memory->permanentStorageSize - sizeof(GameState), (u8 *) memory->permanentStorage + sizeof(GameState));
 
     gameState->world = PUSH_STRUCT(&gameState->worldArena, World);
@@ -423,27 +423,27 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
   }
   else
   {
-    r32 dPlayerX = 0.f;
-    r32 dPlayerY = 0.f;
+    V2 dPlayer = {0};
+
     if (gcInput->up.endedDown)
     {
       gameState->heroFacingDirection = 1;
-      dPlayerY = 1.f;
+      dPlayer.y = 1.f;
     }
     if (gcInput->down.endedDown)
     {
       gameState->heroFacingDirection = 3;
-      dPlayerY = -1.f;
+      dPlayer.y = -1.f;
     }
     if (gcInput->left.endedDown)
     {
       gameState->heroFacingDirection = 2;
-      dPlayerX = -1.f;
+      dPlayer.x = -1.f;
     }
     if (gcInput->right.endedDown)
     {
       gameState->heroFacingDirection = 0;
-      dPlayerX = 1.f;
+      dPlayer.x = 1.f;
     }
 
     r32 playerSpeed = 2.f;
@@ -453,20 +453,23 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
       playerSpeed = 10.f;
     }
 
-    dPlayerX *= playerSpeed;
-    dPlayerY *= playerSpeed;
+    dPlayer *= playerSpeed;
+
+    if (dPlayer.x != 0.f && dPlayer.y != 0.f)
+    {
+      dPlayer *= 0.707106781186548;
+    }
 
     TileMapPosition newPlayerP = gameState->playerP;
-    newPlayerP.offsetX += deltaTimeSec * dPlayerX;
-    newPlayerP.offsetY += deltaTimeSec * dPlayerY;
+    newPlayerP.offset += deltaTimeSec * dPlayer;
     newPlayerP = recanonicalizePosition(tileMap, newPlayerP);
 
     TileMapPosition playerLeft = newPlayerP;
-    playerLeft.offsetX -= 0.5f * playerWidth;
+    playerLeft.offset.x -= 0.5f * playerWidth;
     playerLeft = recanonicalizePosition(tileMap, playerLeft);
 
     TileMapPosition playerRight = newPlayerP;
-    playerRight.offsetX += 0.5f * playerWidth;
+    playerRight.offset.x += 0.5f * playerWidth;
     playerRight = recanonicalizePosition(tileMap, playerRight);
 
     if (isTileMapPointEmpty(tileMap, newPlayerP)
@@ -493,19 +496,19 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     gameState->cameraP.absTileZ = gameState->playerP.absTileZ;
 
     TileMapDifference diff = subtract(tileMap, &gameState->playerP, &gameState->cameraP);
-    if (diff.dx > 9.f * tileMap->tileSideInMeters)
+    if (diff.dXY.x > 9.f * tileMap->tileSideInMeters)
     {
       gameState->cameraP.absTileX += 17;
     }
-    if (diff.dx < -9.f * tileMap->tileSideInMeters)
+    if (diff.dXY.x < -9.f * tileMap->tileSideInMeters)
     {
       gameState->cameraP.absTileX -= 17;
     }
-    if (diff.dy > 5.f * tileMap->tileSideInMeters)
+    if (diff.dXY.y > 5.f * tileMap->tileSideInMeters)
     {
       gameState->cameraP.absTileY += 9;
     }
-    if (diff.dy < -5.f * tileMap->tileSideInMeters)
+    if (diff.dXY.y < -5.f * tileMap->tileSideInMeters)
     {
       gameState->cameraP.absTileY -= 9;
     }
@@ -542,13 +545,12 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
           gray = 0.0f;
         }
 
-        r32 cenX = screenCenterX - metersToPixels * gameState->cameraP.offsetX + ((r32) relColumn) * tileSideInPixels;
-        r32 cenY = screenCenterY + metersToPixels * gameState->cameraP.offsetY - ((r32) relRow) * tileSideInPixels;
-        r32 minX = cenX - 0.5f * tileSideInPixels;
-        r32 minY = cenY - 0.5f * tileSideInPixels;
-        r32 maxX = cenX + 0.5f * tileSideInPixels;
-        r32 maxY = cenY + 0.5f * tileSideInPixels;
-        drawRectangle(buff, minX, minY, maxX, maxY, gray, gray, gray);
+        V2 tileSide = {0.5f * tileSideInPixels, 0.5f * tileSideInPixels};
+        V2 cen = {screenCenterX - metersToPixels * gameState->cameraP.offset.x + ((r32) relColumn) * tileSideInPixels,
+                  screenCenterY + metersToPixels * gameState->cameraP.offset.y - ((r32) relRow) * tileSideInPixels};
+        V2 min = cen - tileSide;
+        V2 max = cen + tileSide;
+        drawRectangle(buff, min, max, gray, gray, gray);
       }
     }
   }
@@ -558,11 +560,11 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
   r32 playerR = 1.f;
   r32 playerG = 1.f;
   r32 playerB = 0.f;
-  r32 playerGroundPointX = screenCenterX + metersToPixels * diff.dx;
-  r32 playerGroundPointY = screenCenterY - metersToPixels * diff.dy;
-  r32 playerLeft = playerGroundPointX - 0.5f * metersToPixels * playerWidth;
-  r32 playerTop = playerGroundPointY - metersToPixels * playerHeight;
-  drawRectangle(buff, playerLeft, playerTop, playerLeft + metersToPixels * playerWidth, playerTop + metersToPixels * playerHeight, playerR, playerG, playerB);
+  r32 playerGroundPointX = screenCenterX + metersToPixels * diff.dXY.x;
+  r32 playerGroundPointY = screenCenterY - metersToPixels * diff.dXY.y;
+  V2 playerLeftTop = {playerGroundPointX - 0.5f * metersToPixels * playerWidth, playerGroundPointY - metersToPixels * playerHeight};
+  V2 playerWidthHeight = {playerWidth, playerHeight};
+  drawRectangle(buff, playerLeftTop, playerLeftTop + metersToPixels * playerWidthHeight, playerR, playerG, playerB);
 
   HeroBitmaps *heroBitmaps = &gameState->heroBitmaps[gameState->heroFacingDirection];
   drawBitmap(buff, &heroBitmaps->torso, playerGroundPointX, playerGroundPointY, heroBitmaps->alignX, heroBitmaps->alignY);

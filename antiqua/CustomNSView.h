@@ -6,9 +6,10 @@
 #import <AppKit/NSView.h>
 #import <CoreVideo/CVBase.h>
 #import <CoreVideo/CVReturn.h>
-#import "antiqua.h"
 
-struct State
+#import "antiqua_platform.h"
+
+typedef struct
 {
   u64 totalMemorySize;
   void *gameMemoryBlock;
@@ -19,15 +20,15 @@ struct State
   s32 inputPlayingIndex;
 
   b32 toggleFullscreen;
-};
+} State;
 
-extern struct ThreadContext thread;
-extern struct State state;
+extern ThreadContext thread;
+extern State state;
 
-void beginRecordingInput(struct State *state, s32 inputRecordingIndex);
-void endRecordingInput(struct State *state);
-void beginInputPlayBack(struct State *state, s32 inputPlayingIndex);
-void endInputPlayBack(struct State *state);
+void beginRecordingInput(State *state, s32 inputRecordingIndex);
+void endRecordingInput(State *state);
+void beginInputPlayBack(State *state, s32 inputPlayingIndex);
+void endInputPlayBack(State *state);
 
 @interface CustomNSView : NSView
 
