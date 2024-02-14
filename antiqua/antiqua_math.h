@@ -20,6 +20,16 @@ inline V2 operator*(r32 a, V2 b)
   return result;
 }
 
+inline V2 operator*(V2 b, r32 a)
+{
+  V2 result;
+
+  result.x = a * b.x;
+  result.y = a * b.y;
+
+  return result;
+}
+
 inline V2 &V2::
 operator*=(r32 a)
 {
@@ -62,6 +72,27 @@ inline V2 operator-(V2 a, V2 b)
 
   result.x = a.x - b.x;
   result.y = a.y - b.y;
+
+  return result;
+}
+
+inline r32 square(r32 a)
+{
+  r32 result = a * a;
+
+  return result;
+}
+
+inline r32 inner(V2 a, V2 b)
+{
+  r32 result = a.x * b.x + a.y * b.y;
+
+  return result;
+}
+
+inline r32 lengthSq(V2 a)
+{
+  r32 result = inner(a, a);
 
   return result;
 }

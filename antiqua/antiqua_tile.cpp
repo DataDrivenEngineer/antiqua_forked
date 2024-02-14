@@ -36,18 +36,6 @@ inline void setTileValueUnchecked(TileMap *tileMap, TileChunk *tileChunk, u32 ti
   tileChunk->tiles[tileY * tileMap->chunkDim + tileX] = tileValue;
 }
 
-inline u32 getTileValue(TileMap *tileMap, TileChunk *tileChunk, u32 testTileX, u32 testTileY)
-{
-  u32 tileChunkValue = 0;
-
-  if (tileChunk && tileChunk->tiles)
-  {
-    tileChunkValue = getTileValueUnchecked(tileMap, tileChunk, testTileX, testTileY);
-  }
-
-  return tileChunkValue;
-}
-
 inline void setTileValue(TileMap *tileMap, TileChunk *tileChunk, u32 testTileX, u32 testTileY, u32 tileValue)
 {
   if (tileChunk && tileChunk->tiles)
@@ -69,7 +57,19 @@ inline TileChunkPosition getChunkPositionFor(TileMap *tileMap, u32 absTileX, u32
   return result;
 }
 
-static u32 getTileValue(TileMap *tileMap, u32 absTileX, u32 absTileY, u32 absTileZ)
+inline u32 getTileValue(TileMap *tileMap, TileChunk *tileChunk, u32 testTileX, u32 testTileY)
+{
+  u32 tileChunkValue = 0;
+
+  if (tileChunk && tileChunk->tiles)
+  {
+    tileChunkValue = getTileValueUnchecked(tileMap, tileChunk, testTileX, testTileY);
+  }
+
+  return tileChunkValue;
+}
+
+static inline u32 getTileValue(TileMap *tileMap, u32 absTileX, u32 absTileY, u32 absTileZ)
 {
   TileChunkPosition chunkPos = getChunkPositionFor(tileMap, absTileX, absTileY, absTileZ);
   TileChunk *tileChunk = getTileChunk(tileMap, chunkPos.tileChunkX, chunkPos.tileChunkY, chunkPos.tileChunkZ);
@@ -78,17 +78,24 @@ static u32 getTileValue(TileMap *tileMap, u32 absTileX, u32 absTileY, u32 absTil
   return tileChunkValue;
 }
 
-static u32 getTileValue(TileMap *tileMap, TileMapPosition pos)
+static inline u32 getTileValue(TileMap *tileMap, TileMapPosition pos)
 {
   u32 tileChunkValue = getTileValue(tileMap, pos.absTileX, pos.absTileY, pos.absTileZ);
   
   return tileChunkValue;
 }
 
+static b32 isTileValueEmpty(u32 tileValue)
+{
+  b32 empty = (tileValue == 1) || (tileValue == 3) || (tileValue == 4);
+
+  return empty;
+}
+
 static b32 isTileMapPointEmpty(TileMap *tileMap, TileMapPosition pos)
 {
   u32 tileChunkValue = getTileValue(tileMap, pos);
-  b32 empty = (tileChunkValue == 1) || (tileChunkValue == 3) || (tileChunkValue == 4);
+  b32 empty = isTileValueEmpty(tileChunkValue);
 
   return empty;
 }
@@ -123,16 +130,16 @@ inline void recanonicalizeCoord(TileMap *tileMap, u32 *tile, r32 *tileRel)
   *tile += offset;
   *tileRel -= offset * tileMap->tileSideInMeters;
 
-  ASSERT(*tileRel >= -0.5f * tileMap->tileSideInMeters);
-  ASSERT(*tileRel <= 0.5f * tileMap->tileSideInMeters);
+  ASSERT(*tileRel > -0.5001f * tileMap->tileSideInMeters);
+  ASSERT(*tileRel < 0.5001f * tileMap->tileSideInMeters);
 }
 
 inline TileMapPosition recanonicalizePosition(TileMap* tileMap, TileMapPosition pos)
 {
   TileMapPosition result = pos;
 
-  recanonicalizeCoord(tileMap, &result.absTileX, &result.offset.x);
-  recanonicalizeCoord(tileMap, &result.absTileY, &result.offset.y);
+  recanonicalizeCoord(tileMap, &result.absTileX, &result.offset_.x);
+  recanonicalizeCoord(tileMap, &result.absTileY, &result.offset_.y);
 
   return result;
 }
@@ -152,8 +159,27 @@ inline TileMapDifference subtract(TileMap *tileMap, TileMapPosition *a, TileMapP
                 (r32) a->absTileY - (r32) b->absTileY};
   r32 dTileZ = (r32) a->absTileZ - (r32) b->absTileZ;
 
-  result.dXY = tileMap->tileSideInMeters * dTileXY + (a->offset- b->offset);
+  result.dXY = tileMap->tileSideInMeters * dTileXY + (a->offset_- b->offset_);
   result.dz = tileMap->tileSideInMeters * dTileZ;
 
   return result;
+}
+
+inline TileMapPosition centeredTilePoint(u32 absTileX, u32 absTileY, u32 absTileZ)
+{
+  TileMapPosition result = {0};
+
+  result.absTileX = absTileX;
+  result.absTileY = absTileY;
+  result.absTileZ = absTileZ;
+
+  return result;
+}
+
+inline TileMapPosition offset(TileMap *tileMap, TileMapPosition p, V2 offset)
+{
+  p.offset_ += offset;
+  p = recanonicalizePosition(tileMap, p);
+
+  return p;
 }

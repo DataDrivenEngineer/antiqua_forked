@@ -3,6 +3,24 @@
 
 #include <math.h>
 
+inline s32 signOf(s32 value)
+{
+  s32 result = value >= 0 ? 1 : -1;
+  return result;
+}
+
+inline r32 squareRoot(r32 real32)
+{
+  r32 result = sqrtf(real32);
+  return result;
+}
+
+inline r32 absoluteValue(r32 real32)
+{
+  r32 result = fabs(real32);
+  return result;
+}
+
 inline s32 roundReal32ToInt32(r32 v)
 {
   s32 result = (s32) roundf(v);
@@ -18,6 +36,12 @@ inline u32 roundReal32ToUInt32(r32 v)
 inline s32 floorReal32ToInt32(r32 v)
 {
   s32 result = (s32) floorf(v);
+  return result;
+}
+
+inline s32 ceilReal32ToInt32(r32 v)
+{
+  s32 result = (s32) ceilf(v);
   return result;
 }
 

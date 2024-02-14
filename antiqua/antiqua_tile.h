@@ -16,7 +16,7 @@ typedef struct
   u32 absTileZ;
 
   // NOTE(dima): these are offsets from tile center
-  V2 offset;
+  V2 offset_;
 } TileMapPosition;
 
 typedef struct

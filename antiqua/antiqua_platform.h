@@ -14,6 +14,8 @@
 #define KB(Value) ((Value) * 1024LL)
 #define MB(Value) (KB(Value) * 1024LL)
 #define GB(Value) (MB(Value) * 1024LL)
+#define MINIMUM(A, B) ((A < B) ? (A) : (B))
+#define MAXIMUM(A, B) ((A > B) ? (A) : (B))
 
 typedef struct
 {
