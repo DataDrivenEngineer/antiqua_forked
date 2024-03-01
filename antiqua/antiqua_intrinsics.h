@@ -21,6 +21,24 @@ inline r32 absoluteValue(r32 real32)
   return result;
 }
 
+inline u32 rotateLeft(u32 value, s32 amount)
+{
+  u32 result = amount > 0 
+    ? (value << amount) | (value >> (32 - amount))
+    : (value >> -amount) | (value << (32 + amount));
+  
+  return result;
+}
+
+inline u32 rotateRight(u32 value, s32 amount)
+{
+  u32 result = amount > 0 
+    ? (value >> amount) | (value << (32 - amount))
+    : (value << -amount) | (value >> (32 + amount));
+  
+  return result;
+}
+
 inline s32 roundReal32ToInt32(r32 v)
 {
   s32 result = (s32) roundf(v);

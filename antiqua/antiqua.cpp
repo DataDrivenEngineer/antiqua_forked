@@ -54,15 +54,15 @@ static void drawRectangle(GameOffscreenBuffer *buf, V2 vMin, V2 vMax, r32 r, r32
   }
 }
 
-static void drawBitmap(GameOffscreenBuffer *buf, LoadedBitmap *bitmap, r32 realX, r32 realY, s32 alignX = 0, s32 alignY = 0)
+static void drawBitmap(GameOffscreenBuffer *buf, LoadedBitmap *bitmap, r32 realX, r32 realY, s32 alignX = 0, s32 alignY = 0, r32 cAlpha = 1.0f)
 {
   realX -= (r32) alignX;
   realY -= (r32) alignY;
 
   s32 minX = roundReal32ToInt32(realX);
   s32 minY = roundReal32ToInt32(realY);
-  s32 maxX = roundReal32ToInt32(realX + (r32) bitmap->width);
-  s32 maxY = roundReal32ToInt32(realY + (r32) bitmap->height);
+  s32 maxX = minX + bitmap->width;
+  s32 maxY = minY + bitmap->height;
 
   s32 sourceOffsetX = 0;
   if (minX < 0)
@@ -98,6 +98,7 @@ static void drawBitmap(GameOffscreenBuffer *buf, LoadedBitmap *bitmap, r32 realX
     for (s32 x = minX; x < maxX; ++x)
     {
       r32 a = (r32) ((*source >> 24) & 0xFF) / 255.f;
+      a *= cAlpha;
       r32 sr = (r32) ((*source >> 16) & 0xFF);
       r32 sg = (r32) ((*source >> 8) & 0xFF);
       r32 sb = (r32) ((*source >> 0) & 0xFF);
@@ -198,44 +199,155 @@ static LoadedBitmap Debug_LoadBMP(ThreadContext *thread, Debug_PlatformReadEntir
   return result;
 }
 
-inline Entity * getEntity(GameState *gameState, u32 index)
+inline LowEntity *getLowEntity(GameState *gameState, u32 index)
 {
-  Entity *entity = {0};
+  LowEntity *result = 0;
 
-  if (index > 0 && index < ARRAY_COUNT(gameState->entities))
+  if (index > 0 && index < gameState->lowEntityCount)
   {
-    entity = &gameState->entities[index];
+      result = gameState->lowEntities + index;
   }
 
-  return entity;
+  return result;
 }
 
-static void initializePlayer(GameState *gameState, u32 entityIndex)
+inline HighEntity *makeEntityHighFrequency(GameState *gameState, u32 lowIndex)
 {
-  Entity *entity = getEntity(gameState, entityIndex);
+    HighEntity *entityHigh = 0;
 
-  entity->exists = true;
-  entity->p.absTileX = 1;
-  entity->p.absTileY = 3;
-  entity->p.offset_.x = 0;
-  entity->p.offset_.y = 0;
-  entity->height = 0.5f;//1.4f;
-  entity->width = 1.0f;
+    LowEntity *entityLow = &gameState->lowEntities[lowIndex];
+    if (entityLow->highEntityIndex)
+    {
+        entityHigh = gameState->highEntities_ + entityLow->highEntityIndex;
+    }
+    else
+    {
+        if (gameState->highEntityCount < ARRAY_COUNT(gameState->highEntities_))
+        {
+            u32 highIndex = gameState->highEntityCount++;
+            entityHigh = gameState->highEntities_ + highIndex;
 
-  if (!getEntity(gameState, gameState->cameraFollowingEntityIndex))
+            // NOTE(dima): map the entity into camera space
+            TileMapDifference diff = subtract(gameState->world->tileMap, &entityLow->p, &gameState->cameraP);
+            entityHigh->p = diff.dXY;
+            entityHigh->dP = v2(0, 0);
+            entityHigh->absTileZ = entityLow->p.absTileZ;
+            entityHigh->facingDirection = 0;
+            entityHigh->lowEntityIndex = lowIndex;
+
+            entityLow->highEntityIndex = highIndex;
+        }
+        else
+        {
+            INVALID_CODE_PATH;
+        }
+    }
+
+    return entityHigh;
+}
+
+inline Entity getHighEntity(GameState *gameState, u32 lowIndex)
+{
+  Entity result = {};
+
+  makeEntityHighFrequency(gameState, lowIndex);
+
+  if(lowIndex > 0 && lowIndex < gameState->lowEntityCount)
   {
-    gameState->cameraFollowingEntityIndex = entityIndex;
+      result.lowIndex = lowIndex;
+      result.low = gameState->lowEntities + lowIndex;
+      result.high = makeEntityHighFrequency(gameState, lowIndex);
   }
+
+  return result;
 }
 
-static u32 addEntity(GameState *gameState)
+inline void makeEntityLowFrequency(GameState *gameState, u32 lowIndex)
 {
-  u32 entityIndex = gameState->entityCount++;
-  ASSERT(gameState->entityCount < ARRAY_COUNT(gameState->entities));
-  Entity *entity = &gameState->entities[entityIndex];
-  *entity = {0};
+    LowEntity *entityLow = &gameState->lowEntities[lowIndex];
+    u32 highIndex = entityLow->highEntityIndex;
+    if (highIndex)
+    {
+        u32 lastHighIndex = gameState->highEntityCount - 1;
+        if (highIndex != lastHighIndex)
+        {
+            HighEntity *lastEntity = gameState->highEntities_ + lastHighIndex;
+            HighEntity *delEntity = gameState->highEntities_ + highIndex;
 
-  return entityIndex;
+            *delEntity = *lastEntity;
+            gameState->lowEntities[lastEntity->lowEntityIndex].highEntityIndex = highIndex;
+        }
+        --gameState->highEntityCount;
+        entityLow->highEntityIndex = 0;
+    }
+}
+
+inline void offsetAndCheckFrequencyByArea(GameState *gameState, V2 offset, Rectangle2 cameraBounds)
+{
+    for (u32 entityIndex = 1;
+        entityIndex < gameState->highEntityCount;
+        )
+    {
+        HighEntity *high = gameState->highEntities_ + entityIndex;
+
+        high->p += offset;
+        if (isInRectangle(cameraBounds, high->p))
+        {
+            ++entityIndex;
+        }
+        else
+        {
+            makeEntityLowFrequency(gameState, high->lowEntityIndex);
+        }
+    }
+
+}
+
+static u32 addLowEntity(GameState *gameState, EntityType type)
+{
+    ASSERT(gameState->lowEntityCount < ARRAY_COUNT(gameState->lowEntities));
+    u32 entityIndex = gameState->lowEntityCount++;
+
+    gameState->lowEntities[entityIndex] = {};
+    gameState->lowEntities[entityIndex].type = type;
+
+    return entityIndex;
+}
+
+static u32 addWall(GameState *gameState, u32 absTileX, u32 absTileY, u32 absTileZ)
+{
+    u32 entityIndex = addLowEntity(gameState, EntityType_Wall);
+    LowEntity *entityLow = getLowEntity(gameState, entityIndex);
+
+    entityLow->p.absTileX = absTileX;
+    entityLow->p.absTileY = absTileY;
+    entityLow->p.absTileZ = absTileZ;
+    entityLow->height = gameState->world->tileMap->tileSideInMeters;//1.4f;
+    entityLow->width = entityLow->height;
+    entityLow->collides = true;
+
+    return entityIndex;
+}
+
+static u32 addPlayer(GameState *gameState)
+{
+    u32 entityIndex = addLowEntity(gameState, EntityType_Hero);
+    LowEntity *entityLow = getLowEntity(gameState, entityIndex);
+
+    entityLow->p.absTileX = 1;
+    entityLow->p.absTileY = 3;
+    entityLow->p.offset_.x = 0;
+    entityLow->p.offset_.y = 0;
+    entityLow->height = 0.5f;//1.4f;
+    entityLow->width = 1.0f;
+    entityLow->collides = true;
+
+    if (gameState->cameraFollowingEntityIndex == 0)
+    {
+        gameState->cameraFollowingEntityIndex = entityIndex;
+    }
+
+    return entityIndex;
 }
 
 static b32 testWall(r32 wallX, r32 relX, r32 relY, r32 playerDeltaX,
@@ -243,7 +355,7 @@ r32 playerDeltaY, r32 *tMin, r32 minY, r32 maxY)
 {
   b32 hit = false;
 
-  r32 tEpsilon = 0.00001f;
+  r32 tEpsilon = 0.001f;
   if (playerDeltaX != 0.0f)
   {
     r32 tResult = (wallX - relX) / playerDeltaX;
@@ -261,7 +373,7 @@ r32 playerDeltaY, r32 *tMin, r32 minY, r32 maxY)
   return hit;
 }
 
-static void movePlayer(GameState *gameState, Entity *entity, r32 dt, V2 ddP)
+static void movePlayer(GameState *gameState, Entity entity, r32 dt, V2 ddP)
 {
   TileMap *tileMap = gameState->world->tileMap;
 
@@ -274,180 +386,167 @@ static void movePlayer(GameState *gameState, Entity *entity, r32 dt, V2 ddP)
   r32 playerSpeed = 50.f;
   ddP *= playerSpeed;
 
-  ddP += -8.0f * entity->dP;
+  ddP += -8.0f * entity.high->dP;
 
-  TileMapPosition oldPlayerP = entity->p;
-  V2 playerDelta = 0.5f * ddP * square(dt) + entity->dP * dt;
-  entity->dP = ddP * dt + entity->dP;
-  TileMapPosition newPlayerP = offset(tileMap, oldPlayerP, playerDelta);
+  V2 oldPlayerP = entity.high->p;
+  V2 playerDelta = 0.5f * ddP * square(dt) + entity.high->dP * dt;
+  entity.high->dP = ddP * dt + entity.high->dP;
+  V2 newPlayerP = oldPlayerP + playerDelta;
 
-#if 0
-  TileMapPosition playerLeft = newPlayerP;
-  playerLeft.offset_.x -= 0.5f * entity->width;
-  playerLeft = recanonicalizePosition(tileMap, playerLeft);
-
-  TileMapPosition playerRight = newPlayerP;
-  playerRight.offset_.x += 0.5f * entity->width;
-  playerRight = recanonicalizePosition(tileMap, playerRight);
-
-  b32 collided = false;
-  TileMapPosition colP = {0};
-  if (!isTileMapPointEmpty(tileMap, newPlayerP))
-  {
-    colP = newPlayerP;
-    collided = true;
-  }
-  if (!isTileMapPointEmpty(tileMap, playerLeft))
-  {
-    colP = playerLeft;
-    collided = true;
-  }
-  if (!isTileMapPointEmpty(tileMap, playerRight))
-  {
-    colP = playerRight;
-    collided = true;
-  }
-
-  if (collided)
-  {
-    V2 r = {0, 0};
-
-    if (colP.absTileX < entity->p.absTileX)
-    {
-      r = V2 {1, 0};
-    }
-    if (colP.absTileX > entity->p.absTileX)
-    {
-      r = V2 {-1, 0};
-    }
-    if (colP.absTileY < entity->p.absTileY)
-    {
-      r = V2 {0, 1};
-    }
-    if (colP.absTileY > entity->p.absTileY)
-    {
-      r = V2 {0, -1};
-    }
-
-    entity->dP = entity->dP - 1 * inner(entity->dP, r) * r;
-  }
-  else
-  {
-    entity->p = newPlayerP;
-  }
-#else
-
+  /*
   u32 minTileX = MINIMUM(oldPlayerP.absTileX, newPlayerP.absTileX);
   u32 minTileY = MINIMUM(oldPlayerP.absTileY, newPlayerP.absTileY);
   u32 maxTileX = MAXIMUM(oldPlayerP.absTileX, newPlayerP.absTileX);
   u32 maxTileY = MAXIMUM(oldPlayerP.absTileY, newPlayerP.absTileY);
 
-  u32 entityTileWidth = ceilReal32ToInt32(entity->width / tileMap->tileSideInMeters);
-  u32 entityTileHeight = ceilReal32ToInt32(entity->height / tileMap->tileSideInMeters);
+  u32 entityTileWidth = ceilReal32ToInt32(entity.high->width / tileMap->tileSideInMeters);
+  u32 entityTileHeight = ceilReal32ToInt32(entity.high->height / tileMap->tileSideInMeters);
 
   minTileX -= entityTileWidth;
   minTileY -= entityTileHeight;
   maxTileX += entityTileWidth;
   maxTileY += entityTileHeight;
 
-  u32 absTileZ = entity->p.absTileZ;
+  u32 absTileZ = entity.high->p.absTileZ;
+  */
 
-  r32 tRemaining = 1.0f;
-  for (u32 iteration = 0; iteration < 4 && tRemaining > 0.0f; ++ iteration)
+  for (u32 iteration = 0;
+       iteration < 4;
+       ++iteration)
   {
-    r32 tMin = 1.0f;
-    V2 wallNormal = {0};
+      r32 tMin = 1.0f;
+      V2 wallNormal = {0};
+      u32 hitHighEntityIndex = 0;
 
-    ASSERT(maxTileX - minTileX < 32);
-    ASSERT(maxTileY - minTileY < 32);
+      V2 desiredPosition = entity.high->p + playerDelta;
 
-    for (u32 absTileY = minTileY; absTileY <= maxTileY; ++absTileY)
-    {
-      for (u32 absTileX = minTileX; absTileX <= maxTileX; ++absTileX)
+      for (u32 testHighEntityIndex = 1; testHighEntityIndex < gameState->highEntityCount; ++testHighEntityIndex)
       {
-        TileMapPosition testTileP = centeredTilePoint(absTileX, absTileY, absTileZ);
-        u32 tileValue = getTileValue(tileMap, testTileP);
-        if (!isTileValueEmpty(tileValue))
-        {
-          r32 diameterW = tileMap->tileSideInMeters + entity->width;
-          r32 diameterH = tileMap->tileSideInMeters + entity->height;
-          V2 minCorner = -0.5f * V2 { diameterW, diameterH };
-          V2 maxCorner = 0.5f * V2 { diameterW, diameterH };
+          if (testHighEntityIndex != entity.low->highEntityIndex)
+          {
+              Entity testEntity;
+              testEntity.high = gameState->highEntities_ + testHighEntityIndex; 
+              testEntity.lowIndex = testEntity.high->lowEntityIndex;
+              testEntity.low = gameState->lowEntities + testEntity.lowIndex;
+              if (testEntity.low->collides)
+              {
+                  r32 diameterW = testEntity.low->width + entity.low->width;
+                  r32 diameterH = testEntity.low->height + entity.low->height;
+                  V2 minCorner = -0.5f * V2 { diameterW, diameterH };
+                  V2 maxCorner = 0.5f * V2 { diameterW, diameterH };
 
-          TileMapDifference relOldPlayerP = subtract(tileMap, &entity->p, &testTileP);
-          V2 rel = relOldPlayerP.dXY;
+                  V2 rel = entity.high->p - testEntity.high->p;
 
-          if (testWall(minCorner.x, rel.x, rel.y, playerDelta.x, playerDelta.y, &tMin, minCorner.y, maxCorner.y))
-          {
-            wallNormal = V2 {-1, 0};
+                  if (testWall(minCorner.x, rel.x, rel.y, playerDelta.x, playerDelta.y, &tMin, minCorner.y, maxCorner.y))
+                  {
+                      wallNormal = v2(-1, 0);
+                      hitHighEntityIndex = testHighEntityIndex;
+                  }
+                  if (testWall(maxCorner.x, rel.x, rel.y, playerDelta.x, playerDelta.y, &tMin, minCorner.y, maxCorner.y))
+                  {
+                      wallNormal = v2(1, 0);
+                      hitHighEntityIndex = testHighEntityIndex;
+                  }
+                  if (testWall(minCorner.y, rel.y, rel.x, playerDelta.y, playerDelta.x, &tMin, minCorner.x, maxCorner.x))
+                  {
+                      wallNormal = v2(0, -1);
+                      hitHighEntityIndex = testHighEntityIndex;
+                  }
+                  if (testWall(maxCorner.y, rel.y, rel.x, playerDelta.y, playerDelta.x, &tMin, minCorner.x, maxCorner.x))
+                  {
+                      wallNormal = v2(0, 1);
+                      hitHighEntityIndex = testHighEntityIndex;
+                  }
+              }
           }
-          if (testWall(maxCorner.x, rel.x, rel.y, playerDelta.x, playerDelta.y, &tMin, minCorner.y, maxCorner.y))
-          {
-            wallNormal = V2 {1, 0};
-          }
-          if (testWall(minCorner.y, rel.y, rel.x, playerDelta.y, playerDelta.x, &tMin, minCorner.x, maxCorner.x))
-          {
-            wallNormal = V2 {0, -1};
-          }
-          if (testWall(maxCorner.y, rel.y, rel.x, playerDelta.y, playerDelta.x, &tMin, minCorner.x, maxCorner.x))
-          {
-            wallNormal = V2 {0, 1};
-          }
-        }
       }
-    }
 
-    entity->p = offset(tileMap, entity->p, tMin * playerDelta);
-    entity->dP = entity->dP - 1 * inner(entity->dP, wallNormal) * wallNormal;
-    playerDelta = playerDelta - 1 * inner(playerDelta, wallNormal) * wallNormal; 
-    tRemaining -= tMin * tRemaining;
-  }
-#endif
+      entity.high->p += tMin * playerDelta;
+      if (hitHighEntityIndex)
+      {
+          entity.high->dP = entity.high->dP - 1 * inner(entity.high->dP, wallNormal) * wallNormal;
+          playerDelta = desiredPosition - entity.high->p;
+          playerDelta = playerDelta - 1 * inner(playerDelta, wallNormal) * wallNormal; 
 
-  // NOTE(dima): update camera/player Z based on last movement
-  if (!areOnTheSameTile(&oldPlayerP, &entity->p))
-  {
-    u32 newTileValue = getTileValue(tileMap, entity->p);
-
-    if (newTileValue == 3)
-    {
-      ++entity->p.absTileZ;
-    }
-    else if (newTileValue == 4)
-    {
-      --entity->p.absTileZ;
-    }
+          HighEntity *hitHigh = gameState->highEntities_ + hitHighEntityIndex;
+          LowEntity *hitLow = gameState->lowEntities + hitHigh->lowEntityIndex;
+          entity.high->absTileZ += hitLow->dAbsTileZ;
+      }
+      else
+      {
+          break;
+      }
   }
 
-  if (entity->dP.x == 0.0f && entity->dP.y == 0.0f)
+  if (entity.high->dP.x == 0.0f && entity.high->dP.y == 0.0f)
   {
     // NOTE(dima): leave facingDirection whatever it was
   }
   else
   {
-    if (absoluteValue(entity->dP.x) > absoluteValue(entity->dP.y))
+    if (absoluteValue(entity.high->dP.x) > absoluteValue(entity.high->dP.y))
     {
-      if (entity->dP.x > 0)
+      if (entity.high->dP.x > 0)
       {
-        entity->facingDirection = 0;
+        entity.high->facingDirection = 0;
       }
       else
       {
-        entity->facingDirection = 2;
+        entity.high->facingDirection = 2;
       }
     }
-    else if (absoluteValue(entity->dP.x) < absoluteValue(entity->dP.y))
+    else if (absoluteValue(entity.high->dP.x) < absoluteValue(entity.high->dP.y))
     {
-      if (entity->dP.y > 0)
+      if (entity.high->dP.y > 0)
       {
-        entity->facingDirection = 1;
+        entity.high->facingDirection = 1;
       }
       else
       {
-        entity->facingDirection = 3;
+        entity.high->facingDirection = 3;
       }
     }
   }
+
+  entity.low->p = mapIntoTileSpace(gameState->world->tileMap, gameState->cameraP, entity.high->p);
+}
+
+static void
+setCamera(GameState *gameState, TileMapPosition newCameraP)
+{
+    TileMap *tileMap = gameState->world->tileMap;
+
+    TileMapDifference dCameraP = subtract(tileMap, &newCameraP, &gameState->cameraP);
+    gameState->cameraP = newCameraP;
+
+    u32 tileSpanX = 17 * 3;
+    u32 tileSpanY = 9 * 3;
+    Rectangle2 cameraBounds = rectCenterHalfDim(v2(0, 0), tileMap->tileSideInMeters * v2((r32) tileSpanX, (r32) tileSpanY));
+
+    V2 entityOffsetForFrame = -dCameraP.dXY;
+    offsetAndCheckFrequencyByArea(gameState, entityOffsetForFrame, cameraBounds);
+
+    u32 minTileX = newCameraP.absTileX - tileSpanX / 2;
+    u32 maxTileX = newCameraP.absTileX + tileSpanX / 2;
+    u32 minTileY = newCameraP.absTileY - tileSpanY / 2;
+    u32 maxTileY = newCameraP.absTileY + tileSpanY / 2;
+    for (u32 entityIndex = 1;
+        entityIndex < gameState->lowEntityCount;
+        ++entityIndex)
+    {
+        LowEntity *low = gameState->lowEntities + entityIndex;
+        if (low->highEntityIndex == 0)
+        {
+            if (low->p.absTileZ == newCameraP.absTileZ &&
+                low->p.absTileX >= minTileX &&
+                low->p.absTileX <= maxTileX &&
+                low->p.absTileY <= minTileY &&
+                low->p.absTileY >= maxTileY)
+            {
+                makeEntityHighFrequency(gameState, entityIndex);
+            }
+        }
+    }
 }
 
 #if !XCODE_BUILD
@@ -456,356 +555,419 @@ EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
 UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #endif
 {
-  ASSERT(&gcInput->terminator - &gcInput->buttons[0] == ARRAY_COUNT(gcInput->buttons));
-  ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
+    ASSERT(&gcInput->terminator - &gcInput->buttons[0] == ARRAY_COUNT(gcInput->buttons));
+    ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
 
-  GameState *gameState = (GameState *) memory->permanentStorage;
-  if (!memory->isInitialized)
-  {
-    // NOTE(dima): reserve entity slot 0 for the null entity
-    addEntity(gameState);
-
-    gameState->backdrop = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_background.bmp");
-
-    HeroBitmaps *bitmap = gameState->heroBitmaps;
-
-    bitmap->head = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_right_head.bmp");
-    bitmap->cape = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_right_cape.bmp");
-    bitmap->torso = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_right_torso.bmp");
-    bitmap->alignX = 72;
-    bitmap->alignY = 182;
-    ++bitmap;
-
-    bitmap->head = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_back_head.bmp");
-    bitmap->cape = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_back_cape.bmp");
-    bitmap->torso = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_back_torso.bmp");
-    bitmap->alignX = 72;
-    bitmap->alignY = 182;
-    ++bitmap;
-
-    bitmap->head = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_left_head.bmp");
-    bitmap->cape = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_left_cape.bmp");
-    bitmap->torso = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_left_torso.bmp");
-    bitmap->alignX = 72;
-    bitmap->alignY = 182;
-    ++bitmap;
-
-    bitmap->head = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_front_head.bmp");
-    bitmap->cape = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_front_cape.bmp");
-    bitmap->torso = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_front_torso.bmp");
-    bitmap->alignX = 72;
-    bitmap->alignY = 182;
-    ++bitmap;
-
-    gameState->cameraP.absTileX = 17 / 2;
-    gameState->cameraP.absTileY = 9 / 2;
-
-    // do initialization here as needed
-
-    initializeArena(&gameState->worldArena, memory->permanentStorageSize - sizeof(GameState), (u8 *) memory->permanentStorage + sizeof(GameState));
-
-    gameState->world = PUSH_STRUCT(&gameState->worldArena, World);
-    World *world = gameState->world;
-    world->tileMap = PUSH_STRUCT(&gameState->worldArena, TileMap);
-
-    TileMap *tileMap = world->tileMap;
-
-    // NOTE(dima): this is set to using 256x256 tile chunks
-    tileMap->chunkShift = 4;
-    tileMap->chunkMask = (1 << tileMap->chunkShift);
-    tileMap->chunkMask -= 1;
-    tileMap->chunkDim = 1 << tileMap->chunkShift;
-
-    tileMap->tileSideInMeters = 1.4f;
-
-    tileMap->tileChunkCountX = 128;
-    tileMap->tileChunkCountY = 128;
-    tileMap->tileChunkCountZ = 2;
-
-    tileMap->tileChunks = PUSH_ARRAY(&gameState->worldArena, tileMap->tileChunkCountX * tileMap->tileChunkCountY * tileMap->tileChunkCountZ, TileChunk);
-
-    u32 randomNumberIndex = 0;
-    u32 tilesPerWidth = 17;
-    u32 tilesPerHeight = 9;
-#if 0
-    // TODO(dima): waiting for full sparseness
-    u32 screenX = INT32_MAX / 2;
-    u32 screenY = INT32_MAX / 2;
-#else
-    u32 screenX = 0;
-    u32 screenY = 0;
-#endif
-    u32 absTileZ = 0;
-
-    b32 doorLeft = 0;
-    b32 doorRight = 0;
-    b32 doorTop = 0;
-    b32 doorBottom = 0;
-    b32 doorUp = 0;
-    b32 doorDown = 0;
-    for (u32 screenIndex = 0; screenIndex < 100; screenIndex++)
+    GameState *gameState = (GameState *) memory->permanentStorage;
+    if (!memory->isInitialized)
     {
-      ASSERT(randomNumberIndex < ARRAY_COUNT(randomNumberTable));
-      u32 randomChoice;
-      if (doorUp || doorDown)
-      {
-        randomChoice = randomNumberTable[randomNumberIndex++] % 2;
-      }
-      else
-      {
-        randomChoice = randomNumberTable[randomNumberIndex++] % 3;
-      }
+        // NOTE(dima): reserve entity slot 0 for the null entity
+        addLowEntity(gameState, EntityType_Null);
+        gameState->highEntityCount = 1;
 
-      b32 createdZDoor = false;
-      if (randomChoice == 2)
-      {
-        createdZDoor = true;
-        if (absTileZ == 0)
+        gameState->backdrop = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_background.bmp");
+        gameState->shadow = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_shadow.bmp");
+
+        HeroBitmaps *bitmap = gameState->heroBitmaps;
+
+        bitmap->head = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_right_head.bmp");
+        bitmap->cape = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_right_cape.bmp");
+        bitmap->torso = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_right_torso.bmp");
+        bitmap->alignX = 72;
+        bitmap->alignY = 182;
+        ++bitmap;
+
+        bitmap->head = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_back_head.bmp");
+        bitmap->cape = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_back_cape.bmp");
+        bitmap->torso = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_back_torso.bmp");
+        bitmap->alignX = 72;
+        bitmap->alignY = 182;
+        ++bitmap;
+
+        bitmap->head = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_left_head.bmp");
+        bitmap->cape = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_left_cape.bmp");
+        bitmap->torso = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_left_torso.bmp");
+        bitmap->alignX = 72;
+        bitmap->alignY = 182;
+        ++bitmap;
+
+        bitmap->head = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_front_head.bmp");
+        bitmap->cape = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_front_cape.bmp");
+        bitmap->torso = Debug_LoadBMP(thread, memory->debug_platformReadEntireFile, "data/test/test_hero_front_torso.bmp");
+        bitmap->alignX = 72;
+        bitmap->alignY = 182;
+        ++bitmap;
+
+        // do initialization here as needed
+
+        initializeArena(&gameState->worldArena, memory->permanentStorageSize - sizeof(GameState), (u8 *) memory->permanentStorage + sizeof(GameState));
+
+        gameState->world = PUSH_STRUCT(&gameState->worldArena, World);
+        World *world = gameState->world;
+        world->tileMap = PUSH_STRUCT(&gameState->worldArena, TileMap);
+        TileMap *tileMap = world->tileMap;
+
+        // NOTE(dima): this is set to using 256x256 tile chunks
+        tileMap->chunkShift = 4;
+        tileMap->chunkMask = (1 << tileMap->chunkShift);
+        tileMap->chunkMask -= 1;
+        tileMap->chunkDim = 1 << tileMap->chunkShift;
+
+        tileMap->tileSideInMeters = 1.4f;
+
+        tileMap->tileChunkCountX = 128;
+        tileMap->tileChunkCountY = 128;
+        tileMap->tileChunkCountZ = 2;
+
+        tileMap->tileChunks = PUSH_ARRAY(&gameState->worldArena, tileMap->tileChunkCountX * tileMap->tileChunkCountY * tileMap->tileChunkCountZ, TileChunk);
+
+        u32 randomNumberIndex = 0;
+        u32 tilesPerWidth = 17;
+        u32 tilesPerHeight = 9;
+#if 0
+        // TODO(dima): waiting for full sparseness
+        u32 screenX = INT32_MAX / 2;
+        u32 screenY = INT32_MAX / 2;
+#else
+        u32 screenX = 0;
+        u32 screenY = 0;
+#endif
+        u32 absTileZ = 0;
+
+        b32 doorLeft = 0;
+        b32 doorRight = 0;
+        b32 doorTop = 0;
+        b32 doorBottom = 0;
+        b32 doorUp = 0;
+        b32 doorDown = 0;
+        for (u32 screenIndex = 0; screenIndex < 2; screenIndex++)
         {
-          doorUp = 1;
-        }
-        else
-        {
-          doorDown = 1;
-        }
-      }
-      else if (randomChoice == 1)
-      {
-        doorRight = 1;
-      }
-      else
-      {
-        doorTop = 1;
-      }
-
-      for (u32 tileY = 0; tileY < tilesPerHeight; tileY++)
-      {
-        for (u32 tileX = 0; tileX < tilesPerWidth; tileX++)
-        {
-          u32 absTileX = screenX * tilesPerWidth + tileX;
-          u32 absTileY = screenY * tilesPerHeight + tileY;
-
-          u32 tileValue = 1;
-          if (tileX == 0 && (!doorLeft || tileY != (tilesPerHeight / 2)))
-          {
-            tileValue = 2;
-          }
-
-          if (tileX == tilesPerWidth - 1 && (!doorRight || tileY != (tilesPerHeight / 2)))
-          {
-              tileValue = 2;
-          }
-
-          if (tileY == 0 && (!doorBottom || tileX != (tilesPerWidth / 2)))
-          {
-              tileValue = 2;
-          }
-
-          if (tileY == tilesPerHeight - 1 && (!doorTop || tileX != (tilesPerWidth / 2)))
-          {
-            tileValue = 2;
-          }
-
-          if (tileX == 10 && tileY == 6)
-          {
-            if (doorUp)
+            ASSERT(randomNumberIndex < ARRAY_COUNT(randomNumberTable));
+            u32 randomChoice;
+//            if (doorUp || doorDown)
             {
-              tileValue = 3;
+                randomChoice = randomNumberTable[randomNumberIndex++] % 2;
+            }
+#if 0
+            else
+            {
+                randomChoice = randomNumberTable[randomNumberIndex++] % 3;
+            }
+#endif
+
+            b32 createdZDoor = false;
+            if (randomChoice == 2)
+            {
+                createdZDoor = true;
+                if (absTileZ == 0)
+                {
+                    doorUp = 1;
+                }
+                else
+                {
+                    doorDown = 1;
+                }
+            }
+            else if (randomChoice == 1)
+            {
+                doorRight = 1;
+            }
+            else
+            {
+                doorTop = 1;
             }
 
-            if (doorDown)
+            for (u32 tileY = 0; tileY < tilesPerHeight; tileY++)
             {
-              tileValue = 4;
+                for (u32 tileX = 0; tileX < tilesPerWidth; tileX++)
+                {
+                    u32 absTileX = screenX * tilesPerWidth + tileX;
+                    u32 absTileY = screenY * tilesPerHeight + tileY;
+
+                    u32 tileValue = 1;
+                    if (tileX == 0 && (!doorLeft || tileY != (tilesPerHeight / 2)))
+                    {
+                        tileValue = 2;
+                    }
+
+                    if (tileX == tilesPerWidth - 1 && (!doorRight || tileY != (tilesPerHeight / 2)))
+                    {
+                        tileValue = 2;
+                    }
+
+                    if (tileY == 0 && (!doorBottom || tileX != (tilesPerWidth / 2)))
+                    {
+                        tileValue = 2;
+                    }
+
+                    if (tileY == tilesPerHeight - 1 && (!doorTop || tileX != (tilesPerWidth / 2)))
+                    {
+                        tileValue = 2;
+                    }
+
+                    if (tileX == 10 && tileY == 6)
+                    {
+                        if (doorUp)
+                        {
+                            tileValue = 3;
+                        }
+
+                        if (doorDown)
+                        {
+                            tileValue = 4;
+                        }
+                    }
+
+                    setTileValue(&gameState->worldArena, world->tileMap, absTileX, absTileY, absTileZ, tileValue);
+
+                    if (tileValue == 2)
+                    {
+                        addWall(gameState, absTileX, absTileY, absTileZ);
+                    }
+                }
             }
-          }
 
-          setTileValue(&gameState->worldArena, world->tileMap, absTileX, absTileY, absTileZ, tileValue);
+            doorLeft = doorRight;
+            doorBottom = doorTop;
+
+            if (createdZDoor)
+            {
+                doorDown = !doorDown;
+                doorUp = !doorUp;
+            }
+            else
+            {
+                doorDown = 0;
+                doorUp = 0;
+            }
+
+            doorRight = 0;
+            doorTop = 0;
+
+            if (randomChoice == 2)
+            {
+                if (absTileZ == 0)
+                {
+                  absTileZ = 1;
+                }
+                else
+                {
+                  absTileZ = 0;
+                }
+            }
+            else if (randomChoice == 1)
+            {
+                screenX += 1;
+            }
+            else
+            {
+                screenY += 1;
+            }
         }
-      }
 
-      doorLeft = doorRight;
-      doorBottom = doorTop;
+        TileMapPosition newCameraP = {};
+        newCameraP.absTileX = 17 / 2;
+        newCameraP.absTileY = 9 / 2;
+        setCamera(gameState, newCameraP);
 
-      if (createdZDoor)
-      {
-        doorDown = !doorDown;
-        doorUp = !doorUp;
-      }
-      else
-      {
-        doorDown = 0;
-        doorUp = 0;
-      }
-
-      doorRight = 0;
-      doorTop = 0;
-
-      if (randomChoice == 2)
-      {
-        if (absTileZ == 0)
-        {
-          absTileZ = 1;
-        }
-        else
-        {
-          absTileZ = 0;
-        }
-      }
-      else if (randomChoice == 1)
-      {
-        screenX += 1;
-      }
-      else
-      {
-        screenY += 1;
-      }
+        memory->isInitialized = 1;
     }
 
-    memory->isInitialized = 1;
-  }
+    World *world = gameState->world;
+    TileMap *tileMap = world->tileMap;
 
-  World *world = gameState->world;
-  TileMap *tileMap = world->tileMap;
+    s32 tileSideInPixels = 60;
+    r32 metersToPixels = (r32) tileSideInPixels / tileMap->tileSideInMeters;
 
-  s32 tileSideInPixels = 60;
-  r32 metersToPixels = (r32) tileSideInPixels / tileMap->tileSideInMeters;
+    r32 lowerLeftX = -tileSideInPixels / 2;
+    r32 lowerLeftY = (r32) buff->height;
 
-  r32 lowerLeftX = -tileSideInPixels / 2;
-  r32 lowerLeftY = (r32) buff->height;
-
-  Entity *controllingEntity = getEntity(gameState, gameState->playerIndexForController[0]);
-  if (controllingEntity)
-  {
-    V2 ddP = {0};
-
-    if (gcInput->isAnalog)
+    u32 lowIndex = gameState->playerIndexForController[0];
+    if (lowIndex == 0)
     {
-      // TODO(dima): need to normalize stickAverage values for it to work
-      ddP = V2 { gcInput->stickAverageX, gcInput->stickAverageY };
+        u32 entityIndex = addPlayer(gameState);
+        gameState->playerIndexForController[0] = entityIndex;
     }
     else
     {
-      if (gcInput->up.endedDown)
-      {
-        ddP.y = 1.f;
-      }
-      if (gcInput->down.endedDown)
-      {
-        ddP.y = -1.f;
-      }
-      if (gcInput->left.endedDown)
-      {
-        ddP.x = -1.f;
-      }
-      if (gcInput->right.endedDown)
-      {
-        ddP.x = 1.f;
-      }
-    }
+        Entity controllingEntity = getHighEntity(gameState, lowIndex);
+        V2 ddP = {0};
 
-    movePlayer(gameState, controllingEntity, deltaTimeSec, ddP);
-  }
-  else
-  {
-    u32 entityIndex = addEntity(gameState);
-    controllingEntity = getEntity(gameState, entityIndex);
-    initializePlayer(gameState, entityIndex);
-    gameState->playerIndexForController[0] = entityIndex;
-  }
-
-  Entity *cameraFollowingEntity = getEntity(gameState, gameState->cameraFollowingEntityIndex);
-  if (cameraFollowingEntity)
-  {
-    gameState->cameraP.absTileZ = cameraFollowingEntity->p.absTileZ;
-
-    TileMapDifference diff = subtract(tileMap, &cameraFollowingEntity->p, &gameState->cameraP);
-    if (diff.dXY.x > 9.f * tileMap->tileSideInMeters)
-    {
-      gameState->cameraP.absTileX += 17;
-    }
-    if (diff.dXY.x < -9.f * tileMap->tileSideInMeters)
-    {
-      gameState->cameraP.absTileX -= 17;
-    }
-    if (diff.dXY.y > 5.f * tileMap->tileSideInMeters)
-    {
-      gameState->cameraP.absTileY += 9;
-    }
-    if (diff.dXY.y < -5.f * tileMap->tileSideInMeters)
-    {
-      gameState->cameraP.absTileY -= 9;
-    }
-  }
-
-  // NOTE(dima): render
-  drawBitmap(buff, &gameState->backdrop, 0, 0);
-
-  r32 screenCenterX = 0.5f * (r32) buff->width;
-  r32 screenCenterY = 0.5f * (r32) buff->height;
-
-  for (s32 relRow = -10; relRow < 10; ++relRow)
-  {
-    for (s32 relColumn = -20; relColumn < 20; relColumn++)
-    {
-      u32 column = gameState->cameraP.absTileX + relColumn;
-      u32 row = gameState->cameraP.absTileY + relRow;
-      u32 tileID = getTileValue(tileMap, column, row, gameState->cameraP.absTileZ);
-
-      if (tileID > 1)
-      {
-        r32 gray = 0.5f;
-        if (tileID == 2)
+        if (gcInput->isAnalog)
         {
-          gray = 1.f;
+            // TODO(dima): need to normalize stickAverage values for it to work
+            ddP = V2 { gcInput->stickAverageX, gcInput->stickAverageY };
+        }
+        else
+        {
+            if (gcInput->up.endedDown)
+            {
+                ddP.y = 1.f;
+            }
+            if (gcInput->down.endedDown)
+            {
+                ddP.y = -1.f;
+            }
+            if (gcInput->left.endedDown)
+            {
+                ddP.x = -1.f;
+            }
+            if (gcInput->right.endedDown)
+            {
+                ddP.x = 1.f;
+            }
+            if (gcInput->actionUp.endedDown)
+            {
+                controllingEntity.high->dZ = 3.0f;
+            }
         }
 
-        if (tileID > 2)
-        {
-          gray = 0.25f;
-        }
-
-        if (column == gameState->cameraP.absTileX && row == gameState->cameraP.absTileY)
-        {
-          gray = 0.0f;
-        }
-
-        V2 tileSide = {0.5f * tileSideInPixels, 0.5f * tileSideInPixels};
-        V2 cen = {screenCenterX - metersToPixels * gameState->cameraP.offset_.x + ((r32) relColumn) * tileSideInPixels,
-                  screenCenterY + metersToPixels * gameState->cameraP.offset_.y - ((r32) relRow) * tileSideInPixels};
-        V2 min = cen - 0.9f * tileSide;
-        V2 max = cen + 0.9f * tileSide;
-        drawRectangle(buff, min, max, gray, gray, gray);
-      }
+        movePlayer(gameState, controllingEntity, deltaTimeSec, ddP);
     }
-  }
 
-  Entity *entity = gameState->entities;
-  for (u32 entityIndex = 0; entityIndex < gameState->entityCount; ++entityIndex, ++entity)
-  {
-    if (entity->exists)
+    V2 entityOffsetForFrame = {};
+    Entity cameraFollowingEntity = getHighEntity(gameState, gameState->cameraFollowingEntityIndex);
+    if (cameraFollowingEntity.high)
     {
-      TileMapDifference diff = subtract(tileMap, &entity->p, &gameState->cameraP);
+        TileMapPosition newCameraP = gameState->cameraP;
 
-      r32 playerR = 1.f;
-      r32 playerG = 1.f;
-      r32 playerB = 0.f;
-      r32 playerGroundPointX = screenCenterX + metersToPixels * diff.dXY.x;
-      r32 playerGroundPointY = screenCenterY - metersToPixels * diff.dXY.y;
-      V2 playerLeftTop = {playerGroundPointX - 0.5f * metersToPixels * entity->width, playerGroundPointY - 0.5f * metersToPixels * entity->height};
-      V2 entityWidthHeight = {entity->width, entity->height};
-      drawRectangle(buff, playerLeftTop, playerLeftTop + metersToPixels * entityWidthHeight, playerR, playerG, playerB);
+        newCameraP.absTileZ = cameraFollowingEntity.low->p.absTileZ;
 
-      HeroBitmaps *heroBitmaps = &gameState->heroBitmaps[entity->facingDirection];
-      drawBitmap(buff, &heroBitmaps->torso, playerGroundPointX, playerGroundPointY, heroBitmaps->alignX, heroBitmaps->alignY);
-      drawBitmap(buff, &heroBitmaps->cape, playerGroundPointX, playerGroundPointY, heroBitmaps->alignX, heroBitmaps->alignY);
-      drawBitmap(buff, &heroBitmaps->head, playerGroundPointX, playerGroundPointY, heroBitmaps->alignX, heroBitmaps->alignY);
+#if 1
+        if (cameraFollowingEntity.high->p.x > 9.f * tileMap->tileSideInMeters)
+        {
+            newCameraP.absTileX += 17;
+        }
+        if (cameraFollowingEntity.high->p.x < -9.f * tileMap->tileSideInMeters)
+        {
+            newCameraP.absTileX -= 17;
+        }
+        if (cameraFollowingEntity.high->p.y > 5.f * tileMap->tileSideInMeters)
+        {
+            newCameraP.absTileY += 9;
+        }
+        if (cameraFollowingEntity.high->p.y < -5.f * tileMap->tileSideInMeters)
+        {
+            newCameraP.absTileY -= 9;
+        }
+#else
+        if (cameraFollowingEntity.high->p.x > 1.f * tileMap->tileSideInMeters)
+        {
+            newCameraP.absTileX += 1;
+        }
+        if (cameraFollowingEntity.high->p.x < -1.f * tileMap->tileSideInMeters)
+        {
+            newCameraP.absTileX -= 1;
+        }
+        if (cameraFollowingEntity.high->p.y > 1.f * tileMap->tileSideInMeters)
+        {
+            newCameraP.absTileY += 1;
+        }
+        if (cameraFollowingEntity.high->p.y < -1.f * tileMap->tileSideInMeters)
+        {
+            newCameraP.absTileY -= 1;
+        }
+#endif
+
+        setCamera(gameState, newCameraP);
     }
-  }
 
-  memory->waitIfInputBlocked(thread);
-  memory->lockInputThread(thread);
-  memory->resetInputStateButtons(thread);
-  memory->unlockInputThread(thread);
+    // NOTE(dima): render
+    drawBitmap(buff, &gameState->backdrop, 0, 0);
+
+    r32 screenCenterX = 0.5f * (r32) buff->width;
+    r32 screenCenterY = 0.5f * (r32) buff->height;
+
+#if 0
+    for (s32 relRow = -10; relRow < 10; ++relRow)
+    {
+        for (s32 relColumn = -20; relColumn < 20; relColumn++)
+        {
+            u32 column = gameState->cameraP.absTileX + relColumn;
+            u32 row = gameState->cameraP.absTileY + relRow;
+            u32 tileID = getTileValue(tileMap, column, row, gameState->cameraP.absTileZ);
+
+            if (tileID > 1)
+            {
+                r32 gray = 0.5f;
+                if (tileID == 2)
+                {
+                    gray = 1.f;
+                }
+
+                if (tileID > 2)
+                {
+                    gray = 0.25f;
+                }
+
+                if (column == gameState->cameraP.absTileX && row == gameState->cameraP.absTileY)
+                {
+                    gray = 0.0f;
+                }
+
+                V2 tileSide = {0.5f * tileSideInPixels, 0.5f * tileSideInPixels};
+                V2 cen = {screenCenterX - metersToPixels * gameState->cameraP.offset_.x + ((r32) relColumn) * tileSideInPixels,
+                          screenCenterY + metersToPixels * gameState->cameraP.offset_.y - ((r32) relRow) * tileSideInPixels};
+                V2 min = cen - 0.9f * tileSide;
+                V2 max = cen + 0.9f * tileSide;
+                drawRectangle(buff, min, max, gray, gray, gray);
+            }
+        }
+    }
+#endif
+
+    for (u32 highEntityIndex = 1; 
+    highEntityIndex < gameState->highEntityCount;
+    ++highEntityIndex)
+    {
+        HighEntity *highEntity = gameState->highEntities_ + highEntityIndex;
+        LowEntity *lowEntity = gameState->lowEntities + highEntity->lowEntityIndex;
+
+        highEntity->p += entityOffsetForFrame;
+
+        r32 ddZ = -9.8f;
+        highEntity->z = 0.5f * ddZ * square(deltaTimeSec) + highEntity->dZ * deltaTimeSec + highEntity->z;
+        highEntity->dZ = ddZ * deltaTimeSec + highEntity->dZ;
+        if (highEntity->z < 0)
+        {
+            highEntity->z = 0;
+        }
+        r32 cAlpha = 1.0f - 0.5f * highEntity->z;
+        if (cAlpha < 0)
+        {
+            cAlpha = 0.0f;
+        }
+
+        r32 playerR = 1.f;
+        r32 playerG = 1.f;
+        r32 playerB = 0.f;
+        r32 playerGroundPointX = screenCenterX + metersToPixels * highEntity->p.x;
+        r32 playerGroundPointY = screenCenterY - metersToPixels * highEntity->p.y;
+        r32 z = -metersToPixels * highEntity->z;
+        V2 playerLeftTop = {playerGroundPointX - 0.5f * metersToPixels * lowEntity->width, playerGroundPointY - 0.5f * metersToPixels * lowEntity->height};
+        V2 entityWidthHeight = {lowEntity->width, lowEntity->height};
+
+        if (lowEntity->type == EntityType_Hero)
+        {
+            HeroBitmaps *heroBitmaps = &gameState->heroBitmaps[highEntity->facingDirection];
+            drawBitmap(buff, &gameState->shadow, playerGroundPointX, playerGroundPointY, heroBitmaps->alignX, heroBitmaps->alignY, cAlpha);
+            drawBitmap(buff, &heroBitmaps->torso, playerGroundPointX, playerGroundPointY + z, heroBitmaps->alignX, heroBitmaps->alignY);
+            drawBitmap(buff, &heroBitmaps->cape, playerGroundPointX, playerGroundPointY + z, heroBitmaps->alignX, heroBitmaps->alignY);
+            drawBitmap(buff, &heroBitmaps->head, playerGroundPointX, playerGroundPointY + z, heroBitmaps->alignX, heroBitmaps->alignY);
+        }
+        else
+        {
+            drawRectangle(buff, 
+                          playerLeftTop,
+                          playerLeftTop + metersToPixels * entityWidthHeight,
+                          playerR, playerG, playerB);
+        }
+    }
+
+    memory->waitIfInputBlocked(thread);
+    memory->lockInputThread(thread);
+    memory->resetInputStateButtons(thread);
+    memory->unlockInputThread(thread);
 }
 
 #if !XCODE_BUILD

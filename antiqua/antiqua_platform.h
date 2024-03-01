@@ -9,6 +9,8 @@
 #define ASSERT(expression)
 #endif
 
+#define INVALID_CODE_PATH ASSERT(!"InvalidCodePath")
+
 #define PI32 3.14159265359f
 #define ARRAY_COUNT(arr) sizeof(arr) / sizeof((arr)[0])
 #define KB(Value) ((Value) * 1024LL)

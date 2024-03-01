@@ -46,12 +46,45 @@ typedef struct
 
 typedef struct
 {
-  b32 exists;
-  TileMapPosition p;
+  V2 p; // NOTE(dima): already relative to the camera
   V2 dP;
   u32 facingDirection;
-  r32 width;
-  r32 height;
+  u32 absTileZ;
+
+  r32 z;
+  r32 dZ;
+
+  u32 lowEntityIndex;
+} HighEntity;
+
+enum EntityType
+{
+    EntityType_Null,
+
+    EntityType_Hero,
+    EntityType_Wall,
+};
+
+typedef struct
+{
+    EntityType type;
+
+    TileMapPosition p;
+    r32 width;
+    r32 height;
+
+    // NOTE(dima): this is for "stairs"
+    b32 collides;
+    s32 dAbsTileZ;
+
+    u32 highEntityIndex;
+} LowEntity;
+
+typedef struct
+{
+  u32 lowIndex;
+  LowEntity *low;
+  HighEntity *high;
 } Entity;
 
 typedef struct
@@ -63,10 +96,15 @@ typedef struct
   TileMapPosition cameraP;
 
   u32 playerIndexForController[1];
-  u32 entityCount;
-  Entity entities[256];
+
+  u32 lowEntityCount;
+  LowEntity lowEntities[4096];
+
+  u32 highEntityCount;
+  HighEntity highEntities_[256];
 
   LoadedBitmap backdrop;
+  LoadedBitmap shadow;
   HeroBitmaps heroBitmaps[4];
 } GameState;
 

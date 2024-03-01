@@ -130,14 +130,15 @@ inline void recanonicalizeCoord(TileMap *tileMap, u32 *tile, r32 *tileRel)
   *tile += offset;
   *tileRel -= offset * tileMap->tileSideInMeters;
 
-  ASSERT(*tileRel > -0.5001f * tileMap->tileSideInMeters);
-  ASSERT(*tileRel < 0.5001f * tileMap->tileSideInMeters);
+  ASSERT(*tileRel > -0.5f * tileMap->tileSideInMeters);
+  ASSERT(*tileRel < 0.5f * tileMap->tileSideInMeters);
 }
 
-inline TileMapPosition recanonicalizePosition(TileMap* tileMap, TileMapPosition pos)
+inline TileMapPosition mapIntoTileSpace(TileMap* tileMap, TileMapPosition basePos, V2 offset)
 {
-  TileMapPosition result = pos;
+  TileMapPosition result = basePos;
 
+  result.offset_ += offset;
   recanonicalizeCoord(tileMap, &result.absTileX, &result.offset_.x);
   recanonicalizeCoord(tileMap, &result.absTileY, &result.offset_.y);
 
@@ -174,12 +175,4 @@ inline TileMapPosition centeredTilePoint(u32 absTileX, u32 absTileY, u32 absTile
   result.absTileZ = absTileZ;
 
   return result;
-}
-
-inline TileMapPosition offset(TileMap *tileMap, TileMapPosition p, V2 offset)
-{
-  p.offset_ += offset;
-  p = recanonicalizePosition(tileMap, p);
-
-  return p;
 }
