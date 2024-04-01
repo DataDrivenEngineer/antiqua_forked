@@ -2,7 +2,6 @@
 #define _ANTIQUA_H_
 
 #include "antiqua_platform.h"
-#include "antiqua_tile.h"
 #include "antiqua_math.h"
 
 void initializeArena(MemoryArena *arena, MemoryIndex size, u8 *base)
@@ -25,7 +24,6 @@ void * pushSize_(MemoryArena *arena, MemoryIndex size)
 
 typedef struct
 {
-  TileMap *tileMap;
 } World;
 
 typedef struct
@@ -46,8 +44,8 @@ typedef struct
 
 typedef struct
 {
-  V2 p; // NOTE(dima): already relative to the camera
-  V2 dP;
+  v2 p; // NOTE(dima): already relative to the camera
+  v2 dP;
   u32 facingDirection;
   u32 absTileZ;
 
@@ -69,7 +67,6 @@ typedef struct
 {
     EntityType type;
 
-    TileMapPosition p;
     r32 width;
     r32 height;
 
@@ -93,12 +90,11 @@ typedef struct
   World *world;
 
   u32 cameraFollowingEntityIndex;
-  TileMapPosition cameraP;
 
   u32 playerIndexForController[1];
 
   u32 lowEntityCount;
-  LowEntity lowEntities[4096];
+  LowEntity lowEntities[100000];
 
   u32 highEntityCount;
   HighEntity highEntities_[256];

@@ -7,7 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		9F8A978C2B746643001AC5DB /* antiqua_tile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F8A97872B746643001AC5DB /* antiqua_tile.cpp */; };
+		9F28AA742B9D88B7001A629A /* osx_renderer.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F28AA732B9D88B7001A629A /* osx_renderer.m */; };
+		9F56470C2BB9180200C0B94A /* shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 9F56470B2BB9180200C0B94A /* shaders.metal */; };
 		9FC718EE2A7D5E45007ADAA1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */; };
 		9FC7191C2A7D608E007ADAA1 /* antiqua.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = 9FC718E42A7D5E44007ADAA1 /* antiqua.app */; };
 		9FCE02832AD9174900BB84CA /* antiqua.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FCE027D2AD9174900BB84CA /* antiqua.m */; };
@@ -35,20 +36,21 @@
 
 /* Begin PBXFileReference section */
 		9F1D09F02A86C1A100263859 /* CustomWindowDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomWindowDelegate.h; sourceTree = "<group>"; };
+		9F28AA722B9D88B7001A629A /* osx_renderer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_renderer.h; sourceTree = "<group>"; };
+		9F28AA732B9D88B7001A629A /* osx_renderer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_renderer.m; sourceTree = "<group>"; };
 		9F3BF0B92B590FE100A6C2B7 /* antiqua_intrinsics.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_intrinsics.h; sourceTree = "<group>"; };
+		9F56470B2BB9180200C0B94A /* shaders.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; path = shaders.metal; sourceTree = "<group>"; };
+		9F56470D2BBA819300C0B94A /* antiqua_render_group.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_render_group.h; sourceTree = "<group>"; };
 		9F6E25E32A7D7559006DF7A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		9F8A97872B746643001AC5DB /* antiqua_tile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = antiqua_tile.cpp; sourceTree = "<group>"; };
 		9F8A97882B746643001AC5DB /* antiqua_random.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_random.h; sourceTree = "<group>"; };
 		9F8A97892B746643001AC5DB /* antiqua_math.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_math.h; sourceTree = "<group>"; };
 		9F8A978A2B746643001AC5DB /* antiqua_platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_platform.h; sourceTree = "<group>"; };
-		9F8A978B2B746643001AC5DB /* antiqua_tile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_tile.h; sourceTree = "<group>"; };
 		9F8AC8C42B0926B100AC9757 /* osx_lock.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_lock.m; sourceTree = "<group>"; };
 		9F8AC8C52B0926B100AC9757 /* osx_time.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_time.h; sourceTree = "<group>"; };
 		9F8AC8C62B0926B100AC9757 /* osx_lock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_lock.h; sourceTree = "<group>"; };
 		9F8AC8C72B0926B100AC9757 /* osx_dynamic_loader.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_dynamic_loader.m; sourceTree = "<group>"; };
 		9F8AC8C82B0926B100AC9757 /* osx_dynamic_loader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_dynamic_loader.h; sourceTree = "<group>"; };
 		9F8AC8C92B0926B100AC9757 /* osx_time.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_time.m; sourceTree = "<group>"; };
-		9FBB7D732A80BA17001EA2E0 /* CustomCALayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomCALayer.h; sourceTree = "<group>"; };
 		9FC718E42A7D5E44007ADAA1 /* antiqua.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = antiqua.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9FC718F22A7D5E45007ADAA1 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
@@ -59,7 +61,6 @@
 		9FCE027C2AD9174900BB84CA /* CustomNSView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomNSView.m; sourceTree = "<group>"; };
 		9FCE027D2AD9174900BB84CA /* antiqua.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = antiqua.m; sourceTree = "<group>"; };
 		9FCE027E2AD9174900BB84CA /* CustomWindowDelegate.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomWindowDelegate.m; sourceTree = "<group>"; };
-		9FCE027F2AD9174900BB84CA /* CustomCALayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomCALayer.m; sourceTree = "<group>"; };
 		9FCE02862AD918A500BB84CA /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
 		9FCE02882AD918AC00BB84CA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		9FCE028A2AD918B200BB84CA /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
@@ -110,11 +111,13 @@
 		9FC718E62A7D5E44007ADAA1 /* antiqua */ = {
 			isa = PBXGroup;
 			children = (
+				9F56470D2BBA819300C0B94A /* antiqua_render_group.h */,
+				9F56470B2BB9180200C0B94A /* shaders.metal */,
+				9F28AA722B9D88B7001A629A /* osx_renderer.h */,
+				9F28AA732B9D88B7001A629A /* osx_renderer.m */,
 				9F8A97892B746643001AC5DB /* antiqua_math.h */,
 				9F8A978A2B746643001AC5DB /* antiqua_platform.h */,
 				9F8A97882B746643001AC5DB /* antiqua_random.h */,
-				9F8A97872B746643001AC5DB /* antiqua_tile.cpp */,
-				9F8A978B2B746643001AC5DB /* antiqua_tile.h */,
 				9F3BF0B92B590FE100A6C2B7 /* antiqua_intrinsics.h */,
 				9F8AC8C82B0926B100AC9757 /* osx_dynamic_loader.h */,
 				9F8AC8C72B0926B100AC9757 /* osx_dynamic_loader.m */,
@@ -123,7 +126,6 @@
 				9F8AC8C52B0926B100AC9757 /* osx_time.h */,
 				9F8AC8C92B0926B100AC9757 /* osx_time.m */,
 				9FCE027D2AD9174900BB84CA /* antiqua.m */,
-				9FCE027F2AD9174900BB84CA /* CustomCALayer.m */,
 				9FCE027C2AD9174900BB84CA /* CustomNSView.m */,
 				9FCE027E2AD9174900BB84CA /* CustomWindowDelegate.m */,
 				9FCE027A2AD9174900BB84CA /* osx_audio.m */,
@@ -134,7 +136,6 @@
 				9FD311FB2AADA0A500C3A9EF /* osx_input.h */,
 				9FD311F72AADA0A500C3A9EF /* types.h */,
 				9F1D09F02A86C1A100263859 /* CustomWindowDelegate.h */,
-				9FBB7D732A80BA17001EA2E0 /* CustomCALayer.h */,
 				9F6E25E32A7D7559006DF7A3 /* Info.plist */,
 				9FC719182A7D5F7E007ADAA1 /* CustomNSView.h */,
 				9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */,
@@ -247,9 +248,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9F56470C2BB9180200C0B94A /* shaders.metal in Sources */,
 				9FD311FE2AADA0A500C3A9EF /* antiqua.cpp in Sources */,
 				9FCE02832AD9174900BB84CA /* antiqua.m in Sources */,
-				9F8A978C2B746643001AC5DB /* antiqua_tile.cpp in Sources */,
+				9F28AA742B9D88B7001A629A /* osx_renderer.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -4,7 +4,10 @@
 #import <AppKit/NSGraphicsContext.h>
 #import <CoreVideo/CVDisplayLink.h>
 #import <AppKit/NSApplication.h>
-#import <QuartzCore/CALayer.h>
+
+#import <Metal/MTLDevice.h>
+#import <QuartzCore/CAMetalLayer.h>
+
 #import <math.h>
 #import <sys/types.h>
 #import <sys/mman.h>
@@ -19,19 +22,15 @@
 #import "osx_input.h"
 #import "types.h"
 #import "CustomNSView.h"
-#import "CustomCALayer.h"
 #import "osx_dynamic_loader.h"
+#import "osx_renderer.h"
 
 #define LOOP_EDIT_FILENAME "tmp/loop_edit.atqi"
 
-GameOffscreenBuffer framebuffer;
 GameMemory gameMemory;
 
-static CustomCALayer *layer;
 static CVDisplayLinkRef displayLink;
 static b32 shouldStopDL = 0;
-
-static b32 skipCurrentFrame = 1;
 
 ThreadContext thread = {0};
 State state = {0};
@@ -96,21 +95,16 @@ static void playBackInput(State *state, GameControllerInput *gcInput)
 
 static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext)
 {
-  skipCurrentFrame = !skipCurrentFrame;
-  if (!skipCurrentFrame)
-  {
     static u64 previousNowNs = 0;
     u64 currentNowNs = TIMESTAMP_TO_NS(inNow->hostTime);
     u64 inNowDiff = currentNowNs - previousNowNs;
     previousNowNs = currentNowNs;
     // Divide by 1000000 to convert from ns to ms
-//    fprintf(stderr, "inNow frame time: %f ms\n", (r32)inNowDiff / 1000000);
+    //    fprintf(stderr, "inNow frame time: %f ms\n", (r32)inNowDiff / 1000000);
 
     r32 deltaTimeSec = (r32) inNowDiff / 1000000000;
     CVReturn error = [(__bridge CustomNSView *) displayLinkContext displayFrame:deltaTimeSec];
     return error;
-  }
-  return kCVReturnSuccess;
 }
 
 @implementation CustomNSView
@@ -186,10 +180,10 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 #if !XCODE_BUILD
     if (gameCode.updateGameAndRender)
     {
-      gameCode.updateGameAndRender(&thread, deltaTimeSec, &gcInput, &soundState, &gameMemory, &framebuffer);
+      gameCode.updateGameAndRender(&thread, deltaTimeSec, &gcInput, &soundState, &gameMemory);
     }
 #else
-    updateGameAndRender(&thread, deltaTimeSec, &gcInput, &soundState, &gameMemory, &framebuffer);
+    updateGameAndRender(&thread, deltaTimeSec, &gcInput, &soundState, &gameMemory);
 #endif
 
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -199,19 +193,29 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   return kCVReturnSuccess;
 }
 
+-(void)frameDidChangeCallback:(NSNotification *)notification
+{
+    CAMetalLayer *layer = (CAMetalLayer *) self.layer;
+    CGFloat scaleFactor = [[NSApplication sharedApplication] mainWindow].backingScaleFactor;
+    layer.drawableSize = CGSizeMake(self.frame.size.width * scaleFactor,
+                                    self.frame.size.height * scaleFactor);
+}
 
 - (instancetype)initWithFrame:(NSRect)frameRect {
   self = [super initWithFrame:frameRect];
+
+  self.postsBoundsChangedNotifications = true;
   
-  layer = [[CustomCALayer alloc] init];
-  NSLog(@"layerw x h: %f x %f", layer.bounds.size.width, layer.bounds.size.height);
-#if !ANTIQUA_INTERNAL
-  // NOTE(dima): increase the resolution for awesome quality on Retina screens!
-  layer.contentsScale = [[NSScreen mainScreen] backingScaleFactor];
-#endif
-  self.wantsLayer = YES;
+  CAMetalLayer *layer = [CAMetalLayer layer];
+  layer.device = MTLCreateSystemDefaultDevice();
   self.layer = layer;
   self.layerContentsRedrawPolicy = NSViewLayerContentsRedrawOnSetNeedsDisplay;
+  InitRenderer(layer);
+
+  [NSNotificationCenter.defaultCenter addObserver:self
+                                      selector:@selector(frameDidChangeCallback:)
+                                      name:NSViewFrameDidChangeNotification
+                                      object:0];
 
   CGDirectDisplayID displayID = CGMainDisplayID();
   CVReturn error = kCVReturnSuccess;
@@ -262,12 +266,7 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   gameMemory.debug_platformReadEntireFile = debug_platformReadEntireFile;
   gameMemory.debug_platformWriteEntireFile = debug_platformWriteEntireFile;
 
-  framebuffer.width = 960;
-  framebuffer.height = 540;
-  framebuffer.bytesPerPixel = 4;
-  framebuffer.pitch = framebuffer.width * framebuffer.bytesPerPixel;
-  framebuffer.sizeBytes = sizeof(u8) * framebuffer.width * 4 * framebuffer.height;
-  framebuffer.memory = malloc(framebuffer.sizeBytes);
+  gameMemory.renderOnGpu = renderOnGpu;
   
   return self;
 }

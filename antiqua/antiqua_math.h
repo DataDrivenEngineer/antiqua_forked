@@ -1,18 +1,20 @@
 #ifndef _ANTIQUA_MATH_H_
 #define _ANTIQUA_MATH_H_
 
-struct V2
+// V2
+
+struct v2
 {
   r32 x, y;
   r32 operator[](s32 index) { return ((&x)[index]); }
 
-  inline V2 &operator*=(r32 a);
-  inline V2 &operator+=(V2 a);
+  inline v2 &operator*=(r32 a);
+  inline v2 &operator+=(v2 a);
 };
 
-inline V2 v2(r32 x, r32 y)
+inline v2 V2(r32 x, r32 y)
 {
-  V2 result;
+  v2 result;
 
   result.x = x;
   result.y = y;
@@ -20,9 +22,9 @@ inline V2 v2(r32 x, r32 y)
   return result;
 }
 
-inline V2 operator*(r32 a, V2 b)
+inline v2 operator*(r32 a, v2 b)
 {
-  V2 result;
+  v2 result;
 
   result.x = a * b.x;
   result.y = a * b.y;
@@ -30,9 +32,9 @@ inline V2 operator*(r32 a, V2 b)
   return result;
 }
 
-inline V2 operator*(V2 b, r32 a)
+inline v2 operator*(v2 b, r32 a)
 {
-  V2 result;
+  v2 result;
 
   result.x = a * b.x;
   result.y = a * b.y;
@@ -40,7 +42,7 @@ inline V2 operator*(V2 b, r32 a)
   return result;
 }
 
-inline V2 &V2::
+inline v2 &v2::
 operator*=(r32 a)
 {
   *this = a * *this;
@@ -48,9 +50,9 @@ operator*=(r32 a)
   return *this;
 }
 
-inline V2 operator-(V2 a)
+inline v2 operator-(v2 a)
 {
-  V2 result;
+  v2 result;
 
   result.x = -a.x;
   result.y = -a.y;
@@ -58,9 +60,9 @@ inline V2 operator-(V2 a)
   return result;
 }
 
-inline V2 operator+(V2 a, V2 b)
+inline v2 operator+(v2 a, v2 b)
 {
-  V2 result;
+  v2 result;
 
   result.x = a.x + b.x;
   result.y = a.y + b.y;
@@ -68,20 +70,43 @@ inline V2 operator+(V2 a, V2 b)
   return result;
 }
 
-inline V2 &V2::
-operator+=(V2 a)
+inline v2 &v2::
+operator+=(v2 a)
 {
   *this = a + *this;
 
   return *this;
 }
 
-inline V2 operator-(V2 a, V2 b)
+inline v2 operator-(v2 a, v2 b)
 {
-  V2 result;
+  v2 result;
 
   result.x = a.x - b.x;
   result.y = a.y - b.y;
+
+  return result;
+}
+
+// V4
+
+struct v4
+{
+  r32 x, y, z, w;
+  r32 operator[](s32 index) { return ((&x)[index]); }
+
+//  inline v4 &operator*=(r32 a);
+//  inline v4 &operator+=(v4 a);
+};
+
+inline v4 V4(r32 x, r32 y, r32 z, r32 w)
+{
+  v4 result;
+
+  result.x = x;
+  result.y = y;
+  result.z = z;
+  result.w = w;
 
   return result;
 }
@@ -93,14 +118,14 @@ inline r32 square(r32 a)
   return result;
 }
 
-inline r32 inner(V2 a, V2 b)
+inline r32 inner(v2 a, v2 b)
 {
   r32 result = a.x * b.x + a.y * b.y;
 
   return result;
 }
 
-inline r32 lengthSq(V2 a)
+inline r32 lengthSq(v2 a)
 {
   r32 result = inner(a, a);
 
@@ -109,11 +134,11 @@ inline r32 lengthSq(V2 a)
 
 typedef struct
 {
-  V2 min;
-  V2 max;
+  v2 min;
+  v2 max;
 } Rectangle2;
 
-inline Rectangle2 rectMinMax(V2 min, V2 max)
+inline Rectangle2 rectMinMax(v2 min, v2 max)
 {
   Rectangle2 result;
 
@@ -123,7 +148,7 @@ inline Rectangle2 rectMinMax(V2 min, V2 max)
   return result;
 }
 
-inline Rectangle2 rectMinDim(V2 min, V2 dim)
+inline Rectangle2 rectMinDim(v2 min, v2 dim)
 {
   Rectangle2 result;
 
@@ -133,7 +158,7 @@ inline Rectangle2 rectMinDim(V2 min, V2 dim)
   return result;
 }
 
-inline Rectangle2 rectCenterHalfDim(V2 center, V2 halfDim)
+inline Rectangle2 rectCenterHalfDim(v2 center, v2 halfDim)
 {
   Rectangle2 result;
 
@@ -143,14 +168,14 @@ inline Rectangle2 rectCenterHalfDim(V2 center, V2 halfDim)
   return result;
 }
 
-inline Rectangle2 rectCenterDim(V2 center, V2 dim)
+inline Rectangle2 rectCenterDim(v2 center, v2 dim)
 {
   Rectangle2 result = rectCenterHalfDim(center, 0.5f * dim);
 
   return result;
 }
 
-inline b32 isInRectangle(Rectangle2 rectangle, V2 test)
+inline b32 isInRectangle(Rectangle2 rectangle, v2 test)
 {
   b32 result = test.x >= rectangle.min.x &&
                test.y >= rectangle.min.y &&

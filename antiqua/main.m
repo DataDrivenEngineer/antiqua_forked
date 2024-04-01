@@ -12,7 +12,6 @@
 
 #import "CustomNSView.h"
 #import "CustomWindowDelegate.h"
-#import "CustomCALayer.h"
 
 #include "types.h"
 #include "osx_audio.h"

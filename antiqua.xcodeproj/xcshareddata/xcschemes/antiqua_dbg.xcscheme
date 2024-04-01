@@ -42,8 +42,7 @@
       allowLocationSimulation = "YES">
       <PathRunnable
          runnableDebuggingMode = "0"
-         BundleIdentifier = "dimatheprogrammer.antiqua"
-         FilePath = "/opt/projects/antiqua/antiqua.app">
+         FilePath = "/opt/projects/antiqua_forked/antiqua.app">
       </PathRunnable>
    </LaunchAction>
    <ProfileAction

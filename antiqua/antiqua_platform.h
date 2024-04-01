@@ -32,16 +32,6 @@ typedef struct
 
 typedef struct
 {
-  u32 width;
-  u32 height;
-  u32 bytesPerPixel;
-  u32 pitch;
-  u32 sizeBytes;
-  u8 *memory;
-} GameOffscreenBuffer;
-
-typedef struct
-{
   u32 halfTransitionCount;
   b32 endedDown;
 } GameButtonState;
@@ -125,6 +115,10 @@ typedef UNLOCK_INPUT_THREAD(UnlockInputThread);
 #define WAIT_IF_INPUT_BLOCKED(name) void name(ThreadContext *thread)
 typedef WAIT_IF_INPUT_BLOCKED(WaitIfInputBlocked);
 
+struct RenderGroup;
+#define RENDER_ON_GPU(name) void name(struct RenderGroup *renderGroup)
+typedef RENDER_ON_GPU(RenderOnGpu);
+
 typedef struct
 {
   b32 isInitialized;
@@ -142,6 +136,8 @@ typedef struct
   UnlockInputThread *unlockInputThread;
   WaitIfInputBlocked *waitIfInputBlocked;
 
+  RenderOnGpu *renderOnGpu;
+
 #if ANTIQUA_INTERNAL
   Debug_PlatformReadEntireFile *debug_platformReadEntireFile;
   Debug_PlatformFreeFileMemory *debug_platformFreeFileMemory;
@@ -149,7 +145,7 @@ typedef struct
 #endif
 } GameMemory;
 
-#define UPDATE_GAME_AND_RENDER(name) void name(ThreadContext *thread, r32 deltaTimeSec, GameControllerInput *gcInput, SoundState *soundState, GameMemory *memory, GameOffscreenBuffer *buff)
+#define UPDATE_GAME_AND_RENDER(name) void name(ThreadContext *thread, r32 deltaTimeSec, GameControllerInput *gcInput, SoundState *soundState, GameMemory *memory)
 typedef UPDATE_GAME_AND_RENDER(UpdateGameAndRender);
 #if XCODE_BUILD
 MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender);
