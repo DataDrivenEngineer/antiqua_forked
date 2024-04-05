@@ -78,6 +78,7 @@ iOSInjectionProject/
 
 #Antiqua
 data/
+codegen/antiqua_math.h
 
 # Metal
 *.ir

@@ -26,6 +26,31 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                     (u8 *) memory->transientStorage);
     memory->renderOnGpu(0);
 
+    M44 a = {1,5,9,13,2,6,10,14,3,7,11,15,4,8,12,16};
+    M44 b = {4,8,12,16,3,7,11,15,2,6,10,14,1,5,9,13};
+
+    M44 res = a * b;
+    for (u32 i = 0; i < 16; i++)
+    {
+        fprintf(stderr, "%f ", res.cols[i]);
+    }
+    // Expected: 120.000000 280.000000 440.000000 600.000000 
+    //           110.000000 254.000000 398.000000 542.000000 
+    //           100.000000 228.000000 356.000000 484.000000 
+    //           90.000000 202.000000 314.000000 426.000000
+
+//    M33 a = {1,5,9,2,6,10,3,7,11};
+//    M33 b = {4,8,12,3,7,11,2,6,10};
+//
+//    M33 res = a * b;
+//    for (u32 i = 0; i < 9; i++)
+//    {
+//        fprintf(stderr, "%f ", res.cols[i]);
+//    }
+    // Excepted: 56.000000 152.000000 248.000000 
+    //           50.000000 134.000000 218.000000 
+    //           44.000000 116.000000 188.000000 
+
     memory->waitIfInputBlocked(thread);
     memory->lockInputThread(thread);
     memory->resetInputStateButtons(thread);

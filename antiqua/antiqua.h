@@ -44,8 +44,8 @@ typedef struct
 
 typedef struct
 {
-  v2 p; // NOTE(dima): already relative to the camera
-  v2 dP;
+  V2 p; // NOTE(dima): already relative to the camera
+  V2 dP;
   u32 facingDirection;
   u32 absTileZ;
 
