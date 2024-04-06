@@ -6,7 +6,7 @@ build:
 	# Compile all C++ files
 	cc -shared -g -std=c++17 -DANTIQUA_SLOW=1 -DANTIQUA_INTERNAL=1 -ffast-math -fno-rtti -fno-exceptions -O0 -Wall -pedantic -Wno-dtor-name -Wno-null-dereference -Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable -Wno-gnu-anonymous-struct -Wno-nested-anon-types -Wno-nullability-completeness antiqua/antiqua.cpp -fvisibility=hidden -o libantiqua.dylib
 	# Compile Metal shaders
-	xcrun -sdk macosx metal -o shaders.ir -c antiqua/shaders.metal
+	xcrun -sdk macosx metal -gline-tables-only -frecord-sources -o shaders.ir -c antiqua/shaders.metal
 	xcrun -sdk macosx metallib -o shaders.metallib shaders.ir
 	# Copy compiled Metal library to the bundle
 	cp -f shaders.metallib antiqua.app/Contents/Resources/shaders.metallib

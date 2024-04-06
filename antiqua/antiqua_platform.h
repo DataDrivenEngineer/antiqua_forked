@@ -12,6 +12,8 @@
 #define INVALID_CODE_PATH ASSERT(!"InvalidCodePath")
 
 #define PI32 3.14159265359f
+#define RADIANS(value) ((value)/180.0f)*PI32
+
 #define ARRAY_COUNT(arr) sizeof(arr) / sizeof((arr)[0])
 #define KB(Value) ((Value) * 1024LL)
 #define MB(Value) (KB(Value) * 1024LL)
@@ -116,7 +118,8 @@ typedef UNLOCK_INPUT_THREAD(UnlockInputThread);
 typedef WAIT_IF_INPUT_BLOCKED(WaitIfInputBlocked);
 
 struct RenderGroup;
-#define RENDER_ON_GPU(name) void name(struct RenderGroup *renderGroup)
+//#define RENDER_ON_GPU(name) void name(struct RenderGroup *renderGroup)
+#define RENDER_ON_GPU(name) void name(r32 *uniforms, u32 uniformsSizeInBytes)
 typedef RENDER_ON_GPU(RenderOnGpu);
 
 typedef struct

@@ -11,8 +11,15 @@ inline s32 signOf(s32 value)
 
 inline r32 squareRoot(r32 real32)
 {
-  r32 result = sqrtf(real32);
-  return result;
+    r32 result;
+
+#if COMPILER_LLVM
+    result = __builtin_sqrtf(real32);
+#else
+    result = sqrtf(real32);
+#endif
+
+    return result;
 }
 
 inline r32 absoluteValue(r32 real32)
@@ -95,6 +102,45 @@ inline BitScanResult findLeastSignificantSetBit(u32 value)
 #endif
 
   return result;
+}
+
+inline r32 tangent(r32 val)
+{
+    r32 result;
+
+#if COMPILER_LLVM
+    result = __builtin_tanf(val);
+#else
+    result = tanf(val);
+#endif
+
+    return result;
+}
+
+inline r32 sine(r32 val)
+{
+    r32 result;
+
+#if COMPILER_LLVM
+    result = __builtin_sinf(val);
+#else
+    result = sinf(val);
+#endif
+
+    return result;
+}
+
+inline r32 cosine(r32 val)
+{
+    r32 result;
+
+#if COMPILER_LLVM
+    result = __builtin_cosf(val);
+#else
+    result = cosf(val);
+#endif
+
+    return result;
 }
 
 #endif

@@ -238,6 +238,20 @@ void generateLength(FILE *file, int size)
     fprintf(file, "\n");
 }
 
+void generateVectorNormalize(FILE *file, char *dim, int size)
+{
+    fprintf(file, "inline void normalize(V%d *a)\n", size);
+    fprintf(file, "{\n");
+    fprintf(file, "%sr32 len = length(*a);\n", TAB);
+    for (int i = 0; i < size; i++)
+    {
+        fprintf(file, "%sa->%c /= len;\n", TAB, dim[i]);
+    }
+    fprintf(file, "}\n");
+    fprintf(file, "\n");
+}
+
+
 // NOTE(dima): Matrices
 
 void generateMatrixDefinition(FILE *file, int size)
@@ -317,13 +331,13 @@ void generateMultiplyMatrixByMatrixOverride(FILE *file, char *dim, int size)
 
 int main(int argc, char **argv)
 {
-    FILE *result = fopen("antiqua_math.h", "w+");
+    FILE *result = fopen("antiqua_math_generated.h", "w+");
 
-    fprintf(result, "#ifndef _ANTIQUA_MATH_H_\n");
-    fprintf(result, "#define _ANTIQUA_MATH_H_\n");
-    fprintf(result, "\n");
-    fprintf(result, "#include \"types.h\"\n");
-    fprintf(result, "\n");
+//    fprintf(result, "#ifndef _ANTIQUA_MATH_H_\n");
+//    fprintf(result, "#define _ANTIQUA_MATH_H_\n");
+//    fprintf(result, "\n");
+//    fprintf(result, "#include \"types.h\"\n");
+//    fprintf(result, "\n");
 
     char v2[2] = {'x', 'y'};
     char v3[3] = {'x', 'y', 'z'};
@@ -383,6 +397,11 @@ int main(int argc, char **argv)
     generateLength(result, ARRAY_COUNT(v3));
     generateLength(result, ARRAY_COUNT(v4));
 
+    fprintf(result, "// NOTE(dima): Vector normalization\n\n");
+    generateVectorNormalize(result, v2, ARRAY_COUNT(v2));
+    generateVectorNormalize(result, v3, ARRAY_COUNT(v3));
+    generateVectorNormalize(result, v4, ARRAY_COUNT(v4));
+
     fprintf(result, "// NOTE(dima): Matrix definitions\n\n");
     fprintf(result, "// NOTE(dima): all matrices are in column-major order\n\n");
 
@@ -400,7 +419,7 @@ int main(int argc, char **argv)
 //    TODO for later: generate matrix inverse
 //    TODO for later: generate matrix vector multiplication
 
-    fprintf(result, "#endif\n");
+//    fprintf(result, "#endif\n");
 
     return 0;
 }

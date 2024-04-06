@@ -24,32 +24,47 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     initializeArena(&renderGroupArena,
                     KB(256),
                     (u8 *) memory->transientStorage);
-    memory->renderOnGpu(0);
 
-    M44 a = {1,5,9,13,2,6,10,14,3,7,11,15,4,8,12,16};
-    M44 b = {4,8,12,16,3,7,11,15,2,6,10,14,1,5,9,13};
+    r32 fov = 90.0f;
+    r32 tanHalfFov = tangent(RADIANS(fov / 2.0f));
+    r32 d = 1 / tanHalfFov;
 
-    M44 res = a * b;
-    for (u32 i = 0; i < 16; i++)
-    {
-        fprintf(stderr, "%f ", res.cols[i]);
-    }
-    // Expected: 120.000000 280.000000 440.000000 600.000000 
-    //           110.000000 254.000000 398.000000 542.000000 
-    //           100.000000 228.000000 356.000000 484.000000 
-    //           90.000000 202.000000 314.000000 426.000000
+    r32 aspectRatio = 1000.0f / 700.0f;
 
-//    M33 a = {1,5,9,2,6,10,3,7,11};
-//    M33 b = {4,8,12,3,7,11,2,6,10};
-//
-//    M33 res = a * b;
-//    for (u32 i = 0; i < 9; i++)
-//    {
-//        fprintf(stderr, "%f ", res.cols[i]);
-//    }
-    // Excepted: 56.000000 152.000000 248.000000 
-    //           50.000000 134.000000 218.000000 
-    //           44.000000 116.000000 188.000000 
+    r32 near = 1.0f;
+    r32 far = 100.0f;
+    r32 a = far / (far - near);
+    r32 b = (near * far) / (near - far);
+
+    M44 projectionMatrix = {d / aspectRatio, 0.0f, 0.0f, 0.0f,
+                            0.0f, d, 0.0f, 0.0f,
+                            0.0f, 0.0f, a, 1.0f,
+                            0.0f, 0.0f, b, 0.0f};
+
+    V3 cameraPos = v3(0.2f, 0.0f, -6.0f);
+    V3 u = v3(1.0f, 0.0f, 0.0f);
+    V3 v = v3(0.0f, 1.0f, 0.0f);
+    V3 n = v3(0.0f, 0.0f, 1.0f);
+
+    // NOTE(dima): rotate around vertical axis by 45 degrees
+    rotate(&n, v, 45.0f);
+
+    // NOTE(dima): rotate around horizontal axis by 45 degrees
+    u = cross(v, n);
+    normalize(&u);
+    rotate(&n, u, 45.0f);
+
+    v = cross(n, u);
+    normalize(&v);
+
+    M44 viewMatrix = {u.x, v.x, n.x, 0.0f,
+                      u.y, v.y, n.y, 0.0f,
+                      u.z, v.z, n.z, 0.0f,
+                      -cameraPos.x, -cameraPos.y, -cameraPos.z, 1.0f};
+
+    M44 uniforms[2] = { viewMatrix, projectionMatrix };
+
+    memory->renderOnGpu((r32 *)uniforms, sizeof(uniforms));
 
     memory->waitIfInputBlocked(thread);
     memory->lockInputThread(thread);

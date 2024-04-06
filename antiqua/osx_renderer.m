@@ -170,9 +170,6 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                                      length:sizeof(r32) * ARRAY_COUNT(vertices)
                                      options:MTLResourceStorageModeShared];
 
-        static r32 angle = 0.0f;
-        angle += 0.01f;
-
         id<MTLRenderCommandEncoder> renderCommandEnc = [commandBuffer
                                                         renderCommandEncoderWithDescriptor:renderPassDesc];
         [renderCommandEnc setRenderPipelineState:renderPipelineState];
@@ -181,8 +178,8 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                           offset: 0
                           attributeStride: 0
                           atIndex: 5];
-        [renderCommandEnc setVertexBytes: &angle
-                          length: sizeof(r32)
+        [renderCommandEnc setVertexBytes: uniforms
+                          length: uniformsSizeInBytes
                           attributeStride: 0
                           atIndex: 7];
         [renderCommandEnc drawPrimitives:MTLPrimitiveTypeTriangle
