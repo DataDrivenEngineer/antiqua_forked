@@ -16,6 +16,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     if (!memory->isInitialized)
     {
         // do initialization here as needed
+
+        memory->isInitialized = true;
     }
 
     MemoryArena renderGroupArena;
@@ -24,6 +26,13 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     initializeArena(&renderGroupArena,
                     KB(256),
                     (u8 *) memory->transientStorage);
+
+    fprintf(stderr, "mouse x, y: %d, %d\n", gcInput->mouseX, gcInput->mouseY);
+
+    M44 worldMatrix = {1.0f, 0.0f, 0.0f, 0.0f,
+                       0.0f, 1.0f, 0.0f, 0.0f,
+                       0.0f, 0.0f, 1.0f, 0.0f,
+                       0.0f, 0.0f, 0.0f, 1.0f};
 
     r32 fov = 90.0f;
     r32 tanHalfFov = tangent(RADIANS(fov / 2.0f));
@@ -41,7 +50,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                             0.0f, 0.0f, a, 1.0f,
                             0.0f, 0.0f, b, 0.0f};
 
-    V3 cameraPos = v3(0.2f, 0.0f, -6.0f);
+    V3 cameraPos = v3(0.0f, 0.0f, -6.0f);
     V3 u = v3(1.0f, 0.0f, 0.0f);
     V3 v = v3(0.0f, 1.0f, 0.0f);
     V3 n = v3(0.0f, 0.0f, 1.0f);
@@ -62,7 +71,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                       u.z, v.z, n.z, 0.0f,
                       -cameraPos.x, -cameraPos.y, -cameraPos.z, 1.0f};
 
-    M44 uniforms[2] = { viewMatrix, projectionMatrix };
+    M44 uniforms[3] = { worldMatrix, viewMatrix, projectionMatrix };
 
     memory->renderOnGpu((r32 *)uniforms, sizeof(uniforms));
 

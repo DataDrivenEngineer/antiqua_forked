@@ -6,6 +6,100 @@
 
 #include "antiqua_math_generated.h"
 
+// NOTE(dima): Inverse of 4x4 matrix
+
+inline r32 determinant(M44 *m)
+{
+    r32 result = m->cols[0] * (m->cols[5] * (m->cols[10] * m->cols[15] - m->cols[11] * m->cols[14])
+                               - m->cols[9] * (m->cols[6] * m->cols[15] - m->cols[7] * m->cols[14])
+                               + m->cols[13] * (m->cols[6] * m->cols[11] - m->cols[7] * m->cols[10]))
+                 - m->cols[4] * (m->cols[1] * (m->cols[10] * m->cols[15] - m->cols[11] * m->cols[14])
+                              - m->cols[9] * (m->cols[2] * m->cols[15] - m->cols[3] * m->cols[14])
+                              + m->cols[13] * (m->cols[2] * m->cols[11] - m->cols[3] * m->cols[10]))
+                 + m->cols[8] * (m->cols[1] * (m->cols[6] * m->cols[15] - m->cols[7] * m->cols[14])
+                              - m->cols[5] * (m->cols[2] * m->cols[15] - m->cols[3] * m->cols[14])
+                              + m->cols[13] * (m->cols[2] * m->cols[7] - m->cols[3] * m->cols[6]))
+                 - m->cols[12] * (m->cols[1] * (m->cols[6] * m->cols[11] - m->cols[7] * m->cols[10])
+                              - m->cols[5] * (m->cols[2] * m->cols[11] - m->cols[3] * m->cols[10])
+                              + m->cols[9] * (m->cols[2] * m->cols[7] - m->cols[3] * m->cols[6]));
+
+    return result;
+}
+
+inline M44 inverse(M44 *m)
+{
+    M44 result;
+
+    r32 det = determinant(m);
+
+    result.cols[0] = (1 / det) 
+                     * (m->cols[5] * (m->cols[10] * m->cols[15] - m->cols[11] * m->cols[14])
+                        - m->cols[9] * (m->cols[6] * m->cols[15] - m->cols[7] * m->cols[14])
+                        + m->cols[13] * (m->cols[6] * m->cols[11] - m->cols[7] * m->cols[10]));
+    result.cols[1] = - (1 / det) 
+                     * (m->cols[1] * (m->cols[10] * m->cols[15] - m->cols[11] * m->cols[14])
+                        - m->cols[9] * (m->cols[2] * m->cols[15] - m->cols[3] * m->cols[14])
+                        + m->cols[13] * (m->cols[2] * m->cols[11] - m->cols[3] * m->cols[10]));
+    result.cols[2] = (1 / det) 
+                     * (m->cols[1] * (m->cols[6] * m->cols[15] - m->cols[7] * m->cols[14])
+                        - m->cols[5] * (m->cols[2] * m->cols[15] - m->cols[3] * m->cols[14])
+                        + m->cols[13] * (m->cols[2] * m->cols[7] - m->cols[3] * m->cols[6]));
+    result.cols[3] = - (1 / det) 
+                     * (m->cols[1] * (m->cols[6] * m->cols[11] - m->cols[7] * m->cols[10])
+                        - m->cols[5] * (m->cols[2] * m->cols[11] - m->cols[3] * m->cols[10])
+                        + m->cols[9] * (m->cols[2] * m->cols[7] - m->cols[3] * m->cols[6]));
+    result.cols[4] = - (1 / det) 
+                     * (m->cols[4] * (m->cols[10] * m->cols[15] - m->cols[11] * m->cols[14])
+                        - m->cols[8] * (m->cols[6] * m->cols[15] - m->cols[7] * m->cols[14])
+                        + m->cols[12] * (m->cols[6] * m->cols[11] - m->cols[7] * m->cols[10]));
+    result.cols[5] = (1 / det) 
+                     * (m->cols[0] * (m->cols[10] * m->cols[15] - m->cols[11] * m->cols[14])
+                        - m->cols[8] * (m->cols[2] * m->cols[15] - m->cols[3] * m->cols[14])
+                        + m->cols[12] * (m->cols[2] * m->cols[11] - m->cols[3] * m->cols[10]));
+    result.cols[6] = - (1 / det) 
+                     * (m->cols[0] * (m->cols[6] * m->cols[15] - m->cols[7] * m->cols[14])
+                        - m->cols[4] * (m->cols[2] * m->cols[15] - m->cols[3] * m->cols[14])
+                        + m->cols[12] * (m->cols[2] * m->cols[7] - m->cols[3] * m->cols[6]));
+    result.cols[7] = (1 / det) 
+                     * (m->cols[0] * (m->cols[6] * m->cols[11] - m->cols[7] * m->cols[10])
+                        - m->cols[4] * (m->cols[2] * m->cols[11] - m->cols[3] * m->cols[10])
+                        + m->cols[8] * (m->cols[2] * m->cols[7] - m->cols[3] * m->cols[6]));
+    result.cols[8] = (1 / det) 
+                     * (m->cols[4] * (m->cols[9] * m->cols[15] - m->cols[11] * m->cols[13])
+                        - m->cols[8] * (m->cols[5] * m->cols[15] - m->cols[7] * m->cols[13])
+                        + m->cols[12] * (m->cols[5] * m->cols[11] - m->cols[7] * m->cols[9]));
+    result.cols[9] = - (1 / det) 
+                     * (m->cols[0] * (m->cols[9] * m->cols[15] - m->cols[11] * m->cols[13])
+                        - m->cols[8] * (m->cols[1] * m->cols[15] - m->cols[3] * m->cols[13])
+                        + m->cols[12] * (m->cols[1] * m->cols[11] - m->cols[3] * m->cols[9]));
+    result.cols[10] = (1 / det) 
+                     * (m->cols[0] * (m->cols[5] * m->cols[15] - m->cols[7] * m->cols[13])
+                        - m->cols[4] * (m->cols[1] * m->cols[15] - m->cols[3] * m->cols[13])
+                        + m->cols[12] * (m->cols[1] * m->cols[7] - m->cols[3] * m->cols[5]));
+    result.cols[11] = - (1 / det) 
+                     * (m->cols[0] * (m->cols[5] * m->cols[11] - m->cols[7] * m->cols[9])
+                        - m->cols[4] * (m->cols[1] * m->cols[11] - m->cols[3] * m->cols[9])
+                        + m->cols[8] * (m->cols[1] * m->cols[7] - m->cols[3] * m->cols[5]));
+    result.cols[12] = - (1 / det) 
+                     * (m->cols[4] * (m->cols[9] * m->cols[14] - m->cols[10] * m->cols[13])
+                        - m->cols[8] * (m->cols[5] * m->cols[14] - m->cols[6] * m->cols[13])
+                        + m->cols[12] * (m->cols[5] * m->cols[10] - m->cols[6] * m->cols[9]));
+    result.cols[13] = (1 / det) 
+                     * (m->cols[0] * (m->cols[9] * m->cols[14] - m->cols[10] * m->cols[13])
+                        - m->cols[8] * (m->cols[1] * m->cols[14] - m->cols[2] * m->cols[13])
+                        + m->cols[12] * (m->cols[1] * m->cols[10] - m->cols[2] * m->cols[9]));
+    result.cols[14] = - (1 / det) 
+                     * (m->cols[0] * (m->cols[5] * m->cols[14] - m->cols[6] * m->cols[13])
+                        - m->cols[4] * (m->cols[1] * m->cols[14] - m->cols[2] * m->cols[13])
+                        + m->cols[12] * (m->cols[1] * m->cols[6] - m->cols[2] * m->cols[5]));
+    result.cols[15] = (1 / det) 
+                     * (m->cols[0] * (m->cols[5] * m->cols[10] - m->cols[6] * m->cols[9])
+                        - m->cols[4] * (m->cols[1] * m->cols[10] - m->cols[2] * m->cols[9])
+                        + m->cols[8] * (m->cols[1] * m->cols[6] - m->cols[2] * m->cols[5]));
+
+    return result;
+}
+
 // NOTE(dima): Quaternions
 
 struct Q

@@ -286,12 +286,12 @@ void generateMatrixDefinition(FILE *file, int size)
 
 void generateMatrixTranspose(FILE *file, char *dim, int size)
 {
-    fprintf(file, "inline M%d%d transpose(M%d%d a)\n", size, size, size, size);
+    fprintf(file, "inline M%d%d transpose(M%d%d *a)\n", size, size, size, size);
     fprintf(file, "{\n");
     fprintf(file, "%sM%d%d result;\n", TAB, size, size);
     fprintf(file, "%sfor (int i = 0; i < %d; i++)\n", TAB, size);
     fprintf(file, "%s{\n", TAB);
-    fprintf(file, "%s%sV%d *col = a[i];\n", TAB, TAB, size);
+    fprintf(file, "%s%sV%d *col = (*a)[i];\n", TAB, TAB, size);
     for (int i = 0; i < size; i++)
     {
         fprintf(file, "%s%sresult.cols[i + %d] = col->%c;\n", TAB, TAB, i * size, dim[i]);
@@ -309,7 +309,7 @@ void generateMultiplyMatrixByMatrixOverride(FILE *file, char *dim, int size)
     fprintf(file, "{\n");
     fprintf(file, "%sM%d%d result;\n", TAB, size, size);
     fprintf(file, "\n");
-    fprintf(file, "%sM%d%d aT = transpose(a);\n", TAB, size, size);
+    fprintf(file, "%sM%d%d aT = transpose(&a);\n", TAB, size, size);
     fprintf(file, "\n");
     fprintf(file, "%sfor (int i = 0; i < %d; i++)\n", TAB, size);
     fprintf(file, "%s{\n", TAB);

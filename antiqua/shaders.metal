@@ -16,6 +16,7 @@ struct VertexOut {
 
 struct Uniforms
 {
+    float4x4 worldMatrix;
     float4x4 viewMatrix;
     float4x4 projectionMatrix;
 };
@@ -27,12 +28,13 @@ struct Uniforms
 {
     const constant VertexIn & vData = vertices[vertexIndex];
 
-    float4x4 projectionMatrix = uniforms.projectionMatrix;
+    float4x4 worldMatrix = uniforms.worldMatrix;
     float4x4 viewMatrix = uniforms.viewMatrix;
+    float4x4 projectionMatrix = uniforms.projectionMatrix;
 
     VertexOut ret
     {
-        .position = projectionMatrix * viewMatrix * float4(vData.position, 1.0f),
+        .position = projectionMatrix * viewMatrix * worldMatrix * float4(vData.position, 1.0f),
         .color = vData.color
     };
     return ret;

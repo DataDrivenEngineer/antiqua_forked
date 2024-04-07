@@ -438,12 +438,12 @@ struct M44
 
 // NOTE(dima): Matrix transpose
 
-inline M33 transpose(M33 a)
+inline M33 transpose(M33 *a)
 {
     M33 result;
     for (int i = 0; i < 3; i++)
     {
-        V3 *col = a[i];
+        V3 *col = (*a)[i];
         result.cols[i + 0] = col->x;
         result.cols[i + 3] = col->y;
         result.cols[i + 6] = col->z;
@@ -452,12 +452,12 @@ inline M33 transpose(M33 a)
     return result;
 }
 
-inline M44 transpose(M44 a)
+inline M44 transpose(M44 *a)
 {
     M44 result;
     for (int i = 0; i < 4; i++)
     {
-        V4 *col = a[i];
+        V4 *col = (*a)[i];
         result.cols[i + 0] = col->x;
         result.cols[i + 4] = col->y;
         result.cols[i + 8] = col->z;
@@ -473,7 +473,7 @@ inline M33 operator*(M33 a, M33 b)
 {
     M33 result;
 
-    M33 aT = transpose(a);
+    M33 aT = transpose(&a);
 
     for (int i = 0; i < 3; i++)
     {
@@ -493,7 +493,7 @@ inline M44 operator*(M44 a, M44 b)
 {
     M44 result;
 
-    M44 aT = transpose(a);
+    M44 aT = transpose(&a);
 
     for (int i = 0; i < 4; i++)
     {
