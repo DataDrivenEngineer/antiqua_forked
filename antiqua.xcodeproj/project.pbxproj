@@ -7,11 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		9F28AA742B9D88B7001A629A /* osx_renderer.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F28AA732B9D88B7001A629A /* osx_renderer.m */; };
 		9F56470C2BB9180200C0B94A /* shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 9F56470B2BB9180200C0B94A /* shaders.metal */; };
+		9F7D54FC2BDC914800ADCC8B /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F7D54FB2BDC914800ADCC8B /* Metal.framework */; };
+		9F7D55082BDCBC2600ADCC8B /* osx_audio.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D54FF2BDCBC2600ADCC8B /* osx_audio.m */; };
+		9F7D55092BDCBC2600ADCC8B /* osx_renderer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D55002BDCBC2600ADCC8B /* osx_renderer.mm */; };
+		9F7D550A2BDCBC2600ADCC8B /* osx_dynamic_loader.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D55022BDCBC2600ADCC8B /* osx_dynamic_loader.m */; };
+		9F7D550B2BDCBC2600ADCC8B /* CustomWindowDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D55032BDCBC2600ADCC8B /* CustomWindowDelegate.m */; };
+		9F7D550C2BDCBC2600ADCC8B /* osx_input.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D55042BDCBC2600ADCC8B /* osx_input.m */; };
+		9F7D550D2BDCBC2600ADCC8B /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D55052BDCBC2600ADCC8B /* main.m */; };
+		9F7D550E2BDCBC2600ADCC8B /* osx_lock.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D55062BDCBC2600ADCC8B /* osx_lock.m */; };
+		9F7D550F2BDCBC2600ADCC8B /* osx_time.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D55072BDCBC2600ADCC8B /* osx_time.m */; };
 		9FC718EE2A7D5E45007ADAA1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */; };
 		9FC7191C2A7D608E007ADAA1 /* antiqua.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = 9FC718E42A7D5E44007ADAA1 /* antiqua.app */; };
-		9FCE02832AD9174900BB84CA /* antiqua.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FCE027D2AD9174900BB84CA /* antiqua.m */; };
+		9FCE02832AD9174900BB84CA /* antiqua.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9FCE027D2AD9174900BB84CA /* antiqua.mm */; };
 		9FCE02872AD918A500BB84CA /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FCE02862AD918A500BB84CA /* Carbon.framework */; };
 		9FCE02892AD918AC00BB84CA /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FCE02882AD918AC00BB84CA /* AppKit.framework */; };
 		9FCE028B2AD918B200BB84CA /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FCE028A2AD918B200BB84CA /* CoreVideo.framework */; };
@@ -37,30 +45,31 @@
 /* Begin PBXFileReference section */
 		9F1D09F02A86C1A100263859 /* CustomWindowDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomWindowDelegate.h; sourceTree = "<group>"; };
 		9F28AA722B9D88B7001A629A /* osx_renderer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_renderer.h; sourceTree = "<group>"; };
-		9F28AA732B9D88B7001A629A /* osx_renderer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_renderer.m; sourceTree = "<group>"; };
 		9F3BF0B92B590FE100A6C2B7 /* antiqua_intrinsics.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_intrinsics.h; sourceTree = "<group>"; };
 		9F56470B2BB9180200C0B94A /* shaders.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; path = shaders.metal; sourceTree = "<group>"; };
 		9F56470D2BBA819300C0B94A /* antiqua_render_group.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_render_group.h; sourceTree = "<group>"; };
 		9F6E25E32A7D7559006DF7A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9F7D54FB2BDC914800ADCC8B /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		9F7D54FF2BDCBC2600ADCC8B /* osx_audio.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_audio.m; sourceTree = "<group>"; };
+		9F7D55002BDCBC2600ADCC8B /* osx_renderer.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = osx_renderer.mm; sourceTree = "<group>"; };
+		9F7D55012BDCBC2600ADCC8B /* antiqua_math_generated.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_math_generated.h; sourceTree = "<group>"; };
+		9F7D55022BDCBC2600ADCC8B /* osx_dynamic_loader.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_dynamic_loader.m; sourceTree = "<group>"; };
+		9F7D55032BDCBC2600ADCC8B /* CustomWindowDelegate.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomWindowDelegate.m; sourceTree = "<group>"; };
+		9F7D55042BDCBC2600ADCC8B /* osx_input.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_input.m; sourceTree = "<group>"; };
+		9F7D55052BDCBC2600ADCC8B /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		9F7D55062BDCBC2600ADCC8B /* osx_lock.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_lock.m; sourceTree = "<group>"; };
+		9F7D55072BDCBC2600ADCC8B /* osx_time.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_time.m; sourceTree = "<group>"; };
 		9F8A97882B746643001AC5DB /* antiqua_random.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_random.h; sourceTree = "<group>"; };
 		9F8A97892B746643001AC5DB /* antiqua_math.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_math.h; sourceTree = "<group>"; };
 		9F8A978A2B746643001AC5DB /* antiqua_platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_platform.h; sourceTree = "<group>"; };
-		9F8AC8C42B0926B100AC9757 /* osx_lock.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_lock.m; sourceTree = "<group>"; };
 		9F8AC8C52B0926B100AC9757 /* osx_time.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_time.h; sourceTree = "<group>"; };
 		9F8AC8C62B0926B100AC9757 /* osx_lock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_lock.h; sourceTree = "<group>"; };
-		9F8AC8C72B0926B100AC9757 /* osx_dynamic_loader.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_dynamic_loader.m; sourceTree = "<group>"; };
 		9F8AC8C82B0926B100AC9757 /* osx_dynamic_loader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_dynamic_loader.h; sourceTree = "<group>"; };
-		9F8AC8C92B0926B100AC9757 /* osx_time.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_time.m; sourceTree = "<group>"; };
 		9FC718E42A7D5E44007ADAA1 /* antiqua.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = antiqua.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		9FC718F22A7D5E45007ADAA1 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		9FC718F42A7D5E45007ADAA1 /* antiqua.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = antiqua.entitlements; sourceTree = "<group>"; };
 		9FC719182A7D5F7E007ADAA1 /* CustomNSView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CustomNSView.h; sourceTree = "<group>"; };
-		9FCE027A2AD9174900BB84CA /* osx_audio.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_audio.m; sourceTree = "<group>"; };
-		9FCE027B2AD9174900BB84CA /* osx_input.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_input.m; sourceTree = "<group>"; };
-		9FCE027C2AD9174900BB84CA /* CustomNSView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomNSView.m; sourceTree = "<group>"; };
-		9FCE027D2AD9174900BB84CA /* antiqua.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = antiqua.m; sourceTree = "<group>"; };
-		9FCE027E2AD9174900BB84CA /* CustomWindowDelegate.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomWindowDelegate.m; sourceTree = "<group>"; };
+		9FCE027D2AD9174900BB84CA /* antiqua.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = antiqua.mm; sourceTree = "<group>"; };
 		9FCE02862AD918A500BB84CA /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
 		9FCE02882AD918AC00BB84CA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		9FCE028A2AD918B200BB84CA /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
@@ -79,6 +88,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9F7D54FC2BDC914800ADCC8B /* Metal.framework in Frameworks */,
 				9FCE02902AD918C500BB84CA /* IOKit.framework in Frameworks */,
 				9FCE028E2AD918BF00BB84CA /* CoreAudio.framework in Frameworks */,
 				9FCE028D2AD918B900BB84CA /* QuartzCore.framework in Frameworks */,
@@ -111,25 +121,26 @@
 		9FC718E62A7D5E44007ADAA1 /* antiqua */ = {
 			isa = PBXGroup;
 			children = (
+				9F7D55012BDCBC2600ADCC8B /* antiqua_math_generated.h */,
+				9F7D55032BDCBC2600ADCC8B /* CustomWindowDelegate.m */,
+				9F7D55052BDCBC2600ADCC8B /* main.m */,
+				9F7D54FF2BDCBC2600ADCC8B /* osx_audio.m */,
+				9F7D55022BDCBC2600ADCC8B /* osx_dynamic_loader.m */,
+				9F7D55042BDCBC2600ADCC8B /* osx_input.m */,
+				9F7D55062BDCBC2600ADCC8B /* osx_lock.m */,
+				9F7D55002BDCBC2600ADCC8B /* osx_renderer.mm */,
+				9F7D55072BDCBC2600ADCC8B /* osx_time.m */,
 				9F56470D2BBA819300C0B94A /* antiqua_render_group.h */,
 				9F56470B2BB9180200C0B94A /* shaders.metal */,
 				9F28AA722B9D88B7001A629A /* osx_renderer.h */,
-				9F28AA732B9D88B7001A629A /* osx_renderer.m */,
 				9F8A97892B746643001AC5DB /* antiqua_math.h */,
 				9F8A978A2B746643001AC5DB /* antiqua_platform.h */,
 				9F8A97882B746643001AC5DB /* antiqua_random.h */,
 				9F3BF0B92B590FE100A6C2B7 /* antiqua_intrinsics.h */,
 				9F8AC8C82B0926B100AC9757 /* osx_dynamic_loader.h */,
-				9F8AC8C72B0926B100AC9757 /* osx_dynamic_loader.m */,
 				9F8AC8C62B0926B100AC9757 /* osx_lock.h */,
-				9F8AC8C42B0926B100AC9757 /* osx_lock.m */,
 				9F8AC8C52B0926B100AC9757 /* osx_time.h */,
-				9F8AC8C92B0926B100AC9757 /* osx_time.m */,
-				9FCE027D2AD9174900BB84CA /* antiqua.m */,
-				9FCE027C2AD9174900BB84CA /* CustomNSView.m */,
-				9FCE027E2AD9174900BB84CA /* CustomWindowDelegate.m */,
-				9FCE027A2AD9174900BB84CA /* osx_audio.m */,
-				9FCE027B2AD9174900BB84CA /* osx_input.m */,
+				9FCE027D2AD9174900BB84CA /* antiqua.mm */,
 				9FD311F82AADA0A500C3A9EF /* antiqua.cpp */,
 				9FD311FA2AADA0A500C3A9EF /* antiqua.h */,
 				9FD311FD2AADA0A500C3A9EF /* osx_audio.h */,
@@ -139,7 +150,6 @@
 				9F6E25E32A7D7559006DF7A3 /* Info.plist */,
 				9FC719182A7D5F7E007ADAA1 /* CustomNSView.h */,
 				9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */,
-				9FC718F22A7D5E45007ADAA1 /* main.m */,
 				9FC718F42A7D5E45007ADAA1 /* antiqua.entitlements */,
 			);
 			path = antiqua;
@@ -148,6 +158,7 @@
 		9FD312012AADA5D900C3A9EF /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				9F7D54FB2BDC914800ADCC8B /* Metal.framework */,
 				9FCE028F2AD918C500BB84CA /* IOKit.framework */,
 				9FCE028C2AD918B900BB84CA /* QuartzCore.framework */,
 				9FCE028A2AD918B200BB84CA /* CoreVideo.framework */,
@@ -248,10 +259,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9F7D550B2BDCBC2600ADCC8B /* CustomWindowDelegate.m in Sources */,
+				9F7D55092BDCBC2600ADCC8B /* osx_renderer.mm in Sources */,
+				9F7D550A2BDCBC2600ADCC8B /* osx_dynamic_loader.m in Sources */,
 				9F56470C2BB9180200C0B94A /* shaders.metal in Sources */,
+				9F7D55082BDCBC2600ADCC8B /* osx_audio.m in Sources */,
+				9F7D550E2BDCBC2600ADCC8B /* osx_lock.m in Sources */,
+				9F7D550F2BDCBC2600ADCC8B /* osx_time.m in Sources */,
 				9FD311FE2AADA0A500C3A9EF /* antiqua.cpp in Sources */,
-				9FCE02832AD9174900BB84CA /* antiqua.m in Sources */,
-				9F28AA742B9D88B7001A629A /* osx_renderer.m in Sources */,
+				9FCE02832AD9174900BB84CA /* antiqua.mm in Sources */,
+				9F7D550D2BDCBC2600ADCC8B /* main.m in Sources */,
+				9F7D550C2BDCBC2600ADCC8B /* osx_input.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -418,6 +436,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = H2VL2PJ39X;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = antiqua/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
@@ -450,6 +469,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = H2VL2PJ39X;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = antiqua/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;

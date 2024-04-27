@@ -118,8 +118,9 @@ typedef UNLOCK_INPUT_THREAD(UnlockInputThread);
 typedef WAIT_IF_INPUT_BLOCKED(WaitIfInputBlocked);
 
 struct RenderGroup;
-//#define RENDER_ON_GPU(name) void name(struct RenderGroup *renderGroup)
-#define RENDER_ON_GPU(name) void name(r32 *uniforms, u32 uniformsSizeInBytes)
+#define INIT_RENDERER(name) void name(void *metalLayer)
+typedef INIT_RENDERER(InitRenderer);
+#define RENDER_ON_GPU(name) void name(ThreadContext *thread, struct RenderGroup *renderGroup)
 typedef RENDER_ON_GPU(RenderOnGpu);
 
 typedef struct

@@ -210,7 +210,7 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   layer.device = MTLCreateSystemDefaultDevice();
   self.layer = layer;
   self.layerContentsRedrawPolicy = NSViewLayerContentsRedrawOnSetNeedsDisplay;
-  InitRenderer(layer);
+  initRenderer(layer);
 
   [NSNotificationCenter.defaultCenter addObserver:self
                                       selector:@selector(frameDidChangeCallback:)
@@ -237,7 +237,7 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   // allocate physical memory
   // equivalent of VirtualAlloc(addr, size, MEM_COMMIT, PAGE_READWRITE) - except that memory is going to be committed on as-needed basis when we write to it
 #if ANTIQUA_INTERNAL
-  u64 baseAddress = GB(10);
+  u64 baseAddress = GB(1024);
   state.gameMemoryBlock = mmap((void *) baseAddress, state.totalMemorySize, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
   gameMemory.permanentStorage = state.gameMemoryBlock;
   msync((void *) baseAddress, gameMemory.permanentStorageSize, MS_SYNC | MS_INVALIDATE);

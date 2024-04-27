@@ -13,6 +13,7 @@ void initializeArena(MemoryArena *arena, MemoryIndex size, u8 *base)
 
 #define PUSH_STRUCT(arena, Type) (Type *) pushSize_(arena, sizeof(Type))
 #define PUSH_ARRAY(arena, count, Type) (Type *) pushSize_(arena, (count) * sizeof(Type))
+#define PUSH_SIZE(arena, size, Type) (Type *) pushSize_(arena, (size))
 void * pushSize_(MemoryArena *arena, MemoryIndex size)
 {
   ASSERT((arena->used + size) <= arena->size);
@@ -89,8 +90,6 @@ typedef struct
   MemoryArena worldArena;
   World *world;
 
-  u32 cameraFollowingEntityIndex;
-
   u32 playerIndexForController[1];
 
   u32 lowEntityCount;
@@ -99,9 +98,16 @@ typedef struct
   u32 highEntityCount;
   HighEntity highEntities_[256];
 
-  LoadedBitmap backdrop;
-  LoadedBitmap shadow;
-  HeroBitmaps heroBitmaps[4];
+  M44 worldMatrix;
+  M44 viewMatrix;
+  M44 projectionMatrix;
+
+  r32 cameraRotationSpeed;
+  r32 cameraMovementSpeed;
+  V3 cameraPosWorld;
+  V3 v;
+  V3 n;
+  V3 u;
 } GameState;
 
 #endif

@@ -1,21 +1,23 @@
 //
 #include "types.h"
 #include "osx_renderer.h"
+#include "antiqua_render_group.h"
 
 #import <Metal/MTLDevice.h>
 #import <Metal/MTLCommandQueue.h>
 #import <Metal/MTLCommandBuffer.h>
+#import <QuartzCore/CAMetalLayer.h>
 
 static id<MTLDevice> metalDevice;
 static id<MTLCommandQueue> commandQueue;
 static CAMetalLayer *layer;
 static id<MTLTexture> depthTex = 0;
 
-void InitRenderer(CAMetalLayer *_layer)
+MONExternC INIT_RENDERER(initRenderer)
 {
-    metalDevice = _layer.device;
+    metalDevice = ((CAMetalLayer *)metalLayer).device;
     commandQueue = [metalDevice newCommandQueue];
-    layer = _layer;
+    layer = (CAMetalLayer *)metalLayer;
 }
 
 MONExternC RENDER_ON_GPU(renderOnGpu)
@@ -178,10 +180,14 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                           offset: 0
                           attributeStride: 0
                           atIndex: 5];
-        [renderCommandEnc setVertexBytes: uniforms
-                          length: uniformsSizeInBytes
+        [renderCommandEnc setVertexBytes: &renderGroup->uniforms
+                          length: sizeof(renderGroup->uniforms)
                           attributeStride: 0
                           atIndex: 7];
+//        [renderCommandEnc setVertexBytes: mousePos
+//                          length: mousePosSizeInBytes
+//                          attributeStride: 0
+//                          atIndex: 8];
         [renderCommandEnc drawPrimitives:MTLPrimitiveTypeTriangle
                           vertexStart: 0
                           vertexCount: 36];

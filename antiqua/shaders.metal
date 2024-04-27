@@ -21,12 +21,13 @@ struct Uniforms
     float4x4 projectionMatrix;
 };
 
-[[vertex]] VertexOut vertexShader(
+vertex VertexOut vertexShader(
 							   const constant VertexIn * vertices [[buffer(5)]],
 							   const ushort vertexIndex [[vertex_id]],
-							   constant const Uniforms &uniforms [[buffer(7)]])
+							   constant const Uniforms &uniforms [[buffer(7)]],
+							   constant const float *mousePos [[buffer(8)]])
 {
-    const constant VertexIn & vData = vertices[vertexIndex];
+    const constant VertexIn &vData = vertices[vertexIndex];
 
     float4x4 worldMatrix = uniforms.worldMatrix;
     float4x4 viewMatrix = uniforms.viewMatrix;
@@ -40,6 +41,6 @@ struct Uniforms
     return ret;
 }
 
-[[fragment]] float4 fragmentShader(VertexOut in [[stage_in]]) {
+fragment float4 fragmentShader(VertexOut in [[stage_in]]) {
   return float4(in.color, 1.0f);
 }

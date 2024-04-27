@@ -4,7 +4,7 @@
 
 #import "osx_dynamic_loader.h"
 
-AntiquaCode gameCode = {0};
+AntiquaCode gameCode = {{0}};
 
 b32 loadGameCode(struct timespec newLastModified)
 {

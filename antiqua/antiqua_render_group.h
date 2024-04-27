@@ -7,34 +7,33 @@
 typedef enum
 {
     RenderGroupEntryType_RenderEntryClear,
-    RenderGroupEntryType_RenderEntryBitmap,
-    RenderGroupEntryType_RenderEntryRectangle,
-    RenderGroupEntryType_RenderEntryCoordinateSystem,
+    RenderGroupEntryType_RenderEntryMesh
 } RenderGroupEntryType;
 
-typedef struct
+typedef struct RenderGroupEntryHeader
 {
     RenderGroupEntryType type;
+    RenderGroupEntryHeader *next;
 } RenderGroupEntryHeader;
 
 typedef struct
 {
-    v4 color;
+    V4 color;
 } RenderEntryClear;
 
 typedef struct
 {
-    v4 color;
-    v2 p;
-    v2 dim;
-} RenderEntryRectangle;
+    r32 *data;
+    u32 size;
+} RenderEntryMesh;
 
-typedef struct
+typedef struct RenderGroup
 {
     u32 maxPushBufferSize;
     u32 pushBufferSize;
     u8 *pushBufferBase;
     u32 pushBufferElementCount;
+    M44 uniforms[3];
 } RenderGroup;
 
 #endif

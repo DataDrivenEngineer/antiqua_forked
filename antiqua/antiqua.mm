@@ -1,5 +1,5 @@
 #import "main.m"
-#import "osx_renderer.m"
+#import "osx_renderer.mm"
 #import "CustomNSView.m"
 #import "osx_audio.m"
 #import "osx_input.m"

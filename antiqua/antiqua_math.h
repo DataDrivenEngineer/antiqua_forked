@@ -6,6 +6,22 @@
 
 #include "antiqua_math_generated.h"
 
+// NOTE(dima): Operator override: multiply 4x4 matrix by 4x1 vector
+
+inline V4 operator*(M44 a, V4 b)
+{
+    V4 result;
+
+    M44 aT = transpose(&a);
+
+    result.x = dot(*aT[0], b);
+    result.y = dot(*aT[1], b);
+    result.z = dot(*aT[2], b);
+    result.w = dot(*aT[3], b);
+
+    return result;
+}
+
 // NOTE(dima): Inverse of 4x4 matrix
 
 inline r32 determinant(M44 *m)

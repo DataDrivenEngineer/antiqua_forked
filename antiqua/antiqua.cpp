@@ -2,6 +2,7 @@
 #include "types.h"
 #include "stdio.h"
 #include "antiqua_intrinsics.h"
+#include "antiqua_render_group.h"
 
 #if !XCODE_BUILD
 EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
@@ -17,6 +18,48 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     {
         // do initialization here as needed
 
+        gameState->worldMatrix = {1.0f, 0.0f, 0.0f, 0.0f,
+                                  0.0f, 1.0f, 0.0f, 0.0f,
+                                  0.0f, 0.0f, 1.0f, 0.0f,
+                                  0.0f, 0.0f, 0.0f, 1.0f};
+
+        r32 fov = 45.0f; //90.0f;
+        r32 tanHalfFov = tangent(RADIANS(fov / 2.0f));
+        r32 d = 1 / tanHalfFov;
+
+        r32 aspectRatio = 1000.0f / 700.0f;
+
+        r32 near = 1.0f;
+        r32 far = 100.0f;
+        r32 a = far / (far - near);
+        r32 b = (near * far) / (near - far);
+
+        gameState->projectionMatrix = {d / aspectRatio, 0.0f, 0.0f, 0.0f,
+                                       0.0f, d, 0.0f, 0.0f,
+                                       0.0f, 0.0f, a, 1.0f,
+                                       0.0f, 0.0f, b, 0.0f};
+
+        gameState->cameraRotationSpeed = 0.3f;
+        gameState->cameraMovementSpeed = 0.1f;
+
+        gameState->cameraPosWorld = v3(0.0f, 0.0f, -6.0f);
+        gameState->v = v3(0.0f, 1.0f, 0.0f);
+        gameState->n = v3(0.0f, 0.0f, 1.0f);
+        gameState->u = cross(gameState->n, gameState->v);
+
+#if 0
+        // NOTE(dima): rotate around vertical axis by 45 degrees
+        rotate(&gameState->n, gameState->v, 45.0f);
+
+        // NOTE(dima): rotate around horizontal axis by 45 degrees
+        u = cross(gameState->v, gameState->n);
+        normalize(&u);
+        rotate(&gameState->n->u, 45.0f);
+
+        gameState->v = cross(gameState->n, u);
+        normalize(&gameState->v);
+#endif
+
         memory->isInitialized = true;
     }
 
@@ -27,53 +70,114 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                     KB(256),
                     (u8 *) memory->transientStorage);
 
-    fprintf(stderr, "mouse x, y: %d, %d\n", gcInput->mouseX, gcInput->mouseY);
+    RenderGroup renderGroup = {0};
+    renderGroup.maxPushBufferSize = KB(128);
+    renderGroup.pushBufferBase = PUSH_SIZE(&renderGroupArena, renderGroup.maxPushBufferSize, u8);
 
-    M44 worldMatrix = {1.0f, 0.0f, 0.0f, 0.0f,
-                       0.0f, 1.0f, 0.0f, 0.0f,
-                       0.0f, 0.0f, 1.0f, 0.0f,
-                       0.0f, 0.0f, 0.0f, 1.0f};
+    RenderGroupEntryHeader *entryClearHeader = (RenderGroupEntryHeader *)renderGroup.pushBufferBase + renderGroup.pushBufferSize;
+    entryClearHeader->type = RenderGroupEntryType_RenderEntryClear;
+    renderGroup.pushBufferSize += sizeof(RenderGroupEntryHeader);
+    RenderEntryClear *entryClear = (RenderEntryClear *)renderGroup.pushBufferBase + renderGroup.pushBufferSize;
+    entryClear->color = { v4(0.0f, 1.0f, 0.0f, 1.0f) };
+    renderGroup.pushBufferSize += sizeof(RenderEntryClear);
+    entryClearHeader->next = (RenderGroupEntryHeader *)renderGroup.pushBufferBase + renderGroup.pushBufferSize;
 
-    r32 fov = 90.0f;
-    r32 tanHalfFov = tangent(RADIANS(fov / 2.0f));
-    r32 d = 1 / tanHalfFov;
+    if (gcInput->right.endedDown)
+    {
+        V3 u = cross(gameState->v, gameState->n);
+        normalize(&u);
+        gameState->cameraPosWorld = gameState->cameraPosWorld
+                                    + gameState->cameraMovementSpeed * u;
+    }
 
-    r32 aspectRatio = 1000.0f / 700.0f;
+    if (gcInput->left.endedDown)
+    {
+        V3 u = cross(gameState->n, gameState->v);
+        normalize(&u);
+        gameState->cameraPosWorld = gameState->cameraPosWorld
+                                    + gameState->cameraMovementSpeed * u;
+    }
 
-    r32 near = 1.0f;
-    r32 far = 100.0f;
-    r32 a = far / (far - near);
-    r32 b = (near * far) / (near - far);
+    if (gcInput->up.endedDown)
+    {
+        gameState->cameraPosWorld = gameState->cameraPosWorld
+                                    + gameState->cameraMovementSpeed * gameState->n;
+    }
 
-    M44 projectionMatrix = {d / aspectRatio, 0.0f, 0.0f, 0.0f,
-                            0.0f, d, 0.0f, 0.0f,
-                            0.0f, 0.0f, a, 1.0f,
-                            0.0f, 0.0f, b, 0.0f};
+    if (gcInput->down.endedDown)
+    {
+        gameState->cameraPosWorld = gameState->cameraPosWorld
+                                    - gameState->cameraMovementSpeed * gameState->n;
+    }
 
-    V3 cameraPos = v3(0.0f, 0.0f, -6.0f);
-    V3 u = v3(1.0f, 0.0f, 0.0f);
-    V3 v = v3(0.0f, 1.0f, 0.0f);
-    V3 n = v3(0.0f, 0.0f, 1.0f);
+//    fprintf(stderr, "mouse x, y: %d, %d\n", gcInput->mouseX, gcInput->mouseY);
+    static s32 mousePos[2] = {500, 350};
+    static r32 cameraVerticalAngle = 0.0f;
+    static r32 cameraHorizontalAngle = 0.0f;
+//    if (gcInput->mouseButtons[0].endedDown
+    if (true
+        && (gcInput->mouseX != mousePos[0] || gcInput->mouseY != mousePos[1]))
+    {
+        V3 v = v3(0.0f, 1.0f, 0.0f);
+        V3 n = v3(0.0f, 0.0f, 1.0f);
+//        V3 v = gameState->v;
+//        V3 n = gameState->n;
+        V3 u = cross(n, v);
 
-    // NOTE(dima): rotate around vertical axis by 45 degrees
-    rotate(&n, v, 45.0f);
+        r32 horizontalOffset = gcInput->mouseX - mousePos[0];
+        r32 verticalOffset = gcInput->mouseY - mousePos[1];
 
-    // NOTE(dima): rotate around horizontal axis by 45 degrees
-    u = cross(v, n);
-    normalize(&u);
-    rotate(&n, u, 45.0f);
+//        cameraVerticalAngle += verticalOffset / 10.0f;
+//        cameraHorizontalAngle += horizontalOffset / 20.0f;
+        cameraVerticalAngle += gameState->cameraRotationSpeed * verticalOffset; 
+        cameraHorizontalAngle += gameState->cameraRotationSpeed * horizontalOffset;
 
-    v = cross(n, u);
-    normalize(&v);
+        // NOTE(dima): rotate by horizontal angle around vertical axis
+        rotate(&n, v, cameraHorizontalAngle);
 
-    M44 viewMatrix = {u.x, v.x, n.x, 0.0f,
-                      u.y, v.y, n.y, 0.0f,
-                      u.z, v.z, n.z, 0.0f,
-                      -cameraPos.x, -cameraPos.y, -cameraPos.z, 1.0f};
+        // NOTE(dima): rotate by vertical angle around horizontal axis
+        u = cross(v, n);
+        normalize(&u);
+        rotate(&n, u, cameraVerticalAngle);
 
-    M44 uniforms[3] = { worldMatrix, viewMatrix, projectionMatrix };
+        v = cross(n, u);
+        normalize(&v);
 
-    memory->renderOnGpu((r32 *)uniforms, sizeof(uniforms));
+        gameState->n = n;
+        gameState->v = v;
+        gameState->u = u;
+
+        mousePos[0] = gcInput->mouseX;
+        mousePos[1] = gcInput->mouseY;
+    }
+
+    gameState->viewMatrix = {gameState->u.x, gameState->v.x, gameState->n.x, 0.0f,
+                             gameState->u.y, gameState->v.y, gameState->n.y, 0.0f,
+                             gameState->u.z, gameState->v.z, gameState->n.z, 0.0f,
+                             -gameState->cameraPosWorld.x,
+                             -gameState->cameraPosWorld.y,
+                             -gameState->cameraPosWorld.z,
+                             1.0f};
+
+//    r32 mouseX = mousePos[0];
+//    r32 mouseY = mousePos[1];
+//
+//    r32 xScale = 2.0f / 1000;
+//    r32 clipX = mouseX * xScale - 1.0f;
+//    r32 yScale = 2.0f / 700;
+//    r32 clipY = mouseY * yScale - 1.0f;
+//
+//    V4 clipPos = v4(clipX, clipY, near, 1.0f);
+//    M44 inverseProjectionMatrix = inverse(&projectionMatrix);
+//    M44 inverseViewMatrix = inverse(&viewMatrix);
+//    V4 mousePosNearPlaneWorld = inverseViewMatrix * inverseProjectionMatrix * clipPos;
+//    fprintf(stderr, "mousePosNearPlaneWorld - x y: %f %f\n", mousePosNearPlaneWorld.x, mousePosNearPlaneWorld.y);
+
+    renderGroup.uniforms[0] = gameState->worldMatrix;
+    renderGroup.uniforms[1] = gameState->viewMatrix;
+    renderGroup.uniforms[2] = gameState->projectionMatrix;
+
+    memory->renderOnGpu(0, &renderGroup);
 
     memory->waitIfInputBlocked(thread);
     memory->lockInputThread(thread);

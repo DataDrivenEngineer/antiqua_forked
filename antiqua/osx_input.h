@@ -10,7 +10,7 @@ extern IOHIDManagerRef ioHIDManager;
 
 b32 initControllerInput(void);
 IOReturn resetInput(void);
-RESET_INPUT_STATE_BUTTONS(resetInputStateButtons);
+MONExternC RESET_INPUT_STATE_BUTTONS(resetInputStateButtons);
 void resetInputStateAll(void);
 
 #endif

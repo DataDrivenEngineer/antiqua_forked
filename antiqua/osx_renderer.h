@@ -1,9 +1,7 @@
 //
-#ifndef osx_renderer_h
-#define osx_renderer_h
+#ifndef OSX_RENDERER_H
+#define OSX_RENDERER_H
 
-#include <QuartzCore/CAMetalLayer.h>
-
-void InitRenderer(CAMetalLayer *_layer);
+MONExternC INIT_RENDERER(initRenderer);
 
 #endif
