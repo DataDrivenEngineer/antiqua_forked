@@ -4,6 +4,8 @@
 #include "antiqua_intrinsics.h"
 #include "antiqua_render_group.h"
 
+#include "antiqua_render_group.cpp"
+
 #if !XCODE_BUILD
 EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #else
@@ -48,6 +50,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->u = cross(gameState->n, gameState->v);
 
 #if 0
+        // NOTE(dima): Below is isometric camera setup
         // NOTE(dima): rotate around vertical axis by 45 degrees
         rotate(&gameState->n, gameState->v, 45.0f);
 
@@ -74,13 +77,90 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     renderGroup.maxPushBufferSize = KB(128);
     renderGroup.pushBufferBase = PUSH_SIZE(&renderGroupArena, renderGroup.maxPushBufferSize, u8);
 
-    RenderGroupEntryHeader *entryClearHeader = (RenderGroupEntryHeader *)renderGroup.pushBufferBase + renderGroup.pushBufferSize;
-    entryClearHeader->type = RenderGroupEntryType_RenderEntryClear;
-    renderGroup.pushBufferSize += sizeof(RenderGroupEntryHeader);
-    RenderEntryClear *entryClear = (RenderEntryClear *)renderGroup.pushBufferBase + renderGroup.pushBufferSize;
-    entryClear->color = { v4(0.0f, 1.0f, 0.0f, 1.0f) };
-    renderGroup.pushBufferSize += sizeof(RenderEntryClear);
-    entryClearHeader->next = (RenderGroupEntryHeader *)renderGroup.pushBufferBase + renderGroup.pushBufferSize;
+    pushRenderEntryClear(&renderGroup, v3(0.3f, 0.3f, 0.3f));
+    pushRenderEntryLine(&renderGroup, v3(1.0f, 0.0f, 0.0f), v3(0.75f, 0.75f, 0.5f), v3(1.25f, 1.25f, 0.5f));
+    r32 vertices[] =
+    {
+        // front face
+        -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
+        1.0f, 0.0f, 0.0f, // color = red
+        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
+        1.0f, 0.0f, 0.0f, // color = red
+        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
+        1.0f, 0.0f, 0.0f, // color = red
+        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
+        1.0f, 0.0f, 0.0f, // color = red
+        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
+        1.0f, 0.0f, 0.0f, // color = red
+        -0.5f, 0.5f, 0.0f, // vertex #0 - coordinates
+        1.0f, 0.0f, 0.0f, // color = red
+        // back face
+        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
+        0.0f, 1.0f, 0.0f, // color = green
+        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
+        0.0f, 1.0f, 0.0f, // color = green
+        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
+        0.0f, 1.0f, 0.0f, // color = green
+        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
+        0.0f, 1.0f, 0.0f, // color = green
+        0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
+        0.0f, 1.0f, 0.0f, // color = green
+        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
+        0.0f, 1.0f, 0.0f, // color = green
+        // left face
+        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
+        0.0f, 0.0f, 1.0f, // color = blue
+        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
+        0.0f, 0.0f, 1.0f, // color = blue
+        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
+        0.0f, 0.0f, 1.0f, // color = blue
+        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
+        0.0f, 0.0f, 1.0f, // color = blue
+        -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
+        0.0f, 0.0f, 1.0f, // color = blue
+        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
+        0.0f, 0.0f, 1.0f, // color = blue
+        // right face
+        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
+        1.0f, 0.4f, 0.0f, // color = orange
+        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
+        1.0f, 0.4f, 0.0f, // color = orange
+        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
+        1.0f, 0.4f, 0.0f, // color = orange
+        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
+        1.0f, 0.4f, 0.0f, // color = orange
+        0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
+        1.0f, 0.4f, 0.0f, // color = orange
+        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
+        1.0f, 0.4f, 0.0f, // color = orange
+        // top face
+        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
+        1.0f, 0.0f, 1.0f, // color = purple
+        -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
+        1.0f, 0.0f, 1.0f, // color = purple
+        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
+        1.0f, 0.0f, 1.0f, // color = purple
+        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
+        1.0f, 0.0f, 1.0f, // color = purple
+        0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
+        1.0f, 0.0f, 1.0f, // color = purple
+        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
+        1.0f, 0.0f, 1.0f, // color = purple
+        // bottom face
+        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
+        0.0f, 1.0f, 1.0f, // color = cyan
+        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
+        0.0f, 1.0f, 1.0f, // color = cyan
+        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
+        0.0f, 1.0f, 1.0f, // color = cyan
+        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
+        0.0f, 1.0f, 1.0f, // color = cyan
+        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
+        0.0f, 1.0f, 1.0f, // color = cyan
+        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
+        0.0f, 1.0f, 1.0f, // color = cyan
+    };
+    pushRenderEntryMesh(&renderGroup, vertices, ARRAY_COUNT(vertices));
 
     if (gcInput->right.endedDown)
     {
@@ -120,15 +200,11 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     {
         V3 v = v3(0.0f, 1.0f, 0.0f);
         V3 n = v3(0.0f, 0.0f, 1.0f);
-//        V3 v = gameState->v;
-//        V3 n = gameState->n;
         V3 u = cross(n, v);
 
         r32 horizontalOffset = gcInput->mouseX - mousePos[0];
         r32 verticalOffset = gcInput->mouseY - mousePos[1];
 
-//        cameraVerticalAngle += verticalOffset / 10.0f;
-//        cameraHorizontalAngle += horizontalOffset / 20.0f;
         cameraVerticalAngle += gameState->cameraRotationSpeed * verticalOffset; 
         cameraHorizontalAngle += gameState->cameraRotationSpeed * horizontalOffset;
 
@@ -151,27 +227,40 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         mousePos[1] = gcInput->mouseY;
     }
 
-    gameState->viewMatrix = {gameState->u.x, gameState->v.x, gameState->n.x, 0.0f,
+    M44 translationComponent = {1.0f, 0.0f, 0.0f, 0.0f,
+                                0.0f, 1.0f, 0.0f, 0.0f,
+                                0.0f, 0.0f, 1.0f, 0.0f,
+                                -gameState->cameraPosWorld.x,
+                                -gameState->cameraPosWorld.y,
+                                -gameState->cameraPosWorld.z,
+                                1.0f};
+    M44 rotationComponent = {gameState->u.x, gameState->v.x, gameState->n.x, 0.0f,
                              gameState->u.y, gameState->v.y, gameState->n.y, 0.0f,
                              gameState->u.z, gameState->v.z, gameState->n.z, 0.0f,
-                             -gameState->cameraPosWorld.x,
-                             -gameState->cameraPosWorld.y,
-                             -gameState->cameraPosWorld.z,
+                             0.0f,
+                             0.0f,
+                             0.0f,
                              1.0f};
 
-//    r32 mouseX = mousePos[0];
-//    r32 mouseY = mousePos[1];
-//
-//    r32 xScale = 2.0f / 1000;
-//    r32 clipX = mouseX * xScale - 1.0f;
-//    r32 yScale = 2.0f / 700;
-//    r32 clipY = mouseY * yScale - 1.0f;
-//
-//    V4 clipPos = v4(clipX, clipY, near, 1.0f);
-//    M44 inverseProjectionMatrix = inverse(&projectionMatrix);
-//    M44 inverseViewMatrix = inverse(&viewMatrix);
-//    V4 mousePosNearPlaneWorld = inverseViewMatrix * inverseProjectionMatrix * clipPos;
-//    fprintf(stderr, "mousePosNearPlaneWorld - x y: %f %f\n", mousePosNearPlaneWorld.x, mousePosNearPlaneWorld.y);
+    gameState->viewMatrix = rotationComponent * translationComponent;
+
+
+#if 0
+    // NOTE(dima): WIP ray tracing
+    r32 mouseX = mousePos[0];
+    r32 mouseY = mousePos[1];
+
+    r32 xScale = 2.0f / 1000;
+    r32 clipX = mouseX * xScale - 1.0f;
+    r32 yScale = 2.0f / 700;
+    r32 clipY = mouseY * yScale - 1.0f;
+
+    V4 clipPos = v4(clipX, clipY, near, 1.0f);
+    M44 inverseProjectionMatrix = inverse(&projectionMatrix);
+    M44 inverseViewMatrix = inverse(&viewMatrix);
+    V4 mousePosNearPlaneWorld = inverseViewMatrix * inverseProjectionMatrix * clipPos;
+    fprintf(stderr, "mousePosNearPlaneWorld - x y: %f %f\n", mousePosNearPlaneWorld.x, mousePosNearPlaneWorld.y);
+#endif
 
     renderGroup.uniforms[0] = gameState->worldMatrix;
     renderGroup.uniforms[1] = gameState->viewMatrix;

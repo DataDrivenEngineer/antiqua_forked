@@ -24,179 +24,241 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
 {
     @autoreleasepool
     {
-        NSURL *libraryURL = [[NSBundle mainBundle] URLForResource:@"shaders"
-                                                   withExtension:@"metallib"];
-        ASSERT(libraryURL != 0);
-
-        id<MTLLibrary> lib = [metalDevice newLibraryWithURL:libraryURL
-                              error:0];
-        ASSERT(lib != 0);
-
-        id<MTLFunction> vertexFn = [lib newFunctionWithName:@"vertexShader"];
-        id<MTLFunction> fragmentFn = [lib newFunctionWithName:@"fragmentShader"];
-
-        MTLRenderPipelineDescriptor *renderPipelineDesc = [[MTLRenderPipelineDescriptor alloc] init];
-        renderPipelineDesc.vertexFunction = vertexFn;
-        renderPipelineDesc.fragmentFunction = fragmentFn;
-        renderPipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
-        renderPipelineDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
-
-        id<MTLRenderPipelineState> renderPipelineState = [metalDevice newRenderPipelineStateWithDescriptor:renderPipelineDesc
-                                                          error:0];
-        ASSERT(renderPipelineState != 0);
-
-        [lib release];
-        [vertexFn release];
-        [fragmentFn release];
-        [renderPipelineDesc release];
-
         id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
-
         id<CAMetalDrawable> drawable = [layer nextDrawable];
 
-        MTLRenderPassDescriptor *renderPassDesc = [MTLRenderPassDescriptor renderPassDescriptor];
-        renderPassDesc.colorAttachments[0].texture = drawable.texture;
-        renderPassDesc.colorAttachments[0].loadAction = MTLLoadActionClear;
-        renderPassDesc.colorAttachments[0].clearColor = MTLClearColorMake(0.3f, 0.3f, 0.3f, 1.0f);
-
-        if (!depthTex ||
-            layer.drawableSize.width != depthTex.width ||
-            layer.drawableSize.height != depthTex.height)
+        RenderGroupEntryHeader *EntryHeader = (RenderGroupEntryHeader *)renderGroup->pushBufferBase;
+        id<MTLBuffer> vertexBuffer = 0;
+        id<MTLRenderPipelineState> renderPipelineState = 0;
+        id<MTLDepthStencilState> depthStencilState = 0;
+        while (EntryHeader)
         {
-            if (depthTex)
+            switch (EntryHeader->type)
             {
-                [depthTex release];
+                case RenderGroupEntryType_RenderEntryClear:
+                {
+                    RenderEntryClear *Entry = (RenderEntryClear *)(EntryHeader + 1);
+                    MTLRenderPassDescriptor *renderPassDesc =
+                        [MTLRenderPassDescriptor renderPassDescriptor];
+                    renderPassDesc.colorAttachments[0].texture = drawable.texture;
+                    renderPassDesc.colorAttachments[0].loadAction = MTLLoadActionClear;
+                    renderPassDesc.colorAttachments[0].clearColor =
+                        MTLClearColorMake(Entry->color.x,
+                                          Entry->color.y,
+                                          Entry->color.z,
+                                          Entry->color.w);
+
+                    id<MTLRenderCommandEncoder> renderCommandEnc =
+                        [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
+
+                    [renderCommandEnc endEncoding];
+
+                    break;
+                }
+                case RenderGroupEntryType_RenderEntryLine:
+                {
+                    RenderEntryLine *Entry = (RenderEntryLine *)(EntryHeader + 1);
+
+                    NSURL *libraryURL = [[NSBundle mainBundle] URLForResource:@"shaders"
+                                                               withExtension:@"metallib"];
+                    ASSERT(libraryURL != 0);
+
+                    id<MTLLibrary> lib = [metalDevice newLibraryWithURL:libraryURL
+                                          error:0];
+                    ASSERT(lib != 0);
+
+                    id<MTLFunction> vertexFn = [lib newFunctionWithName:@"vertexShader"];
+                    id<MTLFunction> fragmentFn = [lib newFunctionWithName:@"fragmentShader"];
+
+                    MTLRenderPipelineDescriptor *renderPipelineDesc =
+                        [[MTLRenderPipelineDescriptor alloc] init];
+                    renderPipelineDesc.vertexFunction = vertexFn;
+                    renderPipelineDesc.fragmentFunction = fragmentFn;
+                    renderPipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+                    renderPipelineDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+
+                    renderPipelineState =
+                        [metalDevice newRenderPipelineStateWithDescriptor:renderPipelineDesc
+                                     error:0];
+                    ASSERT(renderPipelineState != 0);
+
+                    [lib release];
+                    [vertexFn release];
+                    [fragmentFn release];
+                    [renderPipelineDesc release];
+
+                    MTLRenderPassDescriptor *renderPassDesc =
+                        [MTLRenderPassDescriptor renderPassDescriptor];
+                    renderPassDesc.colorAttachments[0].texture = drawable.texture;
+                    renderPassDesc.colorAttachments[0].loadAction = MTLLoadActionLoad;
+
+                    if (!depthTex ||
+                        layer.drawableSize.width != depthTex.width ||
+                        layer.drawableSize.height != depthTex.height)
+                    {
+                        if (depthTex)
+                        {
+                            [depthTex release];
+                        }
+                        MTLTextureDescriptor *depthTexDesc =
+                            [MTLTextureDescriptor
+                             texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                             width:layer.drawableSize.width
+                             height:layer.drawableSize.height
+                             mipmapped:NO];
+                        depthTexDesc.usage = MTLTextureUsageRenderTarget
+                                             | MTLTextureUsageShaderRead;
+                        depthTex = [metalDevice newTextureWithDescriptor:depthTexDesc];
+                    }
+                    renderPassDesc.depthAttachment.texture = depthTex;
+                    renderPassDesc.depthAttachment.loadAction = MTLLoadActionClear;
+                    renderPassDesc.depthAttachment.storeAction = MTLStoreActionStore;
+                    renderPassDesc.depthAttachment.clearDepth = 1.0f;
+
+                    MTLDepthStencilDescriptor *depthStencilDesc = [[MTLDepthStencilDescriptor alloc] init];
+                    depthStencilDesc.depthWriteEnabled = true;
+                    depthStencilDesc.depthCompareFunction = MTLCompareFunctionLess;
+                    depthStencilState =
+                        [metalDevice newDepthStencilStateWithDescriptor:depthStencilDesc];
+                    [depthStencilDesc release];
+
+                    r32 vertices[2 * 3 * 2];
+                    memcpy(vertices, (void*)&Entry->start, sizeof(Entry->start));
+                    memcpy(vertices + 3, (void*)&Entry->color, sizeof(Entry->color));
+                    memcpy(vertices + 6, (void*)&Entry->end, sizeof(Entry->end));
+                    memcpy(vertices + 9, (void*)&Entry->color, sizeof(Entry->color));
+                    vertexBuffer = [metalDevice newBufferWithBytes:vertices
+                                        length:sizeof(r32) * ARRAY_COUNT(vertices)
+                                        options:MTLResourceStorageModeShared];
+
+                    id<MTLRenderCommandEncoder> renderCommandEnc =
+                        [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
+                    [renderCommandEnc setRenderPipelineState:renderPipelineState];
+                    [renderCommandEnc setDepthStencilState:depthStencilState];
+                    [renderCommandEnc setVertexBuffer: vertexBuffer 
+                                      offset: 0
+                                      attributeStride: 0
+                                      atIndex: 5];
+                    [renderCommandEnc setVertexBytes: &renderGroup->uniforms
+                                      length: sizeof(renderGroup->uniforms)
+                                      attributeStride: 0
+                                      atIndex: 7];
+                    [renderCommandEnc drawPrimitives:MTLPrimitiveTypeLine
+                                      vertexStart: 0
+                                      vertexCount: 2];
+                    [renderCommandEnc endEncoding];
+                    break;
+                }
+                case RenderGroupEntryType_RenderEntryMesh:
+                {
+                    RenderEntryMesh *Entry = (RenderEntryMesh *)(EntryHeader + 1);
+
+                    NSURL *libraryURL = [[NSBundle mainBundle] URLForResource:@"shaders"
+                                                               withExtension:@"metallib"];
+                    ASSERT(libraryURL != 0);
+
+                    id<MTLLibrary> lib = [metalDevice newLibraryWithURL:libraryURL
+                                          error:0];
+                    ASSERT(lib != 0);
+
+                    id<MTLFunction> vertexFn = [lib newFunctionWithName:@"vertexShader"];
+                    id<MTLFunction> fragmentFn = [lib newFunctionWithName:@"fragmentShader"];
+
+                    MTLRenderPipelineDescriptor *renderPipelineDesc =
+                        [[MTLRenderPipelineDescriptor alloc] init];
+                    renderPipelineDesc.vertexFunction = vertexFn;
+                    renderPipelineDesc.fragmentFunction = fragmentFn;
+                    renderPipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+                    renderPipelineDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+
+                    renderPipelineState =
+                        [metalDevice newRenderPipelineStateWithDescriptor:renderPipelineDesc
+                                     error:0];
+                    ASSERT(renderPipelineState != 0);
+
+                    [lib release];
+                    [vertexFn release];
+                    [fragmentFn release];
+                    [renderPipelineDesc release];
+
+                    MTLRenderPassDescriptor *renderPassDesc =
+                        [MTLRenderPassDescriptor renderPassDescriptor];
+                    renderPassDesc.colorAttachments[0].texture = drawable.texture;
+                    renderPassDesc.colorAttachments[0].loadAction = MTLLoadActionLoad;
+
+                    if (!depthTex ||
+                        layer.drawableSize.width != depthTex.width ||
+                        layer.drawableSize.height != depthTex.height)
+                    {
+                        if (depthTex)
+                        {
+                            [depthTex release];
+                        }
+                        MTLTextureDescriptor *depthTexDesc =
+                            [MTLTextureDescriptor
+                             texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                             width:layer.drawableSize.width
+                             height:layer.drawableSize.height
+                             mipmapped:NO];
+                        depthTexDesc.usage = MTLTextureUsageRenderTarget
+                                             | MTLTextureUsageShaderRead;
+                        depthTex = [metalDevice newTextureWithDescriptor:depthTexDesc];
+                    }
+                    renderPassDesc.depthAttachment.texture = depthTex;
+                    renderPassDesc.depthAttachment.loadAction = MTLLoadActionClear;
+                    renderPassDesc.depthAttachment.storeAction = MTLStoreActionStore;
+                    renderPassDesc.depthAttachment.clearDepth = 1.0f;
+
+                    MTLDepthStencilDescriptor *depthStencilDesc = [[MTLDepthStencilDescriptor alloc] init];
+                    depthStencilDesc.depthWriteEnabled = true;
+                    depthStencilDesc.depthCompareFunction = MTLCompareFunctionLess;
+                    depthStencilState =
+                        [metalDevice newDepthStencilStateWithDescriptor:depthStencilDesc];
+                    [depthStencilDesc release];
+
+                    vertexBuffer = [metalDevice newBufferWithBytes:Entry->data 
+                                                  length:Entry->size
+                                                  options:MTLResourceStorageModeShared];
+
+                    id<MTLRenderCommandEncoder> renderCommandEnc =
+                        [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
+                    [renderCommandEnc setRenderPipelineState:renderPipelineState];
+                    [renderCommandEnc setDepthStencilState:depthStencilState];
+                    [renderCommandEnc setVertexBuffer: vertexBuffer 
+                                      offset: 0
+                                      attributeStride: 0
+                                      atIndex: 5];
+                    [renderCommandEnc setVertexBytes: &renderGroup->uniforms
+                                      length: sizeof(renderGroup->uniforms)
+                                      attributeStride: 0
+                                      atIndex: 7];
+                    [renderCommandEnc drawPrimitives:MTLPrimitiveTypeTriangle
+                                      vertexStart: 0
+                                      vertexCount: 36];
+                    [renderCommandEnc endEncoding];
+                    break;
+                }
+                default:
+                    break;
             }
-            MTLTextureDescriptor *depthTexDesc = [MTLTextureDescriptor
-                                                  texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
-                                                  width:layer.drawableSize.width
-                                                  height:layer.drawableSize.height
-                                                  mipmapped:NO];
-            depthTexDesc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
-            depthTex = [metalDevice newTextureWithDescriptor:depthTexDesc];
+
+            if (renderPipelineState)
+            {
+                [renderPipelineState release];
+            }
+            if (depthStencilState)
+            {
+                [depthStencilState release];
+            }
+            if (vertexBuffer)
+            {
+                [vertexBuffer release];
+            }
+
+            EntryHeader = EntryHeader->next;
         }
-        renderPassDesc.depthAttachment.texture = depthTex;
-        renderPassDesc.depthAttachment.loadAction = MTLLoadActionClear;
-        renderPassDesc.depthAttachment.storeAction = MTLStoreActionStore;
-        renderPassDesc.depthAttachment.clearDepth = 1.0f;
 
-        MTLDepthStencilDescriptor *depthStencilDesc = [[MTLDepthStencilDescriptor alloc] init];
-        depthStencilDesc.depthWriteEnabled = true;
-        depthStencilDesc.depthCompareFunction = MTLCompareFunctionLess;
-        id<MTLDepthStencilState> depthStencilState = [metalDevice newDepthStencilStateWithDescriptor:depthStencilDesc];
-        [depthStencilDesc release];
-
-        r32 vertices[] =
-        {
-            // front face
-            -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
-            1.0f, 0.0f, 0.0f, // color = red
-            -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
-            1.0f, 0.0f, 0.0f, // color = red
-            0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-            1.0f, 0.0f, 0.0f, // color = red
-            0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-            1.0f, 0.0f, 0.0f, // color = red
-            0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-            1.0f, 0.0f, 0.0f, // color = red
-            -0.5f, 0.5f, 0.0f, // vertex #0 - coordinates
-            1.0f, 0.0f, 0.0f, // color = red
-            // back face
-            -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-            0.0f, 1.0f, 0.0f, // color = green
-            -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
-            0.0f, 1.0f, 0.0f, // color = green
-            0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-            0.0f, 1.0f, 0.0f, // color = green
-            0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-            0.0f, 1.0f, 0.0f, // color = green
-            0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
-            0.0f, 1.0f, 0.0f, // color = green
-            -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-            0.0f, 1.0f, 0.0f, // color = green
-            // left face
-            -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-            0.0f, 0.0f, 1.0f, // color = blue
-            -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
-            0.0f, 0.0f, 1.0f, // color = blue
-            -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
-            0.0f, 0.0f, 1.0f, // color = blue
-            -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
-            0.0f, 0.0f, 1.0f, // color = blue
-            -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
-            0.0f, 0.0f, 1.0f, // color = blue
-            -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-            0.0f, 0.0f, 1.0f, // color = blue
-            // right face
-            0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-            1.0f, 0.4f, 0.0f, // color = orange
-            0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-            1.0f, 0.4f, 0.0f, // color = orange
-            0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-            1.0f, 0.4f, 0.0f, // color = orange
-            0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-            1.0f, 0.4f, 0.0f, // color = orange
-            0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
-            1.0f, 0.4f, 0.0f, // color = orange
-            0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-            1.0f, 0.4f, 0.0f, // color = orange
-            // top face
-            -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-            1.0f, 0.0f, 1.0f, // color = purple
-            -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
-            1.0f, 0.0f, 1.0f, // color = purple
-            0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-            1.0f, 0.0f, 1.0f, // color = purple
-            0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-            1.0f, 0.0f, 1.0f, // color = purple
-            0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
-            1.0f, 0.0f, 1.0f, // color = purple
-            -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-            1.0f, 0.0f, 1.0f, // color = purple
-            // bottom face
-            -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
-            0.0f, 1.0f, 1.0f, // color = cyan
-            -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
-            0.0f, 1.0f, 1.0f, // color = cyan
-            0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-            0.0f, 1.0f, 1.0f, // color = cyan
-            0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-            0.0f, 1.0f, 1.0f, // color = cyan
-            0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-            0.0f, 1.0f, 1.0f, // color = cyan
-            -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
-            0.0f, 1.0f, 1.0f, // color = cyan
-        };
-
-        id<MTLBuffer> vertexBuffer = [metalDevice newBufferWithBytes:vertices 
-                                     length:sizeof(r32) * ARRAY_COUNT(vertices)
-                                     options:MTLResourceStorageModeShared];
-
-        id<MTLRenderCommandEncoder> renderCommandEnc = [commandBuffer
-                                                        renderCommandEncoderWithDescriptor:renderPassDesc];
-        [renderCommandEnc setRenderPipelineState:renderPipelineState];
-        [renderCommandEnc setDepthStencilState:depthStencilState];
-        [renderCommandEnc setVertexBuffer: vertexBuffer 
-                          offset: 0
-                          attributeStride: 0
-                          atIndex: 5];
-        [renderCommandEnc setVertexBytes: &renderGroup->uniforms
-                          length: sizeof(renderGroup->uniforms)
-                          attributeStride: 0
-                          atIndex: 7];
-//        [renderCommandEnc setVertexBytes: mousePos
-//                          length: mousePosSizeInBytes
-//                          attributeStride: 0
-//                          atIndex: 8];
-        [renderCommandEnc drawPrimitives:MTLPrimitiveTypeTriangle
-                          vertexStart: 0
-                          vertexCount: 36];
-        [renderCommandEnc endEncoding];
         [commandBuffer presentDrawable:drawable];
         [commandBuffer commit];
-
-        [renderPipelineState release];
-        [depthStencilState release];
-        [vertexBuffer release];
     }
 }

@@ -17,6 +17,7 @@
 		9F7D550D2BDCBC2600ADCC8B /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D55052BDCBC2600ADCC8B /* main.m */; };
 		9F7D550E2BDCBC2600ADCC8B /* osx_lock.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D55062BDCBC2600ADCC8B /* osx_lock.m */; };
 		9F7D550F2BDCBC2600ADCC8B /* osx_time.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D55072BDCBC2600ADCC8B /* osx_time.m */; };
+		9F7D55112BE9771700ADCC8B /* antiqua_render_group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D55102BE9771700ADCC8B /* antiqua_render_group.cpp */; };
 		9FC718EE2A7D5E45007ADAA1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */; };
 		9FC7191C2A7D608E007ADAA1 /* antiqua.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = 9FC718E42A7D5E44007ADAA1 /* antiqua.app */; };
 		9FCE02832AD9174900BB84CA /* antiqua.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9FCE027D2AD9174900BB84CA /* antiqua.mm */; };
@@ -59,6 +60,7 @@
 		9F7D55052BDCBC2600ADCC8B /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		9F7D55062BDCBC2600ADCC8B /* osx_lock.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_lock.m; sourceTree = "<group>"; };
 		9F7D55072BDCBC2600ADCC8B /* osx_time.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = osx_time.m; sourceTree = "<group>"; };
+		9F7D55102BE9771700ADCC8B /* antiqua_render_group.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = antiqua_render_group.cpp; sourceTree = "<group>"; };
 		9F8A97882B746643001AC5DB /* antiqua_random.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_random.h; sourceTree = "<group>"; };
 		9F8A97892B746643001AC5DB /* antiqua_math.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_math.h; sourceTree = "<group>"; };
 		9F8A978A2B746643001AC5DB /* antiqua_platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = antiqua_platform.h; sourceTree = "<group>"; };
@@ -131,6 +133,7 @@
 				9F7D55002BDCBC2600ADCC8B /* osx_renderer.mm */,
 				9F7D55072BDCBC2600ADCC8B /* osx_time.m */,
 				9F56470D2BBA819300C0B94A /* antiqua_render_group.h */,
+				9F7D55102BE9771700ADCC8B /* antiqua_render_group.cpp */,
 				9F56470B2BB9180200C0B94A /* shaders.metal */,
 				9F28AA722B9D88B7001A629A /* osx_renderer.h */,
 				9F8A97892B746643001AC5DB /* antiqua_math.h */,
@@ -262,6 +265,7 @@
 				9F7D550B2BDCBC2600ADCC8B /* CustomWindowDelegate.m in Sources */,
 				9F7D55092BDCBC2600ADCC8B /* osx_renderer.mm in Sources */,
 				9F7D550A2BDCBC2600ADCC8B /* osx_dynamic_loader.m in Sources */,
+				9F7D55112BE9771700ADCC8B /* antiqua_render_group.cpp in Sources */,
 				9F56470C2BB9180200C0B94A /* shaders.metal in Sources */,
 				9F7D55082BDCBC2600ADCC8B /* osx_audio.m in Sources */,
 				9F7D550E2BDCBC2600ADCC8B /* osx_lock.m in Sources */,
