@@ -12,6 +12,11 @@ EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
 UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #endif
 {
+    /* TODO(dima):
+       - render a point at the center of the screen
+       - implement ray casting through the center of the screen; draw line to visualize ray
+       - finish implementing movement of isometric camera with WASD
+     */
     ASSERT(&gcInput->terminator - &gcInput->buttons[0] == ARRAY_COUNT(gcInput->buttons));
     ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
 
@@ -25,26 +30,10 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                                   0.0f, 0.0f, 1.0f, 0.0f,
                                   0.0f, 0.0f, 0.0f, 1.0f};
 
-        r32 fov = 45.0f; //90.0f;
-        r32 tanHalfFov = tangent(RADIANS(fov / 2.0f));
-        r32 d = 1 / tanHalfFov;
-
-        r32 aspectRatio = 1000.0f / 700.0f;
-
-        r32 near = 1.0f;
-        r32 far = 100.0f;
-        r32 a = far / (far - near);
-        r32 b = (near * far) / (near - far);
-
-        gameState->projectionMatrix = {d / aspectRatio, 0.0f, 0.0f, 0.0f,
-                                       0.0f, d, 0.0f, 0.0f,
-                                       0.0f, 0.0f, a, 1.0f,
-                                       0.0f, 0.0f, b, 0.0f};
-
         gameState->cameraRotationSpeed = 0.3f;
         gameState->cameraMovementSpeed = 0.1f;
 
-        gameState->cameraPosWorld = v3(0.0f, 0.0f, -6.0f);
+        gameState->cameraPosWorld = v3(-2.5f, 2.0f, -1.5f);
         gameState->v = v3(0.0f, 1.0f, 0.0f);
         gameState->n = v3(0.0f, 0.0f, 1.0f);
         gameState->u = cross(gameState->n, gameState->v);
@@ -55,11 +44,11 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         rotate(&gameState->n, gameState->v, 45.0f);
 
         // NOTE(dima): rotate around horizontal axis by 45 degrees
-        u = cross(gameState->v, gameState->n);
-        normalize(&u);
-        rotate(&gameState->n->u, 45.0f);
+        gameState->u = cross(gameState->v, gameState->n);
+        normalize(&gameState->u);
+        rotate(&gameState->n, gameState->u, 45.0f);
 
-        gameState->v = cross(gameState->n, u);
+        gameState->v = cross(gameState->n, gameState->u);
         normalize(&gameState->v);
 #endif
 
@@ -187,6 +176,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                                     + gameState->cameraMovementSpeed * u;
     }
 
+#if 1
     if (gcInput->up.endedDown)
     {
         gameState->cameraPosWorld = gameState->cameraPosWorld
@@ -198,6 +188,19 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->cameraPosWorld = gameState->cameraPosWorld
                                     - gameState->cameraMovementSpeed * gameState->n;
     }
+#else
+    if (gcInput->up.endedDown)
+    {
+        gameState->cameraPosWorld = gameState->cameraPosWorld
+                                    + gameState->cameraMovementSpeed * v3(gameState->v.x, 0.0f, gameState->v.z);
+    }
+
+    if (gcInput->down.endedDown)
+    {
+        gameState->cameraPosWorld = gameState->cameraPosWorld
+                                    - gameState->cameraMovementSpeed * v3(gameState->v.x, 0.0f, gameState->v.z);
+    }
+#endif
 
 //    fprintf(stderr, "mouse x, y: %d, %d\n", gcInput->mouseX, gcInput->mouseY);
     static s32 mousePos[2] = {500, 350};
@@ -253,7 +256,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
     gameState->viewMatrix = rotationComponent * translationComponent;
 
-
 #if 0
     // NOTE(dima): WIP ray tracing
     r32 mouseX = mousePos[0];
@@ -273,7 +275,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
     renderGroup.uniforms[0] = gameState->worldMatrix;
     renderGroup.uniforms[1] = gameState->viewMatrix;
-    renderGroup.uniforms[2] = gameState->projectionMatrix;
 
     memory->renderOnGpu(0, &renderGroup);
 

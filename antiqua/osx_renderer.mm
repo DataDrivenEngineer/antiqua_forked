@@ -84,6 +84,25 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
            - do not have a standalone clear entry
            - do not store depth / color texture after the last render entry */
 
+        // NOTE(dima): creating projection matrix
+        {
+            r32 fov = 45.0f; //90.0f;
+            r32 tanHalfFov = tangent(RADIANS(fov / 2.0f));
+            r32 d = 1 / tanHalfFov;
+
+            r32 aspectRatio = layer.drawableSize.width / layer.drawableSize.height;
+
+            r32 near = 1.0f;
+            r32 far = 100.0f;
+            r32 a = far / (far - near);
+            r32 b = (near * far) / (near - far);
+
+            renderGroup->uniforms[2] = {d / aspectRatio, 0.0f, 0.0f, 0.0f,
+                                           0.0f, d, 0.0f, 0.0f,
+                                           0.0f, 0.0f, a, 1.0f,
+                                           0.0f, 0.0f, b, 0.0f};
+        }
+
         renderGroupBufferCurrentSize = 0;
 
         id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
