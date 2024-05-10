@@ -67,18 +67,19 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     }
 
     MemoryArena renderGroupArena;
-    MemoryIndex renderGroupArenaSize = KB(256);
+    u64 renderGroupArenaSize = KB(256);
     ASSERT(renderGroupArenaSize <= memory->transientStorageSize);
     initializeArena(&renderGroupArena,
                     KB(256),
                     (u8 *) memory->transientStorage);
 
     RenderGroup renderGroup = {0};
-    renderGroup.maxPushBufferSize = KB(128);
-    renderGroup.pushBufferBase = PUSH_SIZE(&renderGroupArena, renderGroup.maxPushBufferSize, u8);
+    renderGroup.maxPushBufferSize = renderGroupArenaSize;
+    renderGroup.pushBufferBase = renderGroupArena.base;
 
-    pushRenderEntryClear(&renderGroup, v3(0.3f, 0.3f, 0.3f));
-    pushRenderEntryLine(&renderGroup, v3(1.0f, 0.0f, 0.0f), v3(0.75f, 0.75f, 0.5f), v3(1.25f, 1.25f, 0.5f));
+    pushRenderEntryClear(&renderGroupArena,
+                         &renderGroup,
+                         v3(0.3f, 0.3f, 0.3f));
     r32 vertices[] =
     {
         // front face
@@ -160,7 +161,15 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
         0.0f, 1.0f, 1.0f, // color = cyan
     };
-    pushRenderEntryMesh(&renderGroup, vertices, ARRAY_COUNT(vertices));
+    pushRenderEntryLine(&renderGroupArena,
+                        &renderGroup,
+                        v3(1.0f, 0.0f, 0.0f),
+                        v3(0.75f, 0.75f, 0.5f),
+                        v3(1.25f, 1.25f, 0.5f));
+    pushRenderEntryMesh(&renderGroupArena,
+                        &renderGroup,
+                        vertices,
+                        ARRAY_COUNT(vertices));
 
     if (gcInput->right.endedDown)
     {

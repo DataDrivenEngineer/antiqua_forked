@@ -14,6 +14,8 @@ static CAMetalLayer *layer;
 static id<MTLTexture> depthTex = 0;
 static id<MTLRenderPipelineState> renderPipelineStates[5];
 static id<MTLDepthStencilState> depthStencilState;
+static id<MTLBuffer> renderGroupBuffer;
+static u32 renderGroupBufferCurrentSize;
 
 MONExternC INIT_RENDERER(initRenderer)
 {
@@ -65,17 +67,28 @@ MONExternC INIT_RENDERER(initRenderer)
 
         [depthStencilDesc release];
     }
+
+    // NOTE(dima): creating GPU buffer for render group
+    {
+        renderGroupBuffer = [metalDevice newBufferWithLength:KB(256)
+                                    options:MTLResourceStorageModeShared];
+    }
 }
 
 MONExternC RENDER_ON_GPU(renderOnGpu)
 {
     @autoreleasepool
     {
+        /* TODO(dima): warnings to address:
+           - do not have a standalone clear entry
+           - do not store depth / color texture after the last render entry */
+
+        renderGroupBufferCurrentSize = 0;
+
         id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
         id<CAMetalDrawable> drawable = [layer nextDrawable];
 
         RenderGroupEntryHeader *EntryHeader = (RenderGroupEntryHeader *)renderGroup->pushBufferBase;
-        id<MTLBuffer> vertexBuffer = 0;
         while (EntryHeader)
         {
             switch (EntryHeader->type)
@@ -116,6 +129,11 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                         if (depthTex)
                         {
                             [depthTex release];
+                            renderPassDesc.depthAttachment.loadAction = MTLLoadActionLoad;
+                        }
+                        else
+                        {
+                            renderPassDesc.depthAttachment.loadAction = MTLLoadActionClear;
                         }
                         MTLTextureDescriptor *depthTexDesc =
                             [MTLTextureDescriptor
@@ -128,25 +146,32 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                         depthTex = [metalDevice newTextureWithDescriptor:depthTexDesc];
                     }
                     renderPassDesc.depthAttachment.texture = depthTex;
-                    renderPassDesc.depthAttachment.loadAction = MTLLoadActionClear;
                     renderPassDesc.depthAttachment.storeAction = MTLStoreActionStore;
                     renderPassDesc.depthAttachment.clearDepth = 1.0f;
 
+                    u8 *bufferContents = (u8 *)[renderGroupBuffer contents];
                     r32 vertices[2 * 3 * 2];
                     memcpy(vertices, (void*)&Entry->start, sizeof(Entry->start));
                     memcpy(vertices + 3, (void*)&Entry->color, sizeof(Entry->color));
                     memcpy(vertices + 6, (void*)&Entry->end, sizeof(Entry->end));
                     memcpy(vertices + 9, (void*)&Entry->color, sizeof(Entry->color));
-                    vertexBuffer = [metalDevice newBufferWithBytes:vertices
-                                        length:sizeof(r32) * ARRAY_COUNT(vertices)
-                                        options:MTLResourceStorageModeShared];
+
+                    u8 *renderGroupBufferDestStart = ((u8 *)[renderGroupBuffer contents])
+                                                     + renderGroupBufferCurrentSize;
+                    u8 sizeOfData = sizeof(r32) * ARRAY_COUNT(vertices); 
+                    memcpy(renderGroupBufferDestStart,
+                           vertices,
+                           sizeOfData);
+                    renderGroupBufferCurrentSize += sizeOfData;
+                    u32 renderGroupBufferOffset = renderGroupBufferDestStart
+                                               - ((u8 *)[renderGroupBuffer contents]);
 
                     id<MTLRenderCommandEncoder> renderCommandEnc =
                         [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
                     [renderCommandEnc setRenderPipelineState:renderPipelineStates[0]];
                     [renderCommandEnc setDepthStencilState:depthStencilState];
-                    [renderCommandEnc setVertexBuffer: vertexBuffer 
-                                      offset: 0
+                    [renderCommandEnc setVertexBuffer: renderGroupBuffer 
+                                      offset: renderGroupBufferOffset 
                                       attributeStride: 0
                                       atIndex: 5];
                     [renderCommandEnc setVertexBytes: &renderGroup->uniforms
@@ -175,6 +200,11 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                         if (depthTex)
                         {
                             [depthTex release];
+                            renderPassDesc.depthAttachment.loadAction = MTLLoadActionLoad;
+                        }
+                        else
+                        {
+                            renderPassDesc.depthAttachment.loadAction = MTLLoadActionClear;
                         }
                         MTLTextureDescriptor *depthTexDesc =
                             [MTLTextureDescriptor
@@ -187,27 +217,23 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                         depthTex = [metalDevice newTextureWithDescriptor:depthTexDesc];
                     }
                     renderPassDesc.depthAttachment.texture = depthTex;
-                    renderPassDesc.depthAttachment.loadAction = MTLLoadActionClear;
                     renderPassDesc.depthAttachment.storeAction = MTLStoreActionStore;
                     renderPassDesc.depthAttachment.clearDepth = 1.0f;
 
-                    MTLDepthStencilDescriptor *depthStencilDesc = [[MTLDepthStencilDescriptor alloc] init];
-                    depthStencilDesc.depthWriteEnabled = true;
-                    depthStencilDesc.depthCompareFunction = MTLCompareFunctionLess;
-                    depthStencilState =
-                        [metalDevice newDepthStencilStateWithDescriptor:depthStencilDesc];
-                    [depthStencilDesc release];
-
-                    vertexBuffer = [metalDevice newBufferWithBytes:Entry->data 
-                                                  length:Entry->size
-                                                  options:MTLResourceStorageModeShared];
+                    u8 *renderGroupBufferDestStart = ((u8 *)[renderGroupBuffer contents]) + renderGroupBufferCurrentSize;
+                    memcpy(renderGroupBufferDestStart,
+                           Entry->data,
+                           Entry->size);
+                    renderGroupBufferCurrentSize += Entry->size;
+                    u32 renderGroupBufferOffset = renderGroupBufferDestStart
+                                               - ((u8 *)[renderGroupBuffer contents]);
 
                     id<MTLRenderCommandEncoder> renderCommandEnc =
                         [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
                     [renderCommandEnc setRenderPipelineState:renderPipelineStates[0]];
                     [renderCommandEnc setDepthStencilState:depthStencilState];
-                    [renderCommandEnc setVertexBuffer: vertexBuffer 
-                                      offset: 0
+                    [renderCommandEnc setVertexBuffer: renderGroupBuffer 
+                                      offset: renderGroupBufferOffset
                                       attributeStride: 0
                                       atIndex: 5];
                     [renderCommandEnc setVertexBytes: &renderGroup->uniforms
@@ -222,11 +248,6 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                 }
                 default:
                     break;
-            }
-
-            if (vertexBuffer)
-            {
-                [vertexBuffer release];
             }
 
             EntryHeader = EntryHeader->next;

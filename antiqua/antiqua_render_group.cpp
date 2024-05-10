@@ -2,14 +2,18 @@
 
 #include "antiqua_render_group.h"
 
-void pushRenderEntryClear(RenderGroup *renderGroup, V3 color)
+void pushRenderEntryClear(MemoryArena *arena,
+                          RenderGroup *renderGroup,
+                          V3 color)
 {
     ASSERT(renderGroup->pushBufferElementCount == 0);
 
-    RenderGroupEntryHeader *entryHeader = (RenderGroupEntryHeader *)(renderGroup->pushBufferBase + renderGroup->pushBufferSize);
+    RenderGroupEntryHeader *entryHeader =
+        (RenderGroupEntryHeader *)PUSH_STRUCT(arena, RenderGroupEntryHeader);
     entryHeader->type = RenderGroupEntryType_RenderEntryClear;
     renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
-    RenderEntryClear *entry = (RenderEntryClear *)(renderGroup->pushBufferBase + renderGroup->pushBufferSize);
+    RenderEntryClear *entry =
+        (RenderEntryClear *)PUSH_STRUCT(arena, RenderEntryClear);
     entry->color = v4(color, 1.0f);
     renderGroup->pushBufferSize += sizeof(RenderEntryClear);
     renderGroup->pushBufferElementCount++;
@@ -21,14 +25,19 @@ void pushRenderEntryClear(RenderGroup *renderGroup, V3 color)
     renderGroup->prevHeader = entryHeader;
 }
 
-void pushRenderEntryLine(RenderGroup *renderGroup, V3 color, V3 start, V3 end)
+void pushRenderEntryLine(MemoryArena *arena,
+                         RenderGroup *renderGroup,
+                         V3 color,
+                         V3 start,
+                         V3 end)
 {
     ASSERT(renderGroup->pushBufferElementCount > 0);
 
-    RenderGroupEntryHeader *entryHeader = (RenderGroupEntryHeader *)(renderGroup->pushBufferBase + renderGroup->pushBufferSize);
+    RenderGroupEntryHeader *entryHeader =
+        (RenderGroupEntryHeader *)PUSH_STRUCT(arena, RenderGroupEntryHeader);
     entryHeader->type = RenderGroupEntryType_RenderEntryLine;
     renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
-    RenderEntryLine *entry = (RenderEntryLine *)(renderGroup->pushBufferBase + renderGroup->pushBufferSize);
+    RenderEntryLine *entry = (RenderEntryLine *)PUSH_STRUCT(arena, RenderEntryLine);
     // NOTE(dima): 3 floats (start) + 3 floats (start color) + 3 floats (end) + 3 floats (end color)
     entry->color = color;
     entry->start = start;
@@ -41,16 +50,21 @@ void pushRenderEntryLine(RenderGroup *renderGroup, V3 color, V3 start, V3 end)
     entryHeader->next = 0;
 }
 
-void pushRenderEntryMesh(RenderGroup *renderGroup, r32 *vertices, u32 totalCountOfElementsInArray)
+void pushRenderEntryMesh(MemoryArena *arena,
+                         RenderGroup *renderGroup,
+                         r32 *vertices,
+                         u32 totalCountOfElementsInArray)
 {
     ASSERT(renderGroup->pushBufferElementCount > 0);
 
-    RenderGroupEntryHeader *entryHeader = (RenderGroupEntryHeader *)(renderGroup->pushBufferBase + renderGroup->pushBufferSize);
+    RenderGroupEntryHeader *entryHeader =
+        (RenderGroupEntryHeader *)PUSH_STRUCT(arena, RenderGroupEntryHeader);
     entryHeader->type = RenderGroupEntryType_RenderEntryMesh;
     renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
-    RenderEntryMesh *entry = (RenderEntryMesh *)(renderGroup->pushBufferBase + renderGroup->pushBufferSize);
-    entry->data = vertices;
+    RenderEntryMesh *entry =
+        (RenderEntryMesh *)(PUSH_STRUCT(arena, RenderEntryMesh));
     entry->size = sizeof(r32) * totalCountOfElementsInArray;
+    entry->data = vertices;
     renderGroup->pushBufferSize += sizeof(RenderEntryMesh);
     renderGroup->pushBufferElementCount++;
 

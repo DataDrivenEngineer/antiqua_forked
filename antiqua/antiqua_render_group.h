@@ -32,10 +32,10 @@ typedef struct
 
 typedef struct
 {
+    u32 size;
     /* NOTE(dima): colors are packed together with vertices,
                    like this: [vertex color vertex color] */
     r32 *data;
-    u32 size;
 } RenderEntryMesh;
 
 typedef struct RenderGroup
