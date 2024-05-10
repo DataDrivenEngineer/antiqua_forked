@@ -12,12 +12,59 @@ static id<MTLDevice> metalDevice;
 static id<MTLCommandQueue> commandQueue;
 static CAMetalLayer *layer;
 static id<MTLTexture> depthTex = 0;
+static id<MTLRenderPipelineState> renderPipelineStates[5];
+static id<MTLDepthStencilState> depthStencilState;
 
 MONExternC INIT_RENDERER(initRenderer)
 {
     metalDevice = ((CAMetalLayer *)metalLayer).device;
     commandQueue = [metalDevice newCommandQueue];
     layer = (CAMetalLayer *)metalLayer;
+
+    // NOTE(dima): creating render pipeline states
+    NSURL *libraryURL = [[NSBundle mainBundle] URLForResource:@"shaders"
+                                               withExtension:@"metallib"];
+    ASSERT(libraryURL != 0);
+
+    id<MTLLibrary> lib = [metalDevice newLibraryWithURL:libraryURL
+                          error:0];
+    ASSERT(lib != 0);
+
+    {
+        id<MTLFunction> vertexFn = [lib newFunctionWithName:@"vertexShader"];
+        id<MTLFunction> fragmentFn = [lib newFunctionWithName:@"fragmentShader"];
+
+        MTLRenderPipelineDescriptor *renderPipelineDesc =
+            [[MTLRenderPipelineDescriptor alloc] init];
+        renderPipelineDesc.vertexFunction = vertexFn;
+        renderPipelineDesc.fragmentFunction = fragmentFn;
+        renderPipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+        renderPipelineDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+
+        id<MTLRenderPipelineState> renderPipelineState =
+            [metalDevice newRenderPipelineStateWithDescriptor:renderPipelineDesc
+                         error:0];
+        ASSERT(renderPipelineState != 0);
+
+        [lib release];
+        [vertexFn release];
+        [fragmentFn release];
+        [renderPipelineDesc release];
+
+        renderPipelineStates[0] = renderPipelineState;
+    }
+
+    // NOTE(dima): creating depth stencil state
+    {
+        MTLDepthStencilDescriptor *depthStencilDesc = [[MTLDepthStencilDescriptor alloc] init];
+        depthStencilDesc.depthWriteEnabled = true;
+        depthStencilDesc.depthCompareFunction = MTLCompareFunctionLess;
+        depthStencilState =
+            [metalDevice newDepthStencilStateWithDescriptor:depthStencilDesc];
+        ASSERT(depthStencilState != 0);
+
+        [depthStencilDesc release];
+    }
 }
 
 MONExternC RENDER_ON_GPU(renderOnGpu)
@@ -29,8 +76,6 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
 
         RenderGroupEntryHeader *EntryHeader = (RenderGroupEntryHeader *)renderGroup->pushBufferBase;
         id<MTLBuffer> vertexBuffer = 0;
-        id<MTLRenderPipelineState> renderPipelineState = 0;
-        id<MTLDepthStencilState> depthStencilState = 0;
         while (EntryHeader)
         {
             switch (EntryHeader->type)
@@ -58,34 +103,6 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                 case RenderGroupEntryType_RenderEntryLine:
                 {
                     RenderEntryLine *Entry = (RenderEntryLine *)(EntryHeader + 1);
-
-                    NSURL *libraryURL = [[NSBundle mainBundle] URLForResource:@"shaders"
-                                                               withExtension:@"metallib"];
-                    ASSERT(libraryURL != 0);
-
-                    id<MTLLibrary> lib = [metalDevice newLibraryWithURL:libraryURL
-                                          error:0];
-                    ASSERT(lib != 0);
-
-                    id<MTLFunction> vertexFn = [lib newFunctionWithName:@"vertexShader"];
-                    id<MTLFunction> fragmentFn = [lib newFunctionWithName:@"fragmentShader"];
-
-                    MTLRenderPipelineDescriptor *renderPipelineDesc =
-                        [[MTLRenderPipelineDescriptor alloc] init];
-                    renderPipelineDesc.vertexFunction = vertexFn;
-                    renderPipelineDesc.fragmentFunction = fragmentFn;
-                    renderPipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
-                    renderPipelineDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
-
-                    renderPipelineState =
-                        [metalDevice newRenderPipelineStateWithDescriptor:renderPipelineDesc
-                                     error:0];
-                    ASSERT(renderPipelineState != 0);
-
-                    [lib release];
-                    [vertexFn release];
-                    [fragmentFn release];
-                    [renderPipelineDesc release];
 
                     MTLRenderPassDescriptor *renderPassDesc =
                         [MTLRenderPassDescriptor renderPassDescriptor];
@@ -115,13 +132,6 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                     renderPassDesc.depthAttachment.storeAction = MTLStoreActionStore;
                     renderPassDesc.depthAttachment.clearDepth = 1.0f;
 
-                    MTLDepthStencilDescriptor *depthStencilDesc = [[MTLDepthStencilDescriptor alloc] init];
-                    depthStencilDesc.depthWriteEnabled = true;
-                    depthStencilDesc.depthCompareFunction = MTLCompareFunctionLess;
-                    depthStencilState =
-                        [metalDevice newDepthStencilStateWithDescriptor:depthStencilDesc];
-                    [depthStencilDesc release];
-
                     r32 vertices[2 * 3 * 2];
                     memcpy(vertices, (void*)&Entry->start, sizeof(Entry->start));
                     memcpy(vertices + 3, (void*)&Entry->color, sizeof(Entry->color));
@@ -133,7 +143,7 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
 
                     id<MTLRenderCommandEncoder> renderCommandEnc =
                         [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
-                    [renderCommandEnc setRenderPipelineState:renderPipelineState];
+                    [renderCommandEnc setRenderPipelineState:renderPipelineStates[0]];
                     [renderCommandEnc setDepthStencilState:depthStencilState];
                     [renderCommandEnc setVertexBuffer: vertexBuffer 
                                       offset: 0
@@ -152,34 +162,6 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                 case RenderGroupEntryType_RenderEntryMesh:
                 {
                     RenderEntryMesh *Entry = (RenderEntryMesh *)(EntryHeader + 1);
-
-                    NSURL *libraryURL = [[NSBundle mainBundle] URLForResource:@"shaders"
-                                                               withExtension:@"metallib"];
-                    ASSERT(libraryURL != 0);
-
-                    id<MTLLibrary> lib = [metalDevice newLibraryWithURL:libraryURL
-                                          error:0];
-                    ASSERT(lib != 0);
-
-                    id<MTLFunction> vertexFn = [lib newFunctionWithName:@"vertexShader"];
-                    id<MTLFunction> fragmentFn = [lib newFunctionWithName:@"fragmentShader"];
-
-                    MTLRenderPipelineDescriptor *renderPipelineDesc =
-                        [[MTLRenderPipelineDescriptor alloc] init];
-                    renderPipelineDesc.vertexFunction = vertexFn;
-                    renderPipelineDesc.fragmentFunction = fragmentFn;
-                    renderPipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
-                    renderPipelineDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
-
-                    renderPipelineState =
-                        [metalDevice newRenderPipelineStateWithDescriptor:renderPipelineDesc
-                                     error:0];
-                    ASSERT(renderPipelineState != 0);
-
-                    [lib release];
-                    [vertexFn release];
-                    [fragmentFn release];
-                    [renderPipelineDesc release];
 
                     MTLRenderPassDescriptor *renderPassDesc =
                         [MTLRenderPassDescriptor renderPassDescriptor];
@@ -222,7 +204,7 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
 
                     id<MTLRenderCommandEncoder> renderCommandEnc =
                         [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
-                    [renderCommandEnc setRenderPipelineState:renderPipelineState];
+                    [renderCommandEnc setRenderPipelineState:renderPipelineStates[0]];
                     [renderCommandEnc setDepthStencilState:depthStencilState];
                     [renderCommandEnc setVertexBuffer: vertexBuffer 
                                       offset: 0
@@ -242,14 +224,6 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                     break;
             }
 
-            if (renderPipelineState)
-            {
-                [renderPipelineState release];
-            }
-            if (depthStencilState)
-            {
-                [depthStencilState release];
-            }
             if (vertexBuffer)
             {
                 [vertexBuffer release];
