@@ -72,6 +72,7 @@ MONExternC INIT_RENDERER(initRenderer)
     {
         renderGroupBuffer = [metalDevice newBufferWithLength:KB(256)
                                     options:MTLResourceStorageModeShared];
+        ASSERT(renderGroupBuffer != 0);
     }
 }
 
