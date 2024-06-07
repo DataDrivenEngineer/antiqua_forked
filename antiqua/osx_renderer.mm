@@ -56,6 +56,30 @@ MONExternC INIT_RENDERER(initRenderer)
         renderPipelineStates[0] = renderPipelineState;
     }
 
+    {
+        id<MTLFunction> vertexFn = [lib newFunctionWithName:@"vertexShaderTile"];
+        id<MTLFunction> fragmentFn = [lib newFunctionWithName:@"fragmentShaderTile"];
+
+        MTLRenderPipelineDescriptor *renderPipelineDesc =
+            [[MTLRenderPipelineDescriptor alloc] init];
+        renderPipelineDesc.vertexFunction = vertexFn;
+        renderPipelineDesc.fragmentFunction = fragmentFn;
+        renderPipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+        renderPipelineDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+
+        id<MTLRenderPipelineState> renderPipelineState =
+            [metalDevice newRenderPipelineStateWithDescriptor:renderPipelineDesc
+                         error:0];
+        ASSERT(renderPipelineState != 0);
+
+        [lib release];
+        [vertexFn release];
+        [fragmentFn release];
+        [renderPipelineDesc release];
+
+        renderPipelineStates[1] = renderPipelineState;
+    }
+
     // NOTE(dima): creating depth stencil state
     {
         MTLDepthStencilDescriptor *depthStencilDesc = [[MTLDepthStencilDescriptor alloc] init];
@@ -85,6 +109,7 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
            - do not store depth / color texture after the last render entry */
 
         // NOTE(dima): creating projection matrix
+        r32 near = 1.0f;
         {
             r32 fov = 45.0f; //90.0f;
             r32 tanHalfFov = tangent(RADIANS(fov / 2.0f));
@@ -92,7 +117,6 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
 
             r32 aspectRatio = layer.drawableSize.width / layer.drawableSize.height;
 
-            r32 near = 1.0f;
             r32 far = 100.0f;
             r32 a = far / (far - near);
             r32 b = (near * far) / (near - far);
@@ -133,6 +157,81 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
 
                     break;
                 }
+                case RenderGroupEntryType_RenderEntryPoint:
+                {
+                    RenderEntryPoint *Entry = (RenderEntryPoint *)(EntryHeader + 1);
+                    MTLRenderPassDescriptor *renderPassDesc =
+                        [MTLRenderPassDescriptor renderPassDescriptor];
+                    renderPassDesc.colorAttachments[0].texture = drawable.texture;
+                    renderPassDesc.colorAttachments[0].loadAction = MTLLoadActionLoad;
+
+                    if (!depthTex ||
+                        layer.drawableSize.width != depthTex.width ||
+                        layer.drawableSize.height != depthTex.height)
+                    {
+                        if (depthTex)
+                        {
+                            [depthTex release];
+                            renderPassDesc.depthAttachment.loadAction = MTLLoadActionLoad;
+                        }
+                        else
+                        {
+                            renderPassDesc.depthAttachment.loadAction = MTLLoadActionClear;
+                        }
+                        MTLTextureDescriptor *depthTexDesc =
+                            [MTLTextureDescriptor
+                             texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                             width:layer.drawableSize.width
+                             height:layer.drawableSize.height
+                             mipmapped:NO];
+                        depthTexDesc.usage = MTLTextureUsageRenderTarget
+                                             | MTLTextureUsageShaderRead;
+                        depthTex = [metalDevice newTextureWithDescriptor:depthTexDesc];
+                    }
+                    renderPassDesc.depthAttachment.texture = depthTex;
+                    renderPassDesc.depthAttachment.storeAction = MTLStoreActionStore;
+                    renderPassDesc.depthAttachment.clearDepth = 1.0f;
+
+                    r32 vertices[3 * 2];
+                    V4 pointPosCamera = v4(0.0f, 0.0f, near + 0.001f, 1.0f);
+                    M44 inverseViewMatrix = inverse(&renderGroup->uniforms[1]);
+                    V4 pointPosNearPlaneWorld = inverseViewMatrix
+                                                * pointPosCamera;
+                    V3 pointPosNearPlaneWorldV3 = v3(pointPosNearPlaneWorld.x,
+                                                   pointPosNearPlaneWorld.y,
+                                                   pointPosNearPlaneWorld.z);
+                    memcpy(vertices, (void*)&pointPosNearPlaneWorldV3, sizeof(V3));
+                    memcpy(vertices + 3, (void*)&Entry->color, sizeof(Entry->color));
+
+                    u8 *renderGroupBufferDestStart = ((u8 *)[renderGroupBuffer contents])
+                                                     + renderGroupBufferCurrentSize;
+                    u8 sizeOfData = sizeof(r32) * ARRAY_COUNT(vertices); 
+                    memcpy(renderGroupBufferDestStart,
+                           vertices,
+                           sizeOfData);
+                    renderGroupBufferCurrentSize += sizeOfData;
+                    u32 renderGroupBufferOffset = renderGroupBufferDestStart
+                                               - ((u8 *)[renderGroupBuffer contents]);
+
+                    id<MTLRenderCommandEncoder> renderCommandEnc =
+                        [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
+                    [renderCommandEnc setRenderPipelineState:renderPipelineStates[0]];
+                    [renderCommandEnc setDepthStencilState:depthStencilState];
+                    [renderCommandEnc setVertexBuffer: renderGroupBuffer 
+                                      offset: renderGroupBufferOffset 
+                                      attributeStride: 0
+                                      atIndex: 5];
+                    [renderCommandEnc setVertexBytes: &renderGroup->uniforms
+                                      length: sizeof(renderGroup->uniforms)
+                                      attributeStride: 0
+                                      atIndex: 7];
+                    [renderCommandEnc drawPrimitives:MTLPrimitiveTypePoint
+                                      vertexStart: 0
+                                      vertexCount: 1];
+                    [renderCommandEnc endEncoding];
+
+                    break;
+                }
                 case RenderGroupEntryType_RenderEntryLine:
                 {
                     RenderEntryLine *Entry = (RenderEntryLine *)(EntryHeader + 1);
@@ -169,7 +268,6 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                     renderPassDesc.depthAttachment.storeAction = MTLStoreActionStore;
                     renderPassDesc.depthAttachment.clearDepth = 1.0f;
 
-                    u8 *bufferContents = (u8 *)[renderGroupBuffer contents];
                     r32 vertices[2 * 3 * 2];
                     memcpy(vertices, (void*)&Entry->start, sizeof(Entry->start));
                     memcpy(vertices + 3, (void*)&Entry->color, sizeof(Entry->color));
@@ -263,6 +361,86 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                     [renderCommandEnc drawPrimitives:MTLPrimitiveTypeTriangle
                                       vertexStart: 0
                                       vertexCount: 36];
+                    [renderCommandEnc endEncoding];
+                    break;
+                }
+                case RenderGroupEntryType_RenderEntryTile:
+                {
+                    RenderEntryTile *Entry = (RenderEntryTile *)(EntryHeader + 1);
+
+                    MTLRenderPassDescriptor *renderPassDesc =
+                        [MTLRenderPassDescriptor renderPassDescriptor];
+                    renderPassDesc.colorAttachments[0].texture = drawable.texture;
+                    renderPassDesc.colorAttachments[0].loadAction = MTLLoadActionLoad;
+
+                    if (!depthTex ||
+                        layer.drawableSize.width != depthTex.width ||
+                        layer.drawableSize.height != depthTex.height)
+                    {
+                        if (depthTex)
+                        {
+                            [depthTex release];
+                            renderPassDesc.depthAttachment.loadAction = MTLLoadActionLoad;
+                        }
+                        else
+                        {
+                            renderPassDesc.depthAttachment.loadAction = MTLLoadActionClear;
+                        }
+                        MTLTextureDescriptor *depthTexDesc =
+                            [MTLTextureDescriptor
+                             texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                             width:layer.drawableSize.width
+                             height:layer.drawableSize.height
+                             mipmapped:NO];
+                        depthTexDesc.usage = MTLTextureUsageRenderTarget
+                                             | MTLTextureUsageShaderRead;
+                        depthTex = [metalDevice newTextureWithDescriptor:depthTexDesc];
+                    }
+                    renderPassDesc.depthAttachment.texture = depthTex;
+                    renderPassDesc.depthAttachment.storeAction = MTLStoreActionStore;
+                    renderPassDesc.depthAttachment.clearDepth = 1.0f;
+
+                    u8 *renderGroupBufferDestStart = ((u8 *)[renderGroupBuffer contents]) + renderGroupBufferCurrentSize;
+                    u32 currSize = 0;
+                    memcpy(renderGroupBufferDestStart,
+                           (void *)&Entry->tileCountPerSide,
+                           sizeof(Entry->tileCountPerSide));
+                    currSize += sizeof(Entry->tileCountPerSide);
+                    memcpy(renderGroupBufferDestStart + currSize,
+                           (void *)&Entry->tileSideLength,
+                           sizeof(Entry->tileSideLength));
+                    currSize += sizeof(Entry->tileSideLength);
+                    memcpy(renderGroupBufferDestStart + currSize,
+                           (void *)&Entry->color,
+                           sizeof(Entry->color));
+                    currSize += sizeof(Entry->color);
+                    memcpy(renderGroupBufferDestStart + currSize,
+                           (void *)&Entry->originTileCenterPositionWorld,
+                           sizeof(Entry->originTileCenterPositionWorld));
+                    currSize += sizeof(Entry->originTileCenterPositionWorld);
+
+                    renderGroupBufferCurrentSize += currSize;
+                    u32 renderGroupBufferOffset = renderGroupBufferDestStart
+                                               - ((u8 *)[renderGroupBuffer contents]);
+
+                    id<MTLRenderCommandEncoder> renderCommandEnc =
+                        [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
+                    [renderCommandEnc setTriangleFillMode:MTLTriangleFillModeLines];
+                    [renderCommandEnc setRenderPipelineState:renderPipelineStates[1]];
+                    [renderCommandEnc setDepthStencilState:depthStencilState];
+                    [renderCommandEnc setVertexBuffer: renderGroupBuffer 
+                                      offset: renderGroupBufferOffset
+                                      attributeStride: 0
+                                      atIndex: 5];
+                    [renderCommandEnc setVertexBytes: &renderGroup->uniforms
+                                      length: sizeof(renderGroup->uniforms)
+                                      attributeStride: 0
+                                      atIndex: 7];
+                    [renderCommandEnc drawPrimitives:MTLPrimitiveTypeTriangleStrip
+                                      vertexStart: 0
+                                      vertexCount: 4
+                                      instanceCount: Entry->tileCountPerSide * Entry->tileCountPerSide
+                                      baseInstance: 0];
                     [renderCommandEnc endEncoding];
                     break;
                 }

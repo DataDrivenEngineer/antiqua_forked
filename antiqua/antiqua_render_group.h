@@ -7,8 +7,10 @@
 typedef enum
 {
     RenderGroupEntryType_RenderEntryClear,
+    RenderGroupEntryType_RenderEntryPoint,
     RenderGroupEntryType_RenderEntryLine,
-    RenderGroupEntryType_RenderEntryMesh
+    RenderGroupEntryType_RenderEntryMesh,
+    RenderGroupEntryType_RenderEntryTile
 } RenderGroupEntryType;
 
 typedef struct RenderGroupEntryHeader
@@ -21,6 +23,11 @@ typedef struct
 {
     V4 color;
 } RenderEntryClear;
+
+typedef struct
+{
+    V3 color;
+} RenderEntryPoint;
 
 typedef struct
 {
@@ -37,6 +44,14 @@ typedef struct
                    like this: [vertex color vertex color] */
     r32 *data;
 } RenderEntryMesh;
+
+typedef struct
+{
+    u32 tileCountPerSide;
+    r32 tileSideLength;
+    V3 color;
+    V3 originTileCenterPositionWorld;
+} RenderEntryTile;
 
 typedef struct RenderGroup
 {

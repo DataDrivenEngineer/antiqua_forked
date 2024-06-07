@@ -25,6 +25,27 @@ void pushRenderEntryClear(MemoryArena *arena,
     renderGroup->prevHeader = entryHeader;
 }
 
+void pushRenderEntryPoint(MemoryArena *arena,
+                          RenderGroup *renderGroup,
+                          V3 color)
+{
+    ASSERT(renderGroup->pushBufferElementCount > 0);
+
+    RenderGroupEntryHeader *entryHeader =
+        (RenderGroupEntryHeader *)PUSH_STRUCT(arena, RenderGroupEntryHeader);
+    entryHeader->type = RenderGroupEntryType_RenderEntryPoint;
+    renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
+    RenderEntryPoint *entry =
+        (RenderEntryPoint *)PUSH_STRUCT(arena, RenderEntryPoint);
+    entry->color = color;
+    renderGroup->pushBufferSize += sizeof(RenderEntryPoint);
+    renderGroup->pushBufferElementCount++;
+
+    renderGroup->prevHeader->next = entryHeader;
+    renderGroup->prevHeader = entryHeader;
+    entryHeader->next = 0;
+}
+
 void pushRenderEntryLine(MemoryArena *arena,
                          RenderGroup *renderGroup,
                          V3 color,
@@ -66,6 +87,29 @@ void pushRenderEntryMesh(MemoryArena *arena,
     entry->size = sizeof(r32) * totalCountOfElementsInArray;
     entry->data = vertices;
     renderGroup->pushBufferSize += sizeof(RenderEntryMesh);
+    renderGroup->pushBufferElementCount++;
+
+    renderGroup->prevHeader->next = entryHeader;
+    renderGroup->prevHeader = entryHeader;
+    entryHeader->next = 0;
+}
+
+void pushRenderEntryTile(MemoryArena *arena,
+                         RenderGroup *renderGroup,
+                         u32 tileCountPerSide,
+                         V3 color)
+{
+    ASSERT(renderGroup->pushBufferElementCount > 0);
+
+    RenderGroupEntryHeader *entryHeader = PUSH_STRUCT(arena, RenderGroupEntryHeader);
+    entryHeader->type = RenderGroupEntryType_RenderEntryTile;
+    renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
+    RenderEntryTile *entry = PUSH_STRUCT(arena, RenderEntryTile);
+    entry->tileCountPerSide = tileCountPerSide;
+    entry->tileSideLength = 1.0f;
+    entry->color = color;
+    entry->originTileCenterPositionWorld = v3(0.0f, 0.0f, 0.0f);
+    renderGroup->pushBufferSize += sizeof(RenderEntryTile);
     renderGroup->pushBufferElementCount++;
 
     renderGroup->prevHeader->next = entryHeader;
