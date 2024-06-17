@@ -87,27 +87,39 @@ typedef struct
 
 typedef struct
 {
-  MemoryArena worldArena;
-  World *world;
+    MemoryArena worldArena;
+    World *world;
 
-  u32 playerIndexForController[1];
+    u32 playerIndexForController[1];
 
-  u32 lowEntityCount;
-  LowEntity lowEntities[100000];
+    u32 lowEntityCount;
+    LowEntity lowEntities[100000];
 
-  u32 highEntityCount;
-  HighEntity highEntities_[256];
+    u32 highEntityCount;
+    HighEntity highEntities_[256];
 
-  M44 worldMatrix;
-  M44 viewMatrix;
-  M44 projectionMatrix;
+    M44 worldMatrix;
+    M44 viewMatrix;
+    M44 projectionMatrix;
 
-  r32 cameraRotationSpeed;
-  r32 cameraMovementSpeed;
-  V3 cameraPosWorld;
-  V3 v;
-  V3 n;
-  V3 u;
+    r32 near;
+    r32 far;
+    r32 fov;
+
+    r32 cameraRotationSpeed;
+    r32 cameraMovementSpeed;
+    V3 cameraPosWorld;
+    V3 v;
+    V3 n;
+    V3 u;
+
+    s32 mousePos[2];
+
+    V3 cameraDirectonPosVectorStartWorld;
+    V3 cameraDirectonPosVectorEndWorld;
+    V3 mouseDirectionVectorWorld;
+    V3 mouseDirectionVectorHorizontalWorld;
+    V3 mouseDirectionVectorVerticalWorld;
 } GameState;
 
 #endif

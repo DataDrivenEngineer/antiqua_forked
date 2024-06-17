@@ -143,4 +143,13 @@ inline r32 cosine(r32 val)
     return result;
 }
 
+inline r32 arccosine(r32 val)
+{
+    r32 result;
+
+    result = acosf(val);
+
+    return result;
+}
+
 #endif

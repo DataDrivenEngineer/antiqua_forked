@@ -32,6 +32,9 @@ GameMemory gameMemory;
 static CVDisplayLinkRef displayLink;
 static b32 shouldStopDL = 0;
 
+static r32 drawableWidthWithoutScaleFactor;
+static r32 drawableHeightWithoutScaleFactor;
+
 ThreadContext thread = {0};
 State state = {0};
 
@@ -177,13 +180,14 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
     {
       playBackInput(&state, &gcInput);
     }
+
 #if !XCODE_BUILD
     if (gameCode.updateGameAndRender)
     {
-      gameCode.updateGameAndRender(&thread, deltaTimeSec, &gcInput, &soundState, &gameMemory);
+      gameCode.updateGameAndRender(&thread, deltaTimeSec, &gcInput, &soundState, &gameMemory, drawableWidthWithoutScaleFactor, drawableHeightWithoutScaleFactor);
     }
 #else
-    updateGameAndRender(&thread, deltaTimeSec, &gcInput, &soundState, &gameMemory);
+    updateGameAndRender(&thread, deltaTimeSec, &gcInput, &soundState, &gameMemory, drawableWidthWithoutScaleFactor, drawableHeightWithoutScaleFactor);
 #endif
 
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -196,6 +200,8 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
 -(void)frameDidChangeCallback:(NSNotification *)notification
 {
     CAMetalLayer *layer = (CAMetalLayer *) self.layer;
+    drawableWidthWithoutScaleFactor = self.frame.size.width;
+    drawableHeightWithoutScaleFactor = self.frame.size.height;
     CGFloat scaleFactor = [[NSApplication sharedApplication] mainWindow].backingScaleFactor;
     layer.drawableSize = CGSizeMake(self.frame.size.width * scaleFactor,
                                     self.frame.size.height * scaleFactor);

@@ -28,6 +28,7 @@
 		9FCE028E2AD918BF00BB84CA /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FD312022AADA5D900C3A9EF /* CoreAudio.framework */; };
 		9FCE02902AD918C500BB84CA /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FCE028F2AD918C500BB84CA /* IOKit.framework */; };
 		9FD311FE2AADA0A500C3A9EF /* antiqua.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9FD311F82AADA0A500C3A9EF /* antiqua.cpp */; };
+		9FE7769B2C12D85E008C7388 /* CustomNSView.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FE7769A2C12D85E008C7388 /* CustomNSView.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -83,6 +84,7 @@
 		9FD311FB2AADA0A500C3A9EF /* osx_input.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_input.h; sourceTree = "<group>"; };
 		9FD311FD2AADA0A500C3A9EF /* osx_audio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = osx_audio.h; sourceTree = "<group>"; };
 		9FD312022AADA5D900C3A9EF /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
+		9FE7769A2C12D85E008C7388 /* CustomNSView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CustomNSView.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -152,6 +154,7 @@
 				9F1D09F02A86C1A100263859 /* CustomWindowDelegate.h */,
 				9F6E25E32A7D7559006DF7A3 /* Info.plist */,
 				9FC719182A7D5F7E007ADAA1 /* CustomNSView.h */,
+				9FE7769A2C12D85E008C7388 /* CustomNSView.m */,
 				9FC718ED2A7D5E45007ADAA1 /* Assets.xcassets */,
 				9FC718F42A7D5E45007ADAA1 /* antiqua.entitlements */,
 			);
@@ -263,6 +266,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9F7D550B2BDCBC2600ADCC8B /* CustomWindowDelegate.m in Sources */,
+				9FE7769B2C12D85E008C7388 /* CustomNSView.m in Sources */,
 				9F7D55092BDCBC2600ADCC8B /* osx_renderer.mm in Sources */,
 				9F7D550A2BDCBC2600ADCC8B /* osx_dynamic_loader.m in Sources */,
 				9F7D55112BE9771700ADCC8B /* antiqua_render_group.cpp in Sources */,

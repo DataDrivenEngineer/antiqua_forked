@@ -26,6 +26,7 @@ typedef struct
 
 typedef struct
 {
+    V3 position;
     V3 color;
 } RenderEntryPoint;
 

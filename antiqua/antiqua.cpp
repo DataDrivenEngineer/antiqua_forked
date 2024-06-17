@@ -30,6 +30,10 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                                   0.0f, 0.0f, 1.0f, 0.0f,
                                   0.0f, 0.0f, 0.0f, 1.0f};
 
+        gameState->near = 1.0f;
+        gameState->far = 100.0f;
+        gameState->fov = 45.0f;
+
         gameState->cameraRotationSpeed = 0.3f;
         gameState->cameraMovementSpeed = 0.1f;
 
@@ -38,8 +42,12 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->n = v3(0.0f, 0.0f, 1.0f);
         gameState->u = cross(gameState->n, gameState->v);
 
+        gameState->mousePos[0] = 500;
+        gameState->mousePos[1] = 350;
+
 #if 0
         // NOTE(dima): Below is isometric camera setup
+
         // NOTE(dima): rotate around vertical axis by 45 degrees
         rotate(&gameState->n, gameState->v, 45.0f);
 
@@ -98,19 +106,18 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #endif
 
 //    fprintf(stderr, "mouse x, y: %d, %d\n", gcInput->mouseX, gcInput->mouseY);
-    static s32 mousePos[2] = {500, 350};
     static r32 cameraVerticalAngle = 0.0f;
     static r32 cameraHorizontalAngle = 0.0f;
-    if (gcInput->mouseButtons[0].endedDown
-//    if (true
-        && (gcInput->mouseX != mousePos[0] || gcInput->mouseY != mousePos[1]))
+//    if (gcInput->mouseButtons[0].endedDown
+    if (true
+        && (gcInput->mouseX != gameState->mousePos[0] || gcInput->mouseY != gameState->mousePos[1]))
     {
         V3 v = v3(0.0f, 1.0f, 0.0f);
         V3 n = v3(0.0f, 0.0f, 1.0f);
         V3 u = cross(n, v);
 
-        r32 horizontalOffset = gcInput->mouseX - mousePos[0];
-        r32 verticalOffset = gcInput->mouseY - mousePos[1];
+        r32 horizontalOffset = gcInput->mouseX - gameState->mousePos[0];
+        r32 verticalOffset = gcInput->mouseY - gameState->mousePos[1];
 
         cameraVerticalAngle += gameState->cameraRotationSpeed * verticalOffset; 
         cameraHorizontalAngle += gameState->cameraRotationSpeed * horizontalOffset;
@@ -130,8 +137,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->v = v;
         gameState->u = u;
 
-        mousePos[0] = gcInput->mouseX;
-        mousePos[1] = gcInput->mouseY;
+        gameState->mousePos[0] = gcInput->mouseX;
+        gameState->mousePos[1] = gcInput->mouseY;
     }
 
     M44 translationComponent = {1.0f, 0.0f, 0.0f, 0.0f,
@@ -151,22 +158,116 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
     gameState->viewMatrix = rotationComponent * translationComponent;
 
-#if 0
-    // NOTE(dima): WIP ray casting
-    r32 mouseX = mousePos[0];
-    r32 mouseY = mousePos[1];
+    // NOTE(dima): creating projection matrix
+    {
+        r32 tanHalfFov = tangent(RADIANS(gameState->fov / 2.0f));
+        r32 d = 1 / tanHalfFov;
 
-    r32 xScale = 2.0f / 1000;
+        r32 aspectRatio = drawableWidthWithoutScaleFactor / drawableHeightWithoutScaleFactor;
+
+        r32 a = gameState->far / (gameState->far - gameState->near);
+        r32 b = (gameState->near * gameState->far) / (gameState->near - gameState->far);
+
+        gameState->projectionMatrix = {d / aspectRatio, 0.0f, 0.0f, 0.0f,
+                                       0.0f, d, 0.0f, 0.0f,
+                                       0.0f, 0.0f, a, 1.0f,
+                                       0.0f, 0.0f, b, 0.0f};
+    }
+
+    // NOTE(dima): convert mouse posistion to world space
+    r32 mouseX = gameState->mousePos[0];
+    r32 mouseY = gameState->mousePos[1];
+//    fprintf(stderr, "mouse x y: %f %f\n", mouseX, mouseY);
+
+//    fprintf(stderr, "drawableWidthWithoutScaleFactor drawableHeightWithoutScaleFactor - %f %f \n",
+//            drawableWidthWithoutScaleFactor,
+//            drawableHeightWithoutScaleFactor);
+
+    r32 xScale = 2.0f / drawableWidthWithoutScaleFactor;
     r32 clipX = mouseX * xScale - 1.0f;
-    r32 yScale = 2.0f / 700;
-    r32 clipY = mouseY * yScale - 1.0f;
+    r32 yScale = 2.0f / drawableHeightWithoutScaleFactor;
+    r32 clipY = -(mouseY * yScale - 1.0f);
 
-    V4 clipPos = v4(clipX, clipY, near, 1.0f);
-    M44 inverseProjectionMatrix = inverse(&projectionMatrix);
-    M44 inverseViewMatrix = inverse(&viewMatrix);
-    V4 mousePosNearPlaneWorld = inverseViewMatrix * inverseProjectionMatrix * clipPos;
-    fprintf(stderr, "mousePosNearPlaneWorld - x y: %f %f\n", mousePosNearPlaneWorld.x, mousePosNearPlaneWorld.y);
+    V4 clipPos = v4(clipX, clipY, 0.0f, 1.0f);
+    M44 inverseProjectionMatrix = inverse(&gameState->projectionMatrix);
+    M44 inverseViewMatrix = inverse(&gameState->viewMatrix);
+    V4 mousePosNearPlaneCamera = inverseProjectionMatrix * clipPos;
+    mousePosNearPlaneCamera.z = gameState->near + 0.001f;
+    V4 mousePosNearPlaneWorld = inverseViewMatrix * mousePosNearPlaneCamera;
+
+    V3 originTileCenterPositionWorld = v3(0.0f, 0.0f, 0.0f);
+
+    V3 p0r0 = originTileCenterPositionWorld - gameState->cameraPosWorld;
+    V3 tileNormalWorld = v3(0.0f, 1.0f, 0.0f);
+    r32 a = dot(tileNormalWorld, p0r0) / dot(gameState->n, tileNormalWorld);
+
+#if 1
+    if (gcInput->mouseButtons[1].endedDown
+//        && dot(cameraDirectonVectorWorld, tileNormalWorld) > 0
+        )
+    {
+        V4 cameraDirectonPosVectorStartCamera = mousePosNearPlaneCamera;
+        cameraDirectonPosVectorStartCamera.z = gameState->near + 0.001;
+        V4 cameraDirectonPosVectorEndCamera = mousePosNearPlaneCamera;
+        cameraDirectonPosVectorEndCamera.z = cameraDirectonPosVectorStartCamera.z + 1.0f;
+        V4 cameraDirectonPosVectorStartWorld = inverseViewMatrix * cameraDirectonPosVectorStartCamera;
+        V4 cameraDirectonPosVectorEndWorld = inverseViewMatrix * cameraDirectonPosVectorEndCamera;
+        gameState->cameraDirectonPosVectorStartWorld = v3(cameraDirectonPosVectorStartWorld);
+        gameState->cameraDirectonPosVectorEndWorld = v3(cameraDirectonPosVectorEndWorld);
+
+        V4 mouseDirectionVectorCamera = mousePosNearPlaneCamera;
+        mouseDirectionVectorCamera.z = 1.0f;
+        mouseDirectionVectorCamera.w = 0.0f;
+        gameState->mouseDirectionVectorWorld = v3(inverseViewMatrix * mouseDirectionVectorCamera);
+
+        V3 n = gameState->n;
+        V3 v = gameState->v;
+        V3 u = gameState->u;
+
+        V3 mouseDirectionVectorProjectionUNWorld = (dot(v, gameState->mouseDirectionVectorWorld)
+                                                    / squareLength(v)) * v;
+        gameState->mouseDirectionVectorHorizontalWorld = gameState->mouseDirectionVectorWorld - mouseDirectionVectorProjectionUNWorld;
+        normalize(&gameState->mouseDirectionVectorHorizontalWorld);
+        r32 cosNRHorizontal = dot(n, gameState->mouseDirectionVectorHorizontalWorld);
+        r32 horizontalAngleDegrees = DEGREES(arccosine(cosNRHorizontal));
+        /* NOTE(dima): this is required, because cos(a) = cos(-a),
+           but we still want to differentiate between negative and positive angles */
+        if (mousePosNearPlaneCamera.x < 0)
+        {
+            horizontalAngleDegrees = 360.0f - horizontalAngleDegrees;
+        }
+//        fprintf(stderr, "horizontal angle - degrees: %f\n", horizontalAngleDegrees);
+
+        V3 mouseDirectionVectorProjectionNVWorld = (dot(u, gameState->mouseDirectionVectorWorld)
+                                                    / squareLength(u)) * u;
+        gameState->mouseDirectionVectorVerticalWorld = gameState->mouseDirectionVectorWorld - mouseDirectionVectorProjectionNVWorld;
+        normalize(&gameState->mouseDirectionVectorVerticalWorld);
+        r32 cosNRVertical = dot(n, gameState->mouseDirectionVectorVerticalWorld);
+        r32 verticalAngleDegrees = -DEGREES(arccosine(cosNRVertical));
+        if (mousePosNearPlaneCamera.y < 0)
+        {
+            verticalAngleDegrees = -verticalAngleDegrees;
+        }
+//        fprintf(stderr, "vertical angle - degrees: %f\n", verticalAngleDegrees);
+        
+        rotate(&n, v, horizontalAngleDegrees);
+        u = cross(v, n);
+        normalize(&u);
+        rotate(&n, u, verticalAngleDegrees);
+        normalize(&n);
+
+        gameState->cameraDirectonPosVectorEndWorld = gameState->cameraDirectonPosVectorStartWorld + n * 100;
+
+//        V4 cameraPosCamera = v4(0.0f, 0.0f, 0.0f, 1.0f);
+//        V3 cameraPosWorld = v3(inverseViewMatrix * cameraPosCamera);
+
+//        gameState->mouseClickPositionOnTilemapWorld = gameState->cameraPosWorld
+//                                                      + a * gameState->cameraDirectonVectorWorld;
+    }
 #endif
+
+    V4 screenCenterPointPosCamera = v4(0.0f, 0.0f, gameState->near + 0.001f, 1.0f);
+    V4 screenCenterPosNearPlaneWorld = inverseViewMatrix * screenCenterPointPosCamera;
 
     MemoryArena renderGroupArena;
     u64 renderGroupArenaSize = KB(256);
@@ -275,13 +376,29 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     pushRenderEntryTile(&renderGroupArena,
                          &renderGroup,
                          64,
+                         originTileCenterPositionWorld,
                          v3(1.0f, 1.0f, 1.0f));
     pushRenderEntryPoint(&renderGroupArena,
                          &renderGroup,
+                         v3(mousePosNearPlaneWorld),
+                         v3(0.0f, 1.0f, 1.0f));
+    pushRenderEntryLine(&renderGroupArena,
+                        &renderGroup,
+                        v3(0.0f, 1.0f, 0.0f),
+                        gameState->cameraDirectonPosVectorStartWorld,
+                        gameState->cameraDirectonPosVectorEndWorld);
+    pushRenderEntryPoint(&renderGroupArena,
+                         &renderGroup,
+                         v3(screenCenterPosNearPlaneWorld),
                          v3(0.0f, 1.0f, 0.0f));
+//    pushRenderEntryPoint(&renderGroupArena,
+//                         &renderGroup,
+//                         gameState->cameraPosWorld,
+//                         v3(0.0f, 0.0f, 1.0f));
 
     renderGroup.uniforms[0] = gameState->worldMatrix;
     renderGroup.uniforms[1] = gameState->viewMatrix;
+    renderGroup.uniforms[2] = gameState->projectionMatrix;
 
     memory->renderOnGpu(0, &renderGroup);
 

@@ -108,25 +108,6 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
            - do not have a standalone clear entry
            - do not store depth / color texture after the last render entry */
 
-        // NOTE(dima): creating projection matrix
-        r32 near = 1.0f;
-        {
-            r32 fov = 45.0f; //90.0f;
-            r32 tanHalfFov = tangent(RADIANS(fov / 2.0f));
-            r32 d = 1 / tanHalfFov;
-
-            r32 aspectRatio = layer.drawableSize.width / layer.drawableSize.height;
-
-            r32 far = 100.0f;
-            r32 a = far / (far - near);
-            r32 b = (near * far) / (near - far);
-
-            renderGroup->uniforms[2] = {d / aspectRatio, 0.0f, 0.0f, 0.0f,
-                                           0.0f, d, 0.0f, 0.0f,
-                                           0.0f, 0.0f, a, 1.0f,
-                                           0.0f, 0.0f, b, 0.0f};
-        }
-
         renderGroupBufferCurrentSize = 0;
 
         id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
@@ -193,14 +174,11 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                     renderPassDesc.depthAttachment.clearDepth = 1.0f;
 
                     r32 vertices[3 * 2];
-                    V4 pointPosCamera = v4(0.0f, 0.0f, near + 0.001f, 1.0f);
-                    M44 inverseViewMatrix = inverse(&renderGroup->uniforms[1]);
-                    V4 pointPosNearPlaneWorld = inverseViewMatrix
-                                                * pointPosCamera;
-                    V3 pointPosNearPlaneWorldV3 = v3(pointPosNearPlaneWorld.x,
-                                                   pointPosNearPlaneWorld.y,
-                                                   pointPosNearPlaneWorld.z);
-                    memcpy(vertices, (void*)&pointPosNearPlaneWorldV3, sizeof(V3));
+                    V4 pointPosCamera = v4(Entry->position.x,
+                                           Entry->position.y,
+                                           Entry->position.z,
+                                           1.0f);
+                    memcpy(vertices, (void*)&Entry->position, sizeof(V3));
                     memcpy(vertices + 3, (void*)&Entry->color, sizeof(Entry->color));
 
                     u8 *renderGroupBufferDestStart = ((u8 *)[renderGroupBuffer contents])
