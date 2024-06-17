@@ -45,6 +45,10 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->mousePos[0] = 500;
         gameState->mousePos[1] = 350;
 
+        gameState->tilemapOriginPositionWorld = v3(0.0f, 0.0f, 0.0f);
+        gameState->tileCountPerSide = 64;
+        gameState->tileSideLength = 1.0f;
+
 #if 0
         // NOTE(dima): Below is isometric camera setup
 
@@ -177,11 +181,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     // NOTE(dima): convert mouse posistion to world space
     r32 mouseX = gameState->mousePos[0];
     r32 mouseY = gameState->mousePos[1];
-//    fprintf(stderr, "mouse x y: %f %f\n", mouseX, mouseY);
-
-//    fprintf(stderr, "drawableWidthWithoutScaleFactor drawableHeightWithoutScaleFactor - %f %f \n",
-//            drawableWidthWithoutScaleFactor,
-//            drawableHeightWithoutScaleFactor);
 
     r32 xScale = 2.0f / drawableWidthWithoutScaleFactor;
     r32 clipX = mouseX * xScale - 1.0f;
@@ -195,16 +194,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     mousePosNearPlaneCamera.z = gameState->near + 0.001f;
     V4 mousePosNearPlaneWorld = inverseViewMatrix * mousePosNearPlaneCamera;
 
-    V3 originTileCenterPositionWorld = v3(0.0f, 0.0f, 0.0f);
-
-    V3 p0r0 = originTileCenterPositionWorld - gameState->cameraPosWorld;
-    V3 tileNormalWorld = v3(0.0f, 1.0f, 0.0f);
-    r32 a = dot(tileNormalWorld, p0r0) / dot(gameState->n, tileNormalWorld);
-
-#if 1
-    if (gcInput->mouseButtons[1].endedDown
-//        && dot(cameraDirectonVectorWorld, tileNormalWorld) > 0
-        )
+    if (gcInput->mouseButtons[1].endedDown)
     {
         V4 cameraDirectonPosVectorStartCamera = mousePosNearPlaneCamera;
         cameraDirectonPosVectorStartCamera.z = gameState->near + 0.001;
@@ -236,7 +226,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         {
             horizontalAngleDegrees = 360.0f - horizontalAngleDegrees;
         }
-//        fprintf(stderr, "horizontal angle - degrees: %f\n", horizontalAngleDegrees);
 
         V3 mouseDirectionVectorProjectionNVWorld = (dot(u, gameState->mouseDirectionVectorWorld)
                                                     / squareLength(u)) * u;
@@ -248,7 +237,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         {
             verticalAngleDegrees = -verticalAngleDegrees;
         }
-//        fprintf(stderr, "vertical angle - degrees: %f\n", verticalAngleDegrees);
         
         rotate(&n, v, horizontalAngleDegrees);
         u = cross(v, n);
@@ -256,15 +244,27 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         rotate(&n, u, verticalAngleDegrees);
         normalize(&n);
 
-        gameState->cameraDirectonPosVectorEndWorld = gameState->cameraDirectonPosVectorStartWorld + n * 100;
+        V3 tilemapOriginToMousePositionVectorWorld = gameState->tilemapOriginPositionWorld
+                                                     - gameState->cameraDirectonPosVectorStartWorld;
+        V3 tileNormalWorld = v3(0.0f, 1.0f, 0.0f);
+        r32 lengthOfVectorToReachTilemap = dot(tileNormalWorld, tilemapOriginToMousePositionVectorWorld)
+                                           / dot(n, tileNormalWorld);
 
-//        V4 cameraPosCamera = v4(0.0f, 0.0f, 0.0f, 1.0f);
-//        V3 cameraPosWorld = v3(inverseViewMatrix * cameraPosCamera);
-
-//        gameState->mouseClickPositionOnTilemapWorld = gameState->cameraPosWorld
-//                                                      + a * gameState->cameraDirectonVectorWorld;
+        gameState->cameraDirectonPosVectorEndWorld = gameState->cameraDirectonPosVectorStartWorld
+                                                     + n * lengthOfVectorToReachTilemap;
+        r32 halfTilemapCoordinateOffset = (gameState->tileCountPerSide / 2) * gameState->tileSideLength;
+        if (gameState->cameraDirectonPosVectorEndWorld.x >= (gameState->tilemapOriginPositionWorld.x - halfTilemapCoordinateOffset)
+            && gameState->cameraDirectonPosVectorEndWorld.x <= (gameState->tilemapOriginPositionWorld.x + halfTilemapCoordinateOffset)
+            && gameState->cameraDirectonPosVectorEndWorld.z >= (gameState->tilemapOriginPositionWorld.z - halfTilemapCoordinateOffset)
+            && gameState->cameraDirectonPosVectorEndWorld.z <= (gameState->tilemapOriginPositionWorld.z + halfTilemapCoordinateOffset))
+        {
+            gameState->isClickPositionInsideTilemap = true;
+        }
+        else
+        {
+            gameState->isClickPositionInsideTilemap = false;
+        }
     }
-#endif
 
     V4 screenCenterPointPosCamera = v4(0.0f, 0.0f, gameState->near + 0.001f, 1.0f);
     V4 screenCenterPosNearPlaneWorld = inverseViewMatrix * screenCenterPointPosCamera;
@@ -375,26 +375,26 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 //                        ARRAY_COUNT(vertices));
     pushRenderEntryTile(&renderGroupArena,
                          &renderGroup,
-                         64,
-                         originTileCenterPositionWorld,
+                         gameState->tileCountPerSide,
+                         gameState->tileSideLength,
+                         gameState->tilemapOriginPositionWorld,
                          v3(1.0f, 1.0f, 1.0f));
     pushRenderEntryPoint(&renderGroupArena,
                          &renderGroup,
                          v3(mousePosNearPlaneWorld),
                          v3(0.0f, 1.0f, 1.0f));
-    pushRenderEntryLine(&renderGroupArena,
-                        &renderGroup,
-                        v3(0.0f, 1.0f, 0.0f),
-                        gameState->cameraDirectonPosVectorStartWorld,
-                        gameState->cameraDirectonPosVectorEndWorld);
+    if (gameState->isClickPositionInsideTilemap)
+    {
+        pushRenderEntryLine(&renderGroupArena,
+                            &renderGroup,
+                            v3(0.0f, 1.0f, 0.0f),
+                            gameState->cameraDirectonPosVectorStartWorld,
+                            gameState->cameraDirectonPosVectorEndWorld);
+    }
     pushRenderEntryPoint(&renderGroupArena,
                          &renderGroup,
                          v3(screenCenterPosNearPlaneWorld),
                          v3(0.0f, 1.0f, 0.0f));
-//    pushRenderEntryPoint(&renderGroupArena,
-//                         &renderGroup,
-//                         gameState->cameraPosWorld,
-//                         v3(0.0f, 0.0f, 1.0f));
 
     renderGroup.uniforms[0] = gameState->worldMatrix;
     renderGroup.uniforms[1] = gameState->viewMatrix;

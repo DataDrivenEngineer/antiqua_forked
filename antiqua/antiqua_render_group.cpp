@@ -99,6 +99,7 @@ void pushRenderEntryMesh(MemoryArena *arena,
 void pushRenderEntryTile(MemoryArena *arena,
                          RenderGroup *renderGroup,
                          u32 tileCountPerSide,
+                         u32 tileSideLength,
                          V3 originTileCenterPositionWorld,
                          V3 color)
 {
@@ -109,7 +110,7 @@ void pushRenderEntryTile(MemoryArena *arena,
     renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
     RenderEntryTile *entry = PUSH_STRUCT(arena, RenderEntryTile);
     entry->tileCountPerSide = tileCountPerSide;
-    entry->tileSideLength = 1.0f;
+    entry->tileSideLength = tileSideLength;
     entry->color = color;
     entry->originTileCenterPositionWorld = originTileCenterPositionWorld;
     renderGroup->pushBufferSize += sizeof(RenderEntryTile);

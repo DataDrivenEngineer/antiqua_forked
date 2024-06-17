@@ -113,6 +113,12 @@ typedef struct
     V3 n;
     V3 u;
 
+    V3 tilemapOriginPositionWorld;
+    u32 tileCountPerSide;
+    r32 tileSideLength;
+
+    b32 isClickPositionInsideTilemap;
+
     s32 mousePos[2];
 
     V3 cameraDirectonPosVectorStartWorld;
