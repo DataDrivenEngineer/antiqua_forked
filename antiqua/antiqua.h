@@ -109,6 +109,8 @@ typedef struct
     r32 cameraMinDistance;
     r32 cameraMaxDistance;
 
+    r32 cameraVerticalAngle;
+    r32 cameraHorizontalAngle;
     r32 cameraRotationSpeed;
     r32 cameraMovementSpeed;
     V3 cameraPosWorld;

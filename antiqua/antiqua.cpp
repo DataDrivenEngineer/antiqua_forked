@@ -112,8 +112,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->debugCameraEnabled = !gameState->debugCameraEnabled;
     }
 
-    static r32 cameraVerticalAngle = 0.0f;
-    static r32 cameraHorizontalAngle = 0.0f;
     if (gameState->debugCameraEnabled)
     {
         if (gcInput->up.endedDown)
@@ -137,16 +135,16 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             r32 horizontalOffset = gcInput->mouseX - gameState->mousePos[0];
             r32 verticalOffset = gcInput->mouseY - gameState->mousePos[1];
 
-            cameraVerticalAngle += gameState->cameraRotationSpeed * verticalOffset; 
-            cameraHorizontalAngle += gameState->cameraRotationSpeed * horizontalOffset;
+            gameState->cameraVerticalAngle += gameState->cameraRotationSpeed * verticalOffset; 
+            gameState->cameraHorizontalAngle += gameState->cameraRotationSpeed * horizontalOffset;
 
             // NOTE(dima): rotate by horizontal angle around vertical axis
-            rotate(&n, v, cameraHorizontalAngle);
+            rotate(&n, v, gameState->cameraHorizontalAngle);
 
             // NOTE(dima): rotate by vertical angle around horizontal axis
             u = cross(v, n);
             normalize(&u);
-            rotate(&n, u, cameraVerticalAngle);
+            rotate(&n, u, gameState->cameraVerticalAngle);
 
             v = cross(n, u);
             normalize(&v);
