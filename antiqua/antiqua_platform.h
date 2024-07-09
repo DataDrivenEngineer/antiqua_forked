@@ -44,6 +44,7 @@ typedef struct
   // Index 0 = LMB, index 1 = RMB
   GameButtonState mouseButtons[2];
   s32 mouseX, mouseY, mouseZ;
+  s32 scrollingDeltaX, scrollingDeltaY;
 
   b32 isAnalog;
 
@@ -52,7 +53,7 @@ typedef struct
 
   union
   {
-    GameButtonState buttons[12];
+    GameButtonState buttons[13];
     struct
     {
       GameButtonState up;
@@ -67,6 +68,8 @@ typedef struct
       GameButtonState rightShoulder;
       GameButtonState leftBumper;
       GameButtonState rightBumper;
+
+      GameButtonState debugCmdC;
 
       // Add new buttons above
       GameButtonState terminator;

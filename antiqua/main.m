@@ -68,6 +68,11 @@ static b32 processEvent(NSEvent *e)
   {
     processButtonUp(&gcInput.mouseButtons[1]);
   }
+  if (e.type == NSEventTypeScrollWheel)
+  {
+      gcInput.scrollingDeltaX = e.scrollingDeltaX;
+      gcInput.scrollingDeltaY = e.scrollingDeltaY;
+  }
 
   if (e.type == NSEventTypeKeyDown)
   {
@@ -121,6 +126,15 @@ static b32 processEvent(NSEvent *e)
       if (e.modifierFlags & NSEventModifierFlagOption)
       {
         state.toggleFullscreen = true;
+      }
+    }
+    if (e.keyCode == kVK_ANSI_C)
+    {
+      handled = 1;
+      // NOTE(dima): if Command key is pressed
+      if (e.modifierFlags & NSEventModifierFlagCommand)
+      {
+          processButtonDown(&gcInput.debugCmdC);
       }
     }
   }

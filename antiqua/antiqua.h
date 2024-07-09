@@ -106,12 +106,19 @@ typedef struct
     r32 far;
     r32 fov;
 
+    r32 cameraMinDistance;
+    r32 cameraMaxDistance;
+
     r32 cameraRotationSpeed;
     r32 cameraMovementSpeed;
     V3 cameraPosWorld;
     V3 v;
     V3 n;
     V3 u;
+    V3 isometricV;
+    V3 isometricN;
+    V3 isometricU;
+    b32 debugCameraEnabled;
 
     V3 tilemapOriginPositionWorld;
     u32 tileCountPerSide;

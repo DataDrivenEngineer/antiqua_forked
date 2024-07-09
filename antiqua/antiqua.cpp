@@ -34,6 +34,9 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->far = 100.0f;
         gameState->fov = 45.0f;
 
+        gameState->cameraMinDistance = 5.0f;
+        gameState->cameraMaxDistance = 20.0f;
+
         gameState->cameraRotationSpeed = 0.3f;
         gameState->cameraMovementSpeed = 0.1f;
 
@@ -49,22 +52,43 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->tileCountPerSide = 64;
         gameState->tileSideLength = 1.0f;
 
-#if 0
-        // NOTE(dima): Below is isometric camera setup
+        {
+            // NOTE(dima): Below is isometric camera setup
+            gameState->isometricV = gameState->v;
+            gameState->isometricN = gameState->n;
+            gameState->isometricU = gameState->u;
 
-        // NOTE(dima): rotate around vertical axis by 45 degrees
-        rotate(&gameState->n, gameState->v, 45.0f);
+            // NOTE(dima): rotate around vertical axis by 45 degrees
+            rotate(&gameState->isometricN, gameState->isometricV, 45.0f);
 
-        // NOTE(dima): rotate around horizontal axis by 45 degrees
-        gameState->u = cross(gameState->v, gameState->n);
-        normalize(&gameState->u);
-        rotate(&gameState->n, gameState->u, 45.0f);
+            // NOTE(dima): rotate around horizontal axis by 45 degrees
+            gameState->isometricU = cross(gameState->isometricV, gameState->isometricN);
+            normalize(&gameState->isometricU);
+            rotate(&gameState->isometricN, gameState->isometricU, 45.0f);
 
-        gameState->v = cross(gameState->n, gameState->u);
-        normalize(&gameState->v);
-#endif
+            gameState->isometricV = cross(gameState->isometricN, gameState->isometricU);
+            normalize(&gameState->isometricV);
+        }
 
         memory->isInitialized = true;
+    }
+
+    if (gcInput->scrollingDeltaY != 0.0f)
+    {
+        r32 newCameraPosWorldY = gameState->cameraPosWorld.y + gameState->cameraMovementSpeed * -gcInput->scrollingDeltaY;
+        if (newCameraPosWorldY >= gameState->cameraMinDistance
+            && newCameraPosWorldY <= gameState->cameraMaxDistance)
+        {
+            gameState->cameraPosWorld.y = newCameraPosWorldY;
+        }
+        else if (newCameraPosWorldY > gameState->cameraMaxDistance)
+        {
+            gameState->cameraPosWorld.y = gameState->cameraMaxDistance;
+        }
+        else
+        {
+            gameState->cameraPosWorld.y = gameState->cameraMinDistance;
+        }
     }
 
     if (gcInput->right.endedDown)
@@ -83,66 +107,78 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                                     + gameState->cameraMovementSpeed * u;
     }
 
-#if 1
-    if (gcInput->up.endedDown)
+    if (gcInput->debugCmdC.endedDown)
     {
-        gameState->cameraPosWorld = gameState->cameraPosWorld
-                                    + gameState->cameraMovementSpeed * gameState->n;
+        gameState->debugCameraEnabled = !gameState->debugCameraEnabled;
     }
 
-    if (gcInput->down.endedDown)
-    {
-        gameState->cameraPosWorld = gameState->cameraPosWorld
-                                    - gameState->cameraMovementSpeed * gameState->n;
-    }
-#else
-    if (gcInput->up.endedDown)
-    {
-        gameState->cameraPosWorld = gameState->cameraPosWorld
-                                    + gameState->cameraMovementSpeed * v3(gameState->v.x, 0.0f, gameState->v.z);
-    }
-
-    if (gcInput->down.endedDown)
-    {
-        gameState->cameraPosWorld = gameState->cameraPosWorld
-                                    - gameState->cameraMovementSpeed * v3(gameState->v.x, 0.0f, gameState->v.z);
-    }
-#endif
-
-//    fprintf(stderr, "mouse x, y: %d, %d\n", gcInput->mouseX, gcInput->mouseY);
     static r32 cameraVerticalAngle = 0.0f;
     static r32 cameraHorizontalAngle = 0.0f;
-//    if (gcInput->mouseButtons[0].endedDown
-    if (true
-        && (gcInput->mouseX != gameState->mousePos[0] || gcInput->mouseY != gameState->mousePos[1]))
+    if (gameState->debugCameraEnabled)
     {
-        V3 v = v3(0.0f, 1.0f, 0.0f);
-        V3 n = v3(0.0f, 0.0f, 1.0f);
-        V3 u = cross(n, v);
+        if (gcInput->up.endedDown)
+        {
+            gameState->cameraPosWorld = gameState->cameraPosWorld
+                                        + gameState->cameraMovementSpeed * gameState->n;
+        }
 
-        r32 horizontalOffset = gcInput->mouseX - gameState->mousePos[0];
-        r32 verticalOffset = gcInput->mouseY - gameState->mousePos[1];
+        if (gcInput->down.endedDown)
+        {
+            gameState->cameraPosWorld = gameState->cameraPosWorld
+                                        - gameState->cameraMovementSpeed * gameState->n;
+        }
 
-        cameraVerticalAngle += gameState->cameraRotationSpeed * verticalOffset; 
-        cameraHorizontalAngle += gameState->cameraRotationSpeed * horizontalOffset;
+        if ((gcInput->mouseX != gameState->mousePos[0] || gcInput->mouseY != gameState->mousePos[1]))
+        {
+            V3 v = v3(0.0f, 1.0f, 0.0f);
+            V3 n = v3(0.0f, 0.0f, 1.0f);
+            V3 u = cross(n, v);
 
-        // NOTE(dima): rotate by horizontal angle around vertical axis
-        rotate(&n, v, cameraHorizontalAngle);
+            r32 horizontalOffset = gcInput->mouseX - gameState->mousePos[0];
+            r32 verticalOffset = gcInput->mouseY - gameState->mousePos[1];
 
-        // NOTE(dima): rotate by vertical angle around horizontal axis
-        u = cross(v, n);
-        normalize(&u);
-        rotate(&n, u, cameraVerticalAngle);
+            cameraVerticalAngle += gameState->cameraRotationSpeed * verticalOffset; 
+            cameraHorizontalAngle += gameState->cameraRotationSpeed * horizontalOffset;
 
-        v = cross(n, u);
-        normalize(&v);
+            // NOTE(dima): rotate by horizontal angle around vertical axis
+            rotate(&n, v, cameraHorizontalAngle);
 
-        gameState->n = n;
-        gameState->v = v;
-        gameState->u = u;
+            // NOTE(dima): rotate by vertical angle around horizontal axis
+            u = cross(v, n);
+            normalize(&u);
+            rotate(&n, u, cameraVerticalAngle);
+
+            v = cross(n, u);
+            normalize(&v);
+
+            gameState->n = n;
+            gameState->v = v;
+            gameState->u = u;
+
+            gameState->mousePos[0] = gcInput->mouseX;
+            gameState->mousePos[1] = gcInput->mouseY;
+        }
+    }
+    else
+    {
+        if (gcInput->up.endedDown)
+        {
+            gameState->cameraPosWorld = gameState->cameraPosWorld
+                                        + gameState->cameraMovementSpeed * v3(gameState->v.x, 0.0f, gameState->v.z);
+        }
+
+        if (gcInput->down.endedDown)
+        {
+            gameState->cameraPosWorld = gameState->cameraPosWorld
+                                        - gameState->cameraMovementSpeed * v3(gameState->v.x, 0.0f, gameState->v.z);
+        }
 
         gameState->mousePos[0] = gcInput->mouseX;
         gameState->mousePos[1] = gcInput->mouseY;
+
+        gameState->n = gameState->isometricN;
+        gameState->u = gameState->isometricU;
+        gameState->v = gameState->isometricV;
     }
 
     M44 translationComponent = {1.0f, 0.0f, 0.0f, 0.0f,
@@ -283,6 +319,12 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     pushRenderEntryClear(&renderGroupArena,
                          &renderGroup,
                          v3(0.3f, 0.3f, 0.3f));
+    pushRenderEntryTile(&renderGroupArena,
+                         &renderGroup,
+                         gameState->tileCountPerSide,
+                         gameState->tileSideLength,
+                         gameState->tilemapOriginPositionWorld,
+                         v3(1.0f, 1.0f, 1.0f));
     r32 vertices[] =
     {
         // front face
@@ -364,21 +406,21 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
         0.0f, 1.0f, 1.0f, // color = cyan
     };
-    pushRenderEntryLine(&renderGroupArena,
-                        &renderGroup,
-                        v3(1.0f, 0.0f, 0.0f),
-                        v3(0.75f, 0.75f, 0.5f),
-                        v3(1.25f, 1.25f, 0.5f));
-//    pushRenderEntryMesh(&renderGroupArena,
+    for (u32 yCoordIndex = 1;
+         yCoordIndex < ARRAY_COUNT(vertices);
+         yCoordIndex += 6)
+    {
+        vertices[yCoordIndex] += 0.5f;
+    }
+//    pushRenderEntryLine(&renderGroupArena,
 //                        &renderGroup,
-//                        vertices,
-//                        ARRAY_COUNT(vertices));
-    pushRenderEntryTile(&renderGroupArena,
-                         &renderGroup,
-                         gameState->tileCountPerSide,
-                         gameState->tileSideLength,
-                         gameState->tilemapOriginPositionWorld,
-                         v3(1.0f, 1.0f, 1.0f));
+//                        v3(1.0f, 0.0f, 0.0f),
+//                        v3(0.75f, 0.75f, 0.5f),
+//                        v3(1.25f, 1.25f, 0.5f));
+    pushRenderEntryMesh(&renderGroupArena,
+                        &renderGroup,
+                        vertices,
+                        ARRAY_COUNT(vertices));
     pushRenderEntryPoint(&renderGroupArena,
                          &renderGroup,
                          v3(mousePosNearPlaneWorld),

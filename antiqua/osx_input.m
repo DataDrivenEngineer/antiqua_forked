@@ -50,15 +50,17 @@ void resetInputStateAll(void)
 
 MONExternC RESET_INPUT_STATE_BUTTONS(resetInputStateButtons)
 {
-  for (s32 i = 0; i < ARRAY_COUNT(gcInput.mouseButtons); i++)
-  {
-    gcInput.mouseButtons[i].halfTransitionCount = INPUT_NOT_INITIALIZED;
-  }
+    for (s32 i = 0; i < ARRAY_COUNT(gcInput.mouseButtons); i++)
+    {
+        gcInput.mouseButtons[i].halfTransitionCount = INPUT_NOT_INITIALIZED;
+    }
 
-  for (s32 i = 0; i < ARRAY_COUNT(gcInput.buttons); i++)
-  {
-    gcInput.buttons[i].halfTransitionCount = INPUT_NOT_INITIALIZED;
-  }
+    for (s32 i = 0; i < ARRAY_COUNT(gcInput.buttons); i++)
+    {
+        gcInput.buttons[i].halfTransitionCount = INPUT_NOT_INITIALIZED;
+    }
+
+    gcInput.debugCmdC.endedDown = false;
 }
 
 static void inputValueCallback(void * _Nullable context, IOReturn result, void * _Nullable sender, IOHIDValueRef __nullable value)
