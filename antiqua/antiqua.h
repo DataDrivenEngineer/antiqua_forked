@@ -43,46 +43,16 @@ typedef struct
   LoadedBitmap torso;
 } HeroBitmaps;
 
-typedef struct
-{
-  V2 p; // NOTE(dima): already relative to the camera
-  V2 dP;
-  u32 facingDirection;
-  u32 absTileZ;
-
-  r32 z;
-  r32 dZ;
-
-  u32 lowEntityIndex;
-} HighEntity;
-
 enum EntityType
 {
     EntityType_Null,
-
-    EntityType_Hero,
-    EntityType_Wall,
+    EntityType_Cube,
 };
 
 typedef struct
 {
     EntityType type;
-
-    r32 width;
-    r32 height;
-
-    // NOTE(dima): this is for "stairs"
-    b32 collides;
-    s32 dAbsTileZ;
-
-    u32 highEntityIndex;
-} LowEntity;
-
-typedef struct
-{
-  u32 lowIndex;
-  LowEntity *low;
-  HighEntity *high;
+    V3 positionWorld;
 } Entity;
 
 typedef struct
@@ -90,13 +60,10 @@ typedef struct
     MemoryArena worldArena;
     World *world;
 
-    u32 playerIndexForController[1];
+    u32 cameraFollowingEntityIndex;
 
-    u32 lowEntityCount;
-    LowEntity lowEntities[100000];
-
-    u32 highEntityCount;
-    HighEntity highEntities_[256];
+    u32 entityCount;
+    Entity entities[256];
 
     M44 worldMatrix;
     M44 viewMatrix;
@@ -109,6 +76,8 @@ typedef struct
     r32 cameraMinDistance;
     r32 cameraMaxDistance;
 
+    r32 cameraIsometricVerticalAxisRotationAngleDegrees;
+    r32 cameraIsometricHorizontalAxisRotationAngleDegrees;
     r32 cameraVerticalAngle;
     r32 cameraHorizontalAngle;
     r32 cameraRotationSpeed;

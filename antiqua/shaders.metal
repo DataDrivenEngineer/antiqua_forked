@@ -113,3 +113,27 @@ vertex VertexOut vertexShaderTile(
 fragment float4 fragmentShaderTile(VertexOut in [[stage_in]]) {
   return float4(in.color, 1.0f);
 }
+
+vertex VertexOut vertexShaderMesh(
+							   const constant VertexIn * vertices [[buffer(5)]],
+							   const ushort vertexIndex [[vertex_id]],
+							   constant const Uniforms &uniforms [[buffer(7)]],
+							   constant const float4x4 &modelMatrix [[buffer(8)]])
+{
+    const constant VertexIn &vData = vertices[vertexIndex];
+
+    float4x4 viewMatrix = uniforms.viewMatrix;
+    float4x4 projectionMatrix = uniforms.projectionMatrix;
+
+    VertexOut ret
+    {
+        .position = projectionMatrix * viewMatrix * modelMatrix * float4(vData.position, 1.0f),
+        .color = vData.color,
+        .pointSize = 10.0f
+    };
+    return ret;
+}
+
+fragment float4 fragmentShaderMesh(VertexOut in [[stage_in]]) {
+  return float4(in.color, 1.0f);
+}

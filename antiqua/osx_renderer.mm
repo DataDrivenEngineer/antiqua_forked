@@ -80,6 +80,30 @@ MONExternC INIT_RENDERER(initRenderer)
         renderPipelineStates[1] = renderPipelineState;
     }
 
+    {
+        id<MTLFunction> vertexFn = [lib newFunctionWithName:@"vertexShaderMesh"];
+        id<MTLFunction> fragmentFn = [lib newFunctionWithName:@"fragmentShaderMesh"];
+
+        MTLRenderPipelineDescriptor *renderPipelineDesc =
+            [[MTLRenderPipelineDescriptor alloc] init];
+        renderPipelineDesc.vertexFunction = vertexFn;
+        renderPipelineDesc.fragmentFunction = fragmentFn;
+        renderPipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+        renderPipelineDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+
+        id<MTLRenderPipelineState> renderPipelineState =
+            [metalDevice newRenderPipelineStateWithDescriptor:renderPipelineDesc
+                         error:0];
+        ASSERT(renderPipelineState != 0);
+
+        [lib release];
+        [vertexFn release];
+        [fragmentFn release];
+        [renderPipelineDesc release];
+
+        renderPipelineStates[2] = renderPipelineState;
+    }
+
     // NOTE(dima): creating depth stencil state
     {
         MTLDepthStencilDescriptor *depthStencilDesc = [[MTLDepthStencilDescriptor alloc] init];
@@ -326,7 +350,7 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
 
                     id<MTLRenderCommandEncoder> renderCommandEnc =
                         [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
-                    [renderCommandEnc setRenderPipelineState:renderPipelineStates[0]];
+                    [renderCommandEnc setRenderPipelineState:renderPipelineStates[2]];
                     [renderCommandEnc setDepthStencilState:depthStencilState];
                     [renderCommandEnc setVertexBuffer: renderGroupBuffer 
                                       offset: renderGroupBufferOffset
@@ -336,6 +360,10 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                                       length: sizeof(renderGroup->uniforms)
                                       attributeStride: 0
                                       atIndex: 7];
+                    [renderCommandEnc setVertexBytes: &Entry->modelMatrix
+                                      length: sizeof(Entry->modelMatrix)
+                                      attributeStride: 0
+                                      atIndex: 8];
                     [renderCommandEnc drawPrimitives:MTLPrimitiveTypeTriangle
                                       vertexStart: 0
                                       vertexCount: 36];

@@ -117,37 +117,37 @@ inline r32 tangent(r32 val)
     return result;
 }
 
-inline r32 sine(r32 val)
+inline r32 sine(r32 valRadians)
 {
     r32 result;
 
 #if COMPILER_LLVM
-    result = __builtin_sinf(val);
+    result = __builtin_sinf(valRadians);
 #else
-    result = sinf(val);
+    result = sinf(valRadians);
 #endif
 
     return result;
 }
 
-inline r32 cosine(r32 val)
+inline r32 cosine(r32 valRadians)
 {
     r32 result;
 
 #if COMPILER_LLVM
-    result = __builtin_cosf(val);
+    result = __builtin_cosf(valRadians);
 #else
-    result = cosf(val);
+    result = cosf(valRadians);
 #endif
 
     return result;
 }
 
-inline r32 arccosine(r32 val)
+inline r32 arccosine(r32 valDegrees)
 {
     r32 result;
 
-    result = acosf(val);
+    result = acosf(valDegrees);
 
     return result;
 }

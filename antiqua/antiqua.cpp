@@ -13,10 +13,95 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #endif
 {
     /* TODO(dima):
-       - implement ray casting through the center of the screen via camera direction vector;
-         draw line to visualize ray
-       - finish implementing movement of isometric camera with WASD
+       - implement movement to click position in a straight line
+       - introduce entities concept and add more objects
+       - draw simple bounding spheres
+       - implement collision detection using bounding spheres
      */
+
+    V3 meshCenterPosWorld = v3(0.0f, 0.0f, 0.5f);
+    r32 vertices[] =
+    {
+        // front face
+        -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
+        1.0f, 0.0f, 0.0f, // color = red
+        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
+        1.0f, 0.0f, 0.0f, // color = red
+        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
+        1.0f, 0.0f, 0.0f, // color = red
+        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
+        1.0f, 0.0f, 0.0f, // color = red
+        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
+        1.0f, 0.0f, 0.0f, // color = red
+        -0.5f, 0.5f, 0.0f, // vertex #0 - coordinates
+        1.0f, 0.0f, 0.0f, // color = red
+        // back face
+        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
+        0.0f, 1.0f, 0.0f, // color = green
+        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
+        0.0f, 1.0f, 0.0f, // color = green
+        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
+        0.0f, 1.0f, 0.0f, // color = green
+        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
+        0.0f, 1.0f, 0.0f, // color = green
+        0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
+        0.0f, 1.0f, 0.0f, // color = green
+        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
+        0.0f, 1.0f, 0.0f, // color = green
+        // left face
+        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
+        0.0f, 0.0f, 1.0f, // color = blue
+        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
+        0.0f, 0.0f, 1.0f, // color = blue
+        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
+        0.0f, 0.0f, 1.0f, // color = blue
+        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
+        0.0f, 0.0f, 1.0f, // color = blue
+        -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
+        0.0f, 0.0f, 1.0f, // color = blue
+        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
+        0.0f, 0.0f, 1.0f, // color = blue
+        // right face
+        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
+        1.0f, 0.4f, 0.0f, // color = orange
+        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
+        1.0f, 0.4f, 0.0f, // color = orange
+        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
+        1.0f, 0.4f, 0.0f, // color = orange
+        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
+        1.0f, 0.4f, 0.0f, // color = orange
+        0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
+        1.0f, 0.4f, 0.0f, // color = orange
+        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
+        1.0f, 0.4f, 0.0f, // color = orange
+        // top face
+        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
+        1.0f, 0.0f, 1.0f, // color = purple
+        -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
+        1.0f, 0.0f, 1.0f, // color = purple
+        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
+        1.0f, 0.0f, 1.0f, // color = purple
+        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
+        1.0f, 0.0f, 1.0f, // color = purple
+        0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
+        1.0f, 0.0f, 1.0f, // color = purple
+        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
+        1.0f, 0.0f, 1.0f, // color = purple
+        // bottom face
+        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
+        0.0f, 1.0f, 1.0f, // color = cyan
+        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
+        0.0f, 1.0f, 1.0f, // color = cyan
+        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
+        0.0f, 1.0f, 1.0f, // color = cyan
+        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
+        0.0f, 1.0f, 1.0f, // color = cyan
+        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
+        0.0f, 1.0f, 1.0f, // color = cyan
+        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
+        0.0f, 1.0f, 1.0f, // color = cyan
+    };
+
     ASSERT(&gcInput->terminator - &gcInput->buttons[0] == ARRAY_COUNT(gcInput->buttons));
     ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
 
@@ -40,7 +125,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->cameraRotationSpeed = 0.3f;
         gameState->cameraMovementSpeed = 0.1f;
 
-        gameState->cameraPosWorld = v3(-2.5f, 2.0f, -1.5f);
         gameState->v = v3(0.0f, 1.0f, 0.0f);
         gameState->n = v3(0.0f, 0.0f, 1.0f);
         gameState->u = cross(gameState->n, gameState->v);
@@ -52,22 +136,51 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->tileCountPerSide = 64;
         gameState->tileSideLength = 1.0f;
 
-        {
+        { 
             // NOTE(dima): Below is isometric camera setup
+            gameState->cameraIsometricVerticalAxisRotationAngleDegrees = 45.0f;
+            gameState->cameraIsometricHorizontalAxisRotationAngleDegrees = 35.23f;//45.0f;
             gameState->isometricV = gameState->v;
             gameState->isometricN = gameState->n;
             gameState->isometricU = gameState->u;
 
             // NOTE(dima): rotate around vertical axis by 45 degrees
-            rotate(&gameState->isometricN, gameState->isometricV, 45.0f);
+            rotate(&gameState->isometricN,
+                   gameState->isometricV,
+                   gameState->cameraIsometricVerticalAxisRotationAngleDegrees);
 
             // NOTE(dima): rotate around horizontal axis by 45 degrees
             gameState->isometricU = cross(gameState->isometricV, gameState->isometricN);
             normalize(&gameState->isometricU);
-            rotate(&gameState->isometricN, gameState->isometricU, 45.0f);
+            rotate(&gameState->isometricN,
+                   gameState->isometricU,
+                   gameState->cameraIsometricHorizontalAxisRotationAngleDegrees);
 
             gameState->isometricV = cross(gameState->isometricN, gameState->isometricU);
             normalize(&gameState->isometricV);
+        }
+
+        {
+            Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
+            newEntity->type = EntityType_Cube;
+            newEntity->positionWorld = v3(0.0f, 0.0f, 0.0f);
+            gameState->entityCount++;
+        }
+        {
+            Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
+            newEntity->type = EntityType_Cube;
+            newEntity->positionWorld = v3(5.0f, 0.0f, 5.0f);
+            gameState->entityCount++;
+        }
+
+        gameState->cameraFollowingEntityIndex = 1;
+
+        {
+            // NOTE(dima): set up camera to look at entity it follows
+            Entity *cameraFollowingEntity = gameState->entities + gameState->cameraFollowingEntityIndex;
+
+            r32 offsetFromCamera = (gameState->cameraMinDistance + 0.001f) / sine(RADIANS(gameState->cameraIsometricHorizontalAxisRotationAngleDegrees));
+            gameState->cameraPosWorld = cameraFollowingEntity->positionWorld - offsetFromCamera * gameState->isometricN;
         }
 
         memory->isInitialized = true;
@@ -323,102 +436,119 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                          gameState->tileSideLength,
                          gameState->tilemapOriginPositionWorld,
                          v3(1.0f, 1.0f, 1.0f));
-    r32 vertices[] =
-    {
-        // front face
-        -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
-        1.0f, 0.0f, 0.0f, // color = red
-        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
-        1.0f, 0.0f, 0.0f, // color = red
-        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-        1.0f, 0.0f, 0.0f, // color = red
-        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-        1.0f, 0.0f, 0.0f, // color = red
-        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-        1.0f, 0.0f, 0.0f, // color = red
-        -0.5f, 0.5f, 0.0f, // vertex #0 - coordinates
-        1.0f, 0.0f, 0.0f, // color = red
-        // back face
-        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-        0.0f, 1.0f, 0.0f, // color = green
-        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
-        0.0f, 1.0f, 0.0f, // color = green
-        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-        0.0f, 1.0f, 0.0f, // color = green
-        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-        0.0f, 1.0f, 0.0f, // color = green
-        0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
-        0.0f, 1.0f, 0.0f, // color = green
-        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-        0.0f, 1.0f, 0.0f, // color = green
-        // left face
-        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-        0.0f, 0.0f, 1.0f, // color = blue
-        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
-        0.0f, 0.0f, 1.0f, // color = blue
-        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
-        0.0f, 0.0f, 1.0f, // color = blue
-        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
-        0.0f, 0.0f, 1.0f, // color = blue
-        -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
-        0.0f, 0.0f, 1.0f, // color = blue
-        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-        0.0f, 0.0f, 1.0f, // color = blue
-        // right face
-        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-        1.0f, 0.4f, 0.0f, // color = orange
-        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-        1.0f, 0.4f, 0.0f, // color = orange
-        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-        1.0f, 0.4f, 0.0f, // color = orange
-        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-        1.0f, 0.4f, 0.0f, // color = orange
-        0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
-        1.0f, 0.4f, 0.0f, // color = orange
-        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-        1.0f, 0.4f, 0.0f, // color = orange
-        // top face
-        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-        1.0f, 0.0f, 1.0f, // color = purple
-        -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
-        1.0f, 0.0f, 1.0f, // color = purple
-        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-        1.0f, 0.0f, 1.0f, // color = purple
-        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-        1.0f, 0.0f, 1.0f, // color = purple
-        0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
-        1.0f, 0.0f, 1.0f, // color = purple
-        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-        1.0f, 0.0f, 1.0f, // color = purple
-        // bottom face
-        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
-        0.0f, 1.0f, 1.0f, // color = cyan
-        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
-        0.0f, 1.0f, 1.0f, // color = cyan
-        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-        0.0f, 1.0f, 1.0f, // color = cyan
-        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-        0.0f, 1.0f, 1.0f, // color = cyan
-        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-        0.0f, 1.0f, 1.0f, // color = cyan
-        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
-        0.0f, 1.0f, 1.0f, // color = cyan
-    };
+
     for (u32 yCoordIndex = 1;
          yCoordIndex < ARRAY_COUNT(vertices);
          yCoordIndex += 6)
     {
         vertices[yCoordIndex] += 0.5f;
     }
-//    pushRenderEntryLine(&renderGroupArena,
-//                        &renderGroup,
-//                        v3(1.0f, 0.0f, 0.0f),
-//                        v3(0.75f, 0.75f, 0.5f),
-//                        v3(1.25f, 1.25f, 0.5f));
-    pushRenderEntryMesh(&renderGroupArena,
-                        &renderGroup,
-                        vertices,
-                        ARRAY_COUNT(vertices));
+
+#if 0
+    // NOTE(dima): code to calculate vertices of bounding sphere
+    V3 min = v3(vertices[0], vertices[1], vertices[2]),
+        max = v3(min.x, min.y, min.z);
+    V3 centerCoordinateWorld;
+    r32 radius = 0.0f;
+    const u32 numberOfSlices = 16;
+    const u32 numberOfStacks = 16;
+    V3 sphereVertices[numberOfSlices * numberOfStacks];
+    {
+        /* NOTE(dima): calculating AABB */
+
+        for (u32 vertexIndex = 0;
+             vertexIndex < ARRAY_COUNT(vertices);
+             vertexIndex += 6)
+        {
+            V3 *vertex = (V3 *) &vertices[vertexIndex];
+            if (vertex->x < min.x)
+            {
+                min.x = vertex->x;
+            }
+            if (vertex->y < min.y)
+            {
+                min.y = vertex->y;
+            }
+            if (vertex->z < min.z)
+            {
+                min.z = vertex->z;
+            }
+
+            if (vertex->x > max.x)
+            {
+                max.x = vertex->x;
+            }
+            if (vertex->y > max.y)
+            {
+                max.y = vertex->y;
+            }
+            if (vertex->z > max.z)
+            {
+                max.z = vertex->z;
+            }
+        }
+
+        centerCoordinateWorld.x = (min.x + max.x) / 2;
+        centerCoordinateWorld.y = (min.y + max.y) / 2;
+        centerCoordinateWorld.z = (min.z + max.z) / 2;
+
+        for (u32 vertexIndex = 0;
+             vertexIndex < ARRAY_COUNT(vertices);
+             vertexIndex += 6)
+        {
+            V3 *vertex = (V3 *) &vertices[vertexIndex];
+            r32 squareDistance = squareLength(centerCoordinateWorld - *vertex);
+            if (squareDistance > radius)
+            {
+                radius = squareDistance;
+            }
+        }
+
+        radius = sqrt(radius);
+
+        for (u32 stackIndex = 0;
+             stackIndex < numberOfStacks;
+             ++stackIndex)
+        {
+            r32 phiArcLength = (stackIndex / (r32) numberOfStacks) * 2.0f * PI32 * radius;
+            r32 phi = (phiArcLength * 360.0f) / (2.0f * PI32 * radius);
+            for (u32 sliceIndex = 0;
+                 sliceIndex < numberOfSlices;
+                 ++sliceIndex)
+            {
+                r32 thetaArcLength = (sliceIndex / (r32) numberOfSlices) * 2.0f * PI32 * radius;
+                r32 theta = (thetaArcLength * 360.f) / (2.0f * PI32 * radius);
+                r32 x = radius * sine(phi) * cosine(theta);
+                r32 y = radius * cosine(phi);
+                r32 z = radius * sine(theta) * sine(phi);
+                sphereVertices[stackIndex * numberOfStacks + sliceIndex] = v3(x, y, z);
+            }
+        }
+    }
+
+//    for (u32 sphereVertexIndex = 0;
+//         sphereVertexIndex < ARRAY_COUNT(sphereVertices);
+//         ++sphereVertexIndex)
+//    {
+//        pushRenderEntryPoint(&renderGroupArena,
+//                             &renderGroup,
+//                             sphereVertices[sphereVertexIndex],
+//                             v3(1.0f, 0.0f, 0.0f));
+//    }
+#endif
+
+    for (u32 entityIndex = 0;
+         entityIndex < gameState->entityCount;
+         ++entityIndex)
+    {
+        Entity *entity = gameState->entities + entityIndex;
+        pushRenderEntryMesh(&renderGroupArena,
+                            &renderGroup,
+                            entity->positionWorld,
+                            vertices,
+                            ARRAY_COUNT(vertices));
+    }
+
     pushRenderEntryPoint(&renderGroupArena,
                          &renderGroup,
                          v3(mousePosNearPlaneWorld),

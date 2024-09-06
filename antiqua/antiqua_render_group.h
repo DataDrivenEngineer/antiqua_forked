@@ -43,6 +43,7 @@ typedef struct
     u32 size;
     /* NOTE(dima): colors are packed together with vertices,
                    like this: [vertex color vertex color] */
+    M44 modelMatrix;
     r32 *data;
 } RenderEntryMesh;
 
