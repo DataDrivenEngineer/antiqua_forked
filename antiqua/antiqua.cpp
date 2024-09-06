@@ -13,13 +13,10 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #endif
 {
     /* TODO(dima):
-       - implement movement to click position in a straight line
-       - introduce entities concept and add more objects
-       - draw simple bounding spheres
-       - implement collision detection using bounding spheres
+       - implement movement with WASD keys
+       - implement collision detection using bounding circles and/or rectangles
      */
 
-    V3 meshCenterPosWorld = v3(0.0f, 0.0f, 0.5f);
     r32 vertices[] =
     {
         // front face
@@ -102,6 +99,59 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         0.0f, 1.0f, 1.0f, // color = cyan
     };
 
+    // NOTE(dima): move mesh center to (0;0;0)
+    // TODO(dima): don't do it every frame - just do it once when loading a mesh
+    r32 minX = 0.0f, maxX = 0.0f, minY = 0.0f, maxY = 0.0f, minZ = 0.0f, maxZ = 0.0f;
+    for (u32 vertexIndex = 0;
+         vertexIndex < ARRAY_COUNT(vertices) - 3;
+         vertexIndex += 6)
+    {
+        r32 x = vertices[vertexIndex];
+        r32 y = vertices[vertexIndex + 1];
+        r32 z = vertices[vertexIndex + 2];
+
+        if (x < minX)
+        {
+            minX = x;
+        }
+        if (x > maxX)
+        {
+            maxX = x;
+        }
+
+        if (y < minY)
+        {
+            minY = y;
+        }
+        if (y > maxY)
+        {
+            maxY = y;
+        }
+
+        if (z < minZ)
+        {
+            minZ = z;
+        }
+        if (z > maxZ)
+        {
+            maxZ = z;
+        }
+    }
+
+    r32 centerX = (minX + maxX) / 2;
+    r32 centerY = (minY + maxY) / 2;
+    r32 centerZ = (minZ + maxZ) / 2;
+
+
+    for (u32 vertexIndex = 0;
+         vertexIndex < ARRAY_COUNT(vertices) - 3;
+         vertexIndex += 6)
+    {
+        vertices[vertexIndex] -= centerX;
+        vertices[vertexIndex + 1] -= centerY;
+        vertices[vertexIndex + 2] -= centerZ;
+    }
+
     ASSERT(&gcInput->terminator - &gcInput->buttons[0] == ARRAY_COUNT(gcInput->buttons));
     ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
 
@@ -158,13 +208,13 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         {
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
             newEntity->type = EntityType_Cube;
-            newEntity->positionWorld = v3(0.0f, 0.0f, 0.0f);
+            newEntity->positionWorld = v3(0.0f, 0.5f, 0.0f);
             gameState->entityCount++;
         }
         {
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
             newEntity->type = EntityType_Cube;
-            newEntity->positionWorld = v3(5.0f, 0.0f, 5.0f);
+            newEntity->positionWorld = v3(5.0f, 0.5f, 5.0f);
             gameState->entityCount++;
         }
 
@@ -431,13 +481,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                          gameState->tileSideLength,
                          gameState->tilemapOriginPositionWorld,
                          v3(1.0f, 1.0f, 1.0f));
-
-    for (u32 yCoordIndex = 1;
-         yCoordIndex < ARRAY_COUNT(vertices);
-         yCoordIndex += 6)
-    {
-        vertices[yCoordIndex] += 0.5f;
-    }
 
 #if 0
     // NOTE(dima): code to calculate vertices of bounding sphere
