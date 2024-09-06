@@ -75,6 +75,7 @@ typedef struct
 
     r32 cameraMinDistance;
     r32 cameraMaxDistance;
+    r32 cameraCurrDistance;
 
     r32 cameraIsometricVerticalAxisRotationAngleDegrees;
     r32 cameraIsometricHorizontalAxisRotationAngleDegrees;

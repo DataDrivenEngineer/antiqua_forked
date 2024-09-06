@@ -166,6 +166,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
         gameState->cameraMinDistance = 5.0f;
         gameState->cameraMaxDistance = 20.0f;
+        gameState->cameraCurrDistance = gameState->cameraMinDistance;
 
         gameState->cameraRotationSpeed = 0.3f;
         gameState->cameraMovementSpeed = 0.1f;
@@ -220,49 +221,20 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
         gameState->cameraFollowingEntityIndex = 1;
 
-        {
-            // NOTE(dima): set up camera to look at entity it follows
-            Entity *cameraFollowingEntity = gameState->entities + gameState->cameraFollowingEntityIndex;
-
-            r32 offsetFromCamera = (gameState->cameraMinDistance + 0.001f) / sine(RADIANS(gameState->cameraIsometricHorizontalAxisRotationAngleDegrees));
-            gameState->cameraPosWorld = cameraFollowingEntity->positionWorld - offsetFromCamera * gameState->isometricN;
-        }
-
         memory->isInitialized = true;
     }
 
     if (gcInput->scrollingDeltaY != 0.0f)
     {
-        r32 newCameraPosWorldY = gameState->cameraPosWorld.y + gameState->cameraMovementSpeed * -gcInput->scrollingDeltaY;
-        if (newCameraPosWorldY >= gameState->cameraMinDistance
-            && newCameraPosWorldY <= gameState->cameraMaxDistance)
+        gameState->cameraCurrDistance += gameState->cameraMovementSpeed * -gcInput->scrollingDeltaY;
+        if (gameState->cameraCurrDistance > gameState->cameraMaxDistance)
         {
-            gameState->cameraPosWorld.y = newCameraPosWorldY;
+            gameState->cameraCurrDistance = gameState->cameraMaxDistance;
         }
-        else if (newCameraPosWorldY > gameState->cameraMaxDistance)
+        else if (gameState->cameraCurrDistance < gameState->cameraMinDistance)
         {
-            gameState->cameraPosWorld.y = gameState->cameraMaxDistance;
+            gameState->cameraCurrDistance = gameState->cameraMinDistance;
         }
-        else
-        {
-            gameState->cameraPosWorld.y = gameState->cameraMinDistance;
-        }
-    }
-
-    if (gcInput->right.endedDown)
-    {
-        V3 u = cross(gameState->v, gameState->n);
-        normalize(&u);
-        gameState->cameraPosWorld = gameState->cameraPosWorld
-                                    + gameState->cameraMovementSpeed * u;
-    }
-
-    if (gcInput->left.endedDown)
-    {
-        V3 u = cross(gameState->n, gameState->v);
-        normalize(&u);
-        gameState->cameraPosWorld = gameState->cameraPosWorld
-                                    + gameState->cameraMovementSpeed * u;
     }
 
     if (gcInput->debugCmdC.endedDown)
@@ -272,6 +244,22 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
     if (gameState->debugCameraEnabled)
     {
+        if (gcInput->right.endedDown)
+        {
+            V3 u = cross(gameState->v, gameState->n);
+            normalize(&u);
+            gameState->cameraPosWorld = gameState->cameraPosWorld
+                                        + gameState->cameraMovementSpeed * u;
+        }
+
+        if (gcInput->left.endedDown)
+        {
+            V3 u = cross(gameState->n, gameState->v);
+            normalize(&u);
+            gameState->cameraPosWorld = gameState->cameraPosWorld
+                                        + gameState->cameraMovementSpeed * u;
+        }
+
         if (gcInput->up.endedDown)
         {
             gameState->cameraPosWorld = gameState->cameraPosWorld
@@ -317,17 +305,36 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     }
     else
     {
+        Entity *cameraFollowingEntity = gameState->entities + gameState->cameraFollowingEntityIndex;
+
         if (gcInput->up.endedDown)
         {
-            gameState->cameraPosWorld = gameState->cameraPosWorld
-                                        + gameState->cameraMovementSpeed * v3(gameState->v.x, 0.0f, gameState->v.z);
+            cameraFollowingEntity->positionWorld = cameraFollowingEntity->positionWorld + gameState->cameraMovementSpeed * v3(gameState->v.x, 0.0f, gameState->v.z);
         }
 
         if (gcInput->down.endedDown)
         {
-            gameState->cameraPosWorld = gameState->cameraPosWorld
-                                        - gameState->cameraMovementSpeed * v3(gameState->v.x, 0.0f, gameState->v.z);
+            cameraFollowingEntity->positionWorld = cameraFollowingEntity->positionWorld - gameState->cameraMovementSpeed * v3(gameState->v.x, 0.0f, gameState->v.z);
         }
+
+        if (gcInput->right.endedDown)
+        {
+            V3 u = cross(gameState->v, gameState->n);
+            normalize(&u);
+            cameraFollowingEntity->positionWorld = cameraFollowingEntity->positionWorld + gameState->cameraMovementSpeed * u;
+        }
+
+        if (gcInput->left.endedDown)
+        {
+            V3 u = cross(gameState->n, gameState->v);
+            normalize(&u);
+            cameraFollowingEntity->positionWorld = cameraFollowingEntity->positionWorld + gameState->cameraMovementSpeed * u;
+        }
+
+
+        // NOTE(dima): set up camera to look at entity it follows
+        r32 offsetFromCamera = (gameState->cameraCurrDistance + 0.001f) / sine(RADIANS(gameState->cameraIsometricHorizontalAxisRotationAngleDegrees));
+        gameState->cameraPosWorld = cameraFollowingEntity->positionWorld - offsetFromCamera * gameState->isometricN;
 
         gameState->mousePos[0] = gcInput->mouseX;
         gameState->mousePos[1] = gcInput->mouseY;
