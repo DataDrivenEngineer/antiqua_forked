@@ -24,8 +24,7 @@ struct Uniforms
 vertex VertexOut vertexShader(
 							   const constant VertexIn * vertices [[buffer(5)]],
 							   const ushort vertexIndex [[vertex_id]],
-							   constant const Uniforms &uniforms [[buffer(7)]],
-							   constant const float *mousePos [[buffer(8)]])
+							   constant const Uniforms &uniforms [[buffer(7)]])
 {
     const constant VertexIn &vData = vertices[vertexIndex];
 
@@ -56,7 +55,6 @@ vertex VertexOut vertexShaderTile(
 							   const constant VertexInTile *data [[buffer(5)]],
 							   const ushort vertexIndex [[vertex_id]],
 							   constant const Uniforms &uniforms [[buffer(7)]],
-							   constant const float *mousePos [[buffer(8)]],
                  uint instanceId [[instance_id]])
 {
     VertexInTile tileData = data[0];
