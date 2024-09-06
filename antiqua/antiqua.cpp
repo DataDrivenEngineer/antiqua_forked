@@ -110,11 +110,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     {
         // do initialization here as needed
 
-        gameState->worldMatrix = {1.0f, 0.0f, 0.0f, 0.0f,
-                                  0.0f, 1.0f, 0.0f, 0.0f,
-                                  0.0f, 0.0f, 1.0f, 0.0f,
-                                  0.0f, 0.0f, 0.0f, 1.0f};
-
         gameState->near = 1.0f;
         gameState->far = 100.0f;
         gameState->fov = 45.0f;
@@ -566,9 +561,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                          v3(screenCenterPosNearPlaneWorld),
                          v3(0.0f, 1.0f, 0.0f));
 
-    renderGroup.uniforms[0] = gameState->worldMatrix;
-    renderGroup.uniforms[1] = gameState->viewMatrix;
-    renderGroup.uniforms[2] = gameState->projectionMatrix;
+    renderGroup.uniforms[0] = gameState->viewMatrix;
+    renderGroup.uniforms[1] = gameState->projectionMatrix;
 
     memory->renderOnGpu(0, &renderGroup);
 

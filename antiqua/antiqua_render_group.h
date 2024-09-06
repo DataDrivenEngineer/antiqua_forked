@@ -62,7 +62,7 @@ typedef struct RenderGroup
     u8 *pushBufferBase;
     u32 pushBufferElementCount;
     RenderGroupEntryHeader *prevHeader;
-    M44 uniforms[3];
+    M44 uniforms[2];
 } RenderGroup;
 
 #endif

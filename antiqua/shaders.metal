@@ -17,7 +17,6 @@ struct VertexOut {
 
 struct Uniforms
 {
-    float4x4 worldMatrix;
     float4x4 viewMatrix;
     float4x4 projectionMatrix;
 };
@@ -30,13 +29,12 @@ vertex VertexOut vertexShader(
 {
     const constant VertexIn &vData = vertices[vertexIndex];
 
-    float4x4 worldMatrix = uniforms.worldMatrix;
     float4x4 viewMatrix = uniforms.viewMatrix;
     float4x4 projectionMatrix = uniforms.projectionMatrix;
 
     VertexOut ret
     {
-        .position = projectionMatrix * viewMatrix * worldMatrix * float4(vData.position, 1.0f),
+        .position = projectionMatrix * viewMatrix * float4(vData.position, 1.0f),
         .color = vData.color,
         .pointSize = 10.0f
     };
@@ -97,13 +95,12 @@ vertex VertexOut vertexShaderTile(
     tileVertexPositionsWorld[3].z = tileVertexPositionsWorld[0].z - tileData.tileSideLength;
     tileVertexPositionsWorld[3].w = 1.0f;
 
-    float4x4 worldMatrix = uniforms.worldMatrix;
     float4x4 viewMatrix = uniforms.viewMatrix;
     float4x4 projectionMatrix = uniforms.projectionMatrix;
 
     VertexOut ret
     {
-        .position = projectionMatrix * viewMatrix * worldMatrix * tileVertexPositionsWorld[vertexIndex],
+        .position = projectionMatrix * viewMatrix * tileVertexPositionsWorld[vertexIndex],
         .color = tileData.color,
         .pointSize = 0.0f
     };
