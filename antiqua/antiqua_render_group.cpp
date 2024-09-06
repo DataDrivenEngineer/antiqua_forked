@@ -76,6 +76,7 @@ void pushRenderEntryLine(MemoryArena *arena,
 void pushRenderEntryMesh(MemoryArena *arena,
                          RenderGroup *renderGroup,
                          V3 positionWorld,
+                         V3 scaleFactor,
                          r32 *vertices,
                          u32 totalCountOfElementsInArray)
 {
@@ -88,9 +89,9 @@ void pushRenderEntryMesh(MemoryArena *arena,
     RenderEntryMesh *entry =
         (RenderEntryMesh *)(PUSH_STRUCT(arena, RenderEntryMesh));
     entry->size = sizeof(r32) * totalCountOfElementsInArray;
-    entry->modelMatrix = {1.0f, 0.0f, 0.0f, 0.0f,
-                          0.0f, 1.0f, 0.0f, 0.0f,
-                          0.0f, 0.0f, 1.0f, 0.0f,
+    entry->modelMatrix = {scaleFactor.x, 0.0f, 0.0f, 0.0f,
+                          0.0f, scaleFactor.y, 0.0f, 0.0f,
+                          0.0f, 0.0f, scaleFactor.z, 0.0f,
                           positionWorld.x,
                           positionWorld.y,
                           positionWorld.z,

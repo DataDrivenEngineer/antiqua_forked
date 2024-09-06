@@ -53,6 +53,7 @@ typedef struct
 {
     EntityType type;
     V3 positionWorld;
+    V3 scaleFactor;
 } Entity;
 
 typedef struct

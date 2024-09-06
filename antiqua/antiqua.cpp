@@ -13,7 +13,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #endif
 {
     /* TODO(dima):
-       - implement movement with WASD keys
        - implement collision detection using bounding circles and/or rectangles
      */
 
@@ -210,16 +209,18 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
             newEntity->type = EntityType_Cube;
             newEntity->positionWorld = v3(0.0f, 0.5f, 0.0f);
+            newEntity->scaleFactor = v3(1.0f, 1.0f, 1.0f);
             gameState->entityCount++;
         }
         {
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
             newEntity->type = EntityType_Cube;
             newEntity->positionWorld = v3(5.0f, 0.5f, 5.0f);
+            newEntity->scaleFactor = v3(20.0f, 1.0f, 1.0f);
             gameState->entityCount++;
         }
 
-        gameState->cameraFollowingEntityIndex = 1;
+        gameState->cameraFollowingEntityIndex = 0;
 
         memory->isInitialized = true;
     }
@@ -582,14 +583,15 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 //    }
 #endif
 
-    for (u32 entityIndex = 0;
-         entityIndex < gameState->entityCount;
-         ++entityIndex)
+    for (s32 entityIndex = gameState->entityCount - 1;
+         entityIndex >= 0;
+         --entityIndex)
     {
         Entity *entity = gameState->entities + entityIndex;
         pushRenderEntryMesh(&renderGroupArena,
                             &renderGroup,
                             entity->positionWorld,
+                            entity->scaleFactor,
                             vertices,
                             ARRAY_COUNT(vertices));
     }
