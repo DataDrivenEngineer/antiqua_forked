@@ -163,6 +163,10 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
         unlockInputThread(&thread);
       }
     }
+    else
+    {
+        fprintf(stderr, "Failed to stat library with game code, error: %s\n", strerror(errno));
+    }
   }
 #endif
 

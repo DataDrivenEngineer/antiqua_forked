@@ -78,6 +78,9 @@ typedef struct
     r32 cameraMaxDistance;
     r32 cameraCurrDistance;
 
+    r32 playerSpeed;
+    V3 dPlayerPosition;
+
     r32 cameraIsometricVerticalAxisRotationAngleDegrees;
     r32 cameraIsometricHorizontalAxisRotationAngleDegrees;
     r32 cameraVerticalAngle;

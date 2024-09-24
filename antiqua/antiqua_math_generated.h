@@ -200,6 +200,41 @@ operator*=(r32 a)
     return *this;
 }
 
+// NOTE(dima): Operator override: unary minus
+
+inline V2 operator-(V2 a)
+{
+    V2 result;
+
+    result.x = -a.x;
+    result.y = -a.y;
+
+    return result;
+}
+
+inline V3 operator-(V3 a)
+{
+    V3 result;
+
+    result.x = -a.x;
+    result.y = -a.y;
+    result.z = -a.z;
+
+    return result;
+}
+
+inline V4 operator-(V4 a)
+{
+    V4 result;
+
+    result.x = -a.x;
+    result.y = -a.y;
+    result.z = -a.z;
+    result.w = -a.w;
+
+    return result;
+}
+
 // NOTE(dima): Operator override: subtract a vector
 
 inline V2 operator-(V2 a, V2 b)

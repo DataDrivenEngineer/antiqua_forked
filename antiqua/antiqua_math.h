@@ -214,4 +214,15 @@ inline void rotate(V3 *vectorToRotate, V3 vectorOfRotation, r32 rotationAngleInD
     normalize(vectorToRotate);
 }
 
+// NOTE(dima): Miscellaneous functions
+
+inline r32 square(r32 val)
+{
+    r32 result;
+
+    result = val * val;
+
+    return result;
+}
+
 #endif

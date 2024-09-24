@@ -163,12 +163,14 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->far = 100.0f;
         gameState->fov = 45.0f;
 
+        gameState->playerSpeed = 20.0f;
+
         gameState->cameraMinDistance = 5.0f;
         gameState->cameraMaxDistance = 20.0f;
         gameState->cameraCurrDistance = gameState->cameraMinDistance;
 
         gameState->cameraRotationSpeed = 0.3f;
-        gameState->cameraMovementSpeed = 0.1f;
+        gameState->cameraMovementSpeed = 5.0f;
 
         gameState->v = v3(0.0f, 1.0f, 0.0f);
         gameState->n = v3(0.0f, 0.0f, 1.0f);
@@ -227,7 +229,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
     if (gcInput->scrollingDeltaY != 0.0f)
     {
-        gameState->cameraCurrDistance += gameState->cameraMovementSpeed * -gcInput->scrollingDeltaY;
+        gameState->cameraCurrDistance += gameState->cameraMovementSpeed * deltaTimeSec * -gcInput->scrollingDeltaY;
         if (gameState->cameraCurrDistance > gameState->cameraMaxDistance)
         {
             gameState->cameraCurrDistance = gameState->cameraMaxDistance;
@@ -250,7 +252,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             V3 u = cross(gameState->v, gameState->n);
             normalize(&u);
             gameState->cameraPosWorld = gameState->cameraPosWorld
-                                        + gameState->cameraMovementSpeed * u;
+                                        + gameState->cameraMovementSpeed * deltaTimeSec * u;
         }
 
         if (gcInput->left.endedDown)
@@ -258,19 +260,19 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             V3 u = cross(gameState->n, gameState->v);
             normalize(&u);
             gameState->cameraPosWorld = gameState->cameraPosWorld
-                                        + gameState->cameraMovementSpeed * u;
+                                        + gameState->cameraMovementSpeed * deltaTimeSec * u;
         }
 
         if (gcInput->up.endedDown)
         {
             gameState->cameraPosWorld = gameState->cameraPosWorld
-                                        + gameState->cameraMovementSpeed * gameState->n;
+                                        + gameState->cameraMovementSpeed * deltaTimeSec * gameState->n;
         }
 
         if (gcInput->down.endedDown)
         {
             gameState->cameraPosWorld = gameState->cameraPosWorld
-                                        - gameState->cameraMovementSpeed * gameState->n;
+                                        - gameState->cameraMovementSpeed * deltaTimeSec * gameState->n;
         }
 
         if ((gcInput->mouseX != gameState->mousePos[0] || gcInput->mouseY != gameState->mousePos[1]))
@@ -308,30 +310,86 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     {
         Entity *cameraFollowingEntity = gameState->entities + gameState->cameraFollowingEntityIndex;
 
+        V3 playerAcceleration = {};
+
         if (gcInput->up.endedDown)
         {
-            cameraFollowingEntity->positionWorld = cameraFollowingEntity->positionWorld + gameState->cameraMovementSpeed * v3(gameState->v.x, 0.0f, gameState->v.z);
+            playerAcceleration.x = gameState->v.x;
+            playerAcceleration.z = gameState->v.z;
         }
 
         if (gcInput->down.endedDown)
         {
-            cameraFollowingEntity->positionWorld = cameraFollowingEntity->positionWorld - gameState->cameraMovementSpeed * v3(gameState->v.x, 0.0f, gameState->v.z);
+            playerAcceleration.x = -gameState->v.x;
+            playerAcceleration.z = -gameState->v.z;
         }
 
         if (gcInput->right.endedDown)
         {
-            V3 u = cross(gameState->v, gameState->n);
-            normalize(&u);
-            cameraFollowingEntity->positionWorld = cameraFollowingEntity->positionWorld + gameState->cameraMovementSpeed * u;
+            V3 uWithoutY = cross(gameState->v, gameState->n);
+            uWithoutY.y = 0.0f;
+            normalize(&uWithoutY);
+            V3 vWithoutY = v3(gameState->v.x, 0.0f, gameState->v.z);
+            r32 vWithoutYLength = length(vWithoutY);
+            vWithoutY = (1.0f / vWithoutYLength) * vWithoutY;
+
+            if (gcInput->up.endedDown)
+            {
+                V3 diagonalDirectionVector = vWithoutY + uWithoutY;
+                normalize(&diagonalDirectionVector);
+                playerAcceleration.x = diagonalDirectionVector.x;
+                playerAcceleration.z = diagonalDirectionVector.z;
+            }
+            else if (gcInput->down.endedDown)
+            {
+                V3 diagonalDirectionVector = -vWithoutY + uWithoutY;
+                normalize(&diagonalDirectionVector);
+                playerAcceleration.x = diagonalDirectionVector.x;
+                playerAcceleration.z = diagonalDirectionVector.z;
+            }
+            else
+            {
+                playerAcceleration.x = uWithoutY.x;
+                playerAcceleration.z = uWithoutY.z;
+            }
         }
 
         if (gcInput->left.endedDown)
         {
-            V3 u = cross(gameState->n, gameState->v);
-            normalize(&u);
-            cameraFollowingEntity->positionWorld = cameraFollowingEntity->positionWorld + gameState->cameraMovementSpeed * u;
+            V3 uWithoutY = cross(gameState->n, gameState->v);
+            uWithoutY.y = 0.0f;
+            normalize(&uWithoutY);
+            V3 vWithoutY = v3(gameState->v.x, 0.0f, gameState->v.z);
+            r32 vWithoutYLength = length(vWithoutY);
+            vWithoutY = (1.0f / vWithoutYLength) * vWithoutY;
+
+            if (gcInput->up.endedDown)
+            {
+                V3 diagonalDirectionVector = vWithoutY + uWithoutY;
+                normalize(&diagonalDirectionVector);
+                playerAcceleration.x = diagonalDirectionVector.x;
+                playerAcceleration.z = diagonalDirectionVector.z;
+            }
+            else if (gcInput->down.endedDown)
+            {
+                V3 diagonalDirectionVector = -vWithoutY + uWithoutY;
+                normalize(&diagonalDirectionVector);
+                playerAcceleration.x = diagonalDirectionVector.x;
+                playerAcceleration.z = diagonalDirectionVector.z;
+            }
+            else
+            {
+                playerAcceleration.x = uWithoutY.x;
+                playerAcceleration.z = uWithoutY.z;
+            }
         }
 
+        playerAcceleration *= gameState->playerSpeed;
+
+        playerAcceleration = playerAcceleration + -3.0f * gameState->dPlayerPosition;
+
+        cameraFollowingEntity->positionWorld = 0.5f * playerAcceleration * square(deltaTimeSec) + gameState->dPlayerPosition * deltaTimeSec + cameraFollowingEntity->positionWorld;
+        gameState->dPlayerPosition = playerAcceleration * deltaTimeSec + gameState->dPlayerPosition;
 
         // NOTE(dima): set up camera to look at entity it follows
         r32 offsetFromCamera = (gameState->cameraCurrDistance + 0.001f) / sine(RADIANS(gameState->cameraIsometricHorizontalAxisRotationAngleDegrees));

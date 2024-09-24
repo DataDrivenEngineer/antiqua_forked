@@ -136,6 +136,22 @@ void generateMultiplyEqualScalarOverride(FILE *file, int size)
     fprintf(file, "}\n");
     fprintf(file, "\n");
 }
+
+void generateUnaryMinusOverride(FILE *file, char *dim, int size)
+{
+    fprintf(file, "inline V%d operator-(V%d a)\n", size, size);
+    fprintf(file, "{\n");
+    fprintf(file, "%sV%d result;\n", TAB, size);
+    fprintf(file, "\n");
+    for (int i = 0; i < size; ++i)
+    {
+        fprintf(file, "%sresult.%c = -a.%c;\n", TAB, dim[i], dim[i]);
+    }
+    fprintf(file, "\n");
+    fprintf(file, "%sreturn result;\n", TAB);
+    fprintf(file, "}\n");
+    fprintf(file, "\n");
+}
  
 void generateSubtractOverride(FILE *file, char *dim, int size)
 {
@@ -368,6 +384,11 @@ int main(int argc, char **argv)
     generateMultiplyEqualScalarOverride(result, ARRAY_COUNT(v2));
     generateMultiplyEqualScalarOverride(result, ARRAY_COUNT(v3));
     generateMultiplyEqualScalarOverride(result, ARRAY_COUNT(v4));
+
+    fprintf(result, "// NOTE(dima): Operator override: unary minus\n\n");
+    generateUnaryMinusOverride(result, v2, ARRAY_COUNT(v2));
+    generateUnaryMinusOverride(result, v3, ARRAY_COUNT(v3));
+    generateUnaryMinusOverride(result, v4, ARRAY_COUNT(v4));
 
     fprintf(result, "// NOTE(dima): Operator override: subtract a vector\n\n");
     generateSubtractOverride(result, v2, ARRAY_COUNT(v2));
