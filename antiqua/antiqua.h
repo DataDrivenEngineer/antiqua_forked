@@ -54,6 +54,7 @@ typedef struct
     EntityType type;
     V3 positionWorld;
     V3 scaleFactor;
+    V2 axisAlignedBoundingEllipseRadiuses;
 } Entity;
 
 typedef struct

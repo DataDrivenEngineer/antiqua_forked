@@ -98,57 +98,60 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         0.0f, 1.0f, 1.0f, // color = cyan
     };
 
-    // NOTE(dima): move mesh center to (0;0;0)
-    // TODO(dima): don't do it every frame - just do it once when loading a mesh
-    r32 minX = 0.0f, maxX = 0.0f, minY = 0.0f, maxY = 0.0f, minZ = 0.0f, maxZ = 0.0f;
-    for (u32 vertexIndex = 0;
-         vertexIndex < ARRAY_COUNT(vertices) - 3;
-         vertexIndex += 6)
     {
-        r32 x = vertices[vertexIndex];
-        r32 y = vertices[vertexIndex + 1];
-        r32 z = vertices[vertexIndex + 2];
 
-        if (x < minX)
+        // NOTE(dima): move mesh center to (0;0;0)
+        // TODO(dima): don't do it every frame - just do it once when loading a mesh
+        r32 minX = 0.0f, maxX = 0.0f, minY = 0.0f, maxY = 0.0f, minZ = 0.0f, maxZ = 0.0f;
+        for (u32 vertexIndex = 0;
+             vertexIndex < ARRAY_COUNT(vertices) - 3;
+             vertexIndex += 6)
         {
-            minX = x;
-        }
-        if (x > maxX)
-        {
-            maxX = x;
+            r32 x = vertices[vertexIndex];
+            r32 y = vertices[vertexIndex + 1];
+            r32 z = vertices[vertexIndex + 2];
+
+            if (x < minX)
+            {
+                minX = x;
+            }
+            if (x > maxX)
+            {
+                maxX = x;
+            }
+
+            if (y < minY)
+            {
+                minY = y;
+            }
+            if (y > maxY)
+            {
+                maxY = y;
+            }
+
+            if (z < minZ)
+            {
+                minZ = z;
+            }
+            if (z > maxZ)
+            {
+                maxZ = z;
+            }
         }
 
-        if (y < minY)
-        {
-            minY = y;
-        }
-        if (y > maxY)
-        {
-            maxY = y;
-        }
-
-        if (z < minZ)
-        {
-            minZ = z;
-        }
-        if (z > maxZ)
-        {
-            maxZ = z;
-        }
-    }
-
-    r32 centerX = (minX + maxX) / 2;
-    r32 centerY = (minY + maxY) / 2;
-    r32 centerZ = (minZ + maxZ) / 2;
+        r32 centerX = (minX + maxX) / 2;
+        r32 centerY = (minY + maxY) / 2;
+        r32 centerZ = (minZ + maxZ) / 2;
 
 
-    for (u32 vertexIndex = 0;
-         vertexIndex < ARRAY_COUNT(vertices) - 3;
-         vertexIndex += 6)
-    {
-        vertices[vertexIndex] -= centerX;
-        vertices[vertexIndex + 1] -= centerY;
-        vertices[vertexIndex + 2] -= centerZ;
+        for (u32 vertexIndex = 0;
+             vertexIndex < ARRAY_COUNT(vertices) - 3;
+             vertexIndex += 6)
+        {
+            vertices[vertexIndex] -= centerX;
+            vertices[vertexIndex + 1] -= centerY;
+            vertices[vertexIndex + 2] -= centerZ;
+        }
     }
 
     ASSERT(&gcInput->terminator - &gcInput->buttons[0] == ARRAY_COUNT(gcInput->buttons));
@@ -207,6 +210,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             normalize(&gameState->isometricV);
         }
 
+        // NOTE(dima): below is code to initially position entities in the world
         {
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
             newEntity->type = EntityType_Cube;
@@ -218,7 +222,11 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
             newEntity->type = EntityType_Cube;
             newEntity->positionWorld = v3(5.0f, 0.5f, 5.0f);
+#if 1
             newEntity->scaleFactor = v3(20.0f, 1.0f, 1.0f);
+#else
+            newEntity->scaleFactor = v3(1.0f, 1.0f, 1.0f);
+#endif
             gameState->entityCount++;
         }
 
@@ -244,6 +252,15 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     {
         gameState->debugCameraEnabled = !gameState->debugCameraEnabled;
     }
+
+    V3 boundingEllipsePoints[4];
+
+    V3 tangentVectorNormalized;
+    V3 collisionPointDebug;
+    r32 zAtZero;
+    V3 tangentNormalVector = {0};
+    V3 reflectedDPositionVector;
+    V3 debugPlayerPosition;
 
     if (gameState->debugCameraEnabled)
     {
@@ -385,11 +402,146 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         }
 
         playerAcceleration *= gameState->playerSpeed;
-
         playerAcceleration = playerAcceleration + -3.0f * gameState->dPlayerPosition;
 
-        cameraFollowingEntity->positionWorld = 0.5f * playerAcceleration * square(deltaTimeSec) + gameState->dPlayerPosition * deltaTimeSec + cameraFollowingEntity->positionWorld;
+        V3 playerDelta = 0.5f * playerAcceleration * square(deltaTimeSec) + gameState->dPlayerPosition * deltaTimeSec;
         gameState->dPlayerPosition = playerAcceleration * deltaTimeSec + gameState->dPlayerPosition;
+
+        // NOTE(dima): collision detection and response using bounding ellipse
+        r32 epsilon = 0.00001f;
+        V3 playerPositionWorld = {0};
+
+        r32 tRemaining = 1.0f;
+        for (u32 iteration = 0;
+             iteration < 4 && tRemaining > 0.0f;
+             ++iteration)
+        {
+            r32 tMin = 1.0f;
+
+            Entity *entity = 0;
+            for (u32 entityIndex = 0;
+                 entityIndex < gameState->entityCount;
+                 ++entityIndex)
+            {
+                entity = gameState->entities + entityIndex;
+
+                r32 minX = 0.0f, maxX = 0.0f, minZ = 0.0f, maxZ = 0.0f;
+                for (u32 vertexIndex = 0;
+                     vertexIndex < ARRAY_COUNT(vertices) - 3;
+                     vertexIndex += 6)
+                {
+                    r32 x = vertices[vertexIndex];
+                    r32 z = vertices[vertexIndex + 2];
+
+                    if (x < minX)
+                    {
+                        minX = x;
+                    }
+                    if (x > maxX)
+                    {
+                        maxX = x;
+                    }
+
+                    if (z < minZ)
+                    {
+                        minZ = z;
+                    }
+                    if (z > maxZ)
+                    {
+                        maxZ = z;
+                    }
+                }
+
+                minX *= entity->scaleFactor.x;
+                maxX *= entity->scaleFactor.x;
+
+                entity->axisAlignedBoundingEllipseRadiuses.x = absoluteValue((maxX - minX) / 2);
+                entity->axisAlignedBoundingEllipseRadiuses.y = absoluteValue((maxZ - minZ) / 2);
+
+                Entity *cameraFollowingEntity = gameState->entities + gameState->cameraFollowingEntityIndex;
+
+                if (entityIndex != gameState->cameraFollowingEntityIndex)
+                {
+                    playerPositionWorld = v3(cameraFollowingEntity->positionWorld.x,
+                                                   0.0f,
+                                                   cameraFollowingEntity->positionWorld.z);
+                    V3 ro = playerPositionWorld - entity->positionWorld;
+                    ro.y = 0.0f;
+                    r32 rax = (entity->axisAlignedBoundingEllipseRadiuses.x + cameraFollowingEntity->axisAlignedBoundingEllipseRadiuses.x) * squareRoot(2.0f);
+                    r32 raz = (entity->axisAlignedBoundingEllipseRadiuses.y + cameraFollowingEntity->axisAlignedBoundingEllipseRadiuses.y) * squareRoot(2.0f);
+                    r32 rdx = gameState->dPlayerPosition.x;
+                    r32 rdz = gameState->dPlayerPosition.z;
+                    r32 rox = ro.x;
+                    r32 roz = ro.z;
+
+                    // NOTE(dima): for visualizing ellipse only
+                    // left
+                    boundingEllipsePoints[0] = v3(entity->positionWorld.x - rax, 0.0f, entity->positionWorld.z);
+                    // right
+                    boundingEllipsePoints[1] = v3(entity->positionWorld.x + rax, 0.0f, entity->positionWorld.z);
+                    // top
+                    boundingEllipsePoints[2] = v3(entity->positionWorld.x, 0.0f, entity->positionWorld.z + raz);
+                    // bottom
+                    boundingEllipsePoints[3] = v3(entity->positionWorld.x, 0.0f, entity->positionWorld.z - raz);
+
+                    r32 a = raz*raz*rdx*rdx + rax*rax*rdz*rdz;
+                    r32 b = 2*raz*raz*rox*rdx + 2*rax*rax*roz*rdz;
+                    r32 c = raz*raz*rox*rox + rax*rax*roz*roz - rax*rax*raz*raz;
+
+                    r32 d = b*b - 4*a*c;
+
+                    if (d >= 0)
+                    {
+                        r32 tOne = (-b + squareRoot(d)) / (2*a);
+                        r32 tTwo = (-b - squareRoot(d)) / (2*a);
+                        if (tOne >= 0 || tTwo >= 0)
+                        {
+                            r32 distanceTillCollision = minimum(tOne, tTwo) - epsilon;
+                            distanceTillCollision = length(gameState->dPlayerPosition*distanceTillCollision);
+
+                            r32 maxPossibleDistanceForCurrentFrame = length(playerDelta);
+                            if (maxPossibleDistanceForCurrentFrame >= 0 &&
+                                maxPossibleDistanceForCurrentFrame >= distanceTillCollision)
+                            {
+                                tMin = distanceTillCollision / maxPossibleDistanceForCurrentFrame;
+                                if (tMin < 0.0f)
+                                {
+                                    tMin = 0.0f;
+                                }
+
+                                V3 collisionPointPositionWorld = playerPositionWorld + tMin * playerDelta;
+                                collisionPointPositionWorld.y = 0.0f;
+                                collisionPointDebug = v3(collisionPointPositionWorld.x, collisionPointPositionWorld.y, collisionPointPositionWorld.z);
+
+                                r32 tangentSlope = -((collisionPointPositionWorld.x - entity->positionWorld.x) * square(raz)) / ((collisionPointPositionWorld.z - entity->positionWorld.z) * square(rax));
+                                zAtZero = collisionPointPositionWorld.z - tangentSlope * collisionPointPositionWorld.x;
+                                V3 tangentVector = v3(collisionPointPositionWorld.x - 0.0f, 0.0f, collisionPointPositionWorld.z - zAtZero);
+                                r32 tangentVectorLength = length(tangentVector);
+                                tangentVectorNormalized = (1.0f / tangentVectorLength) * tangentVector;
+
+                                tangentNormalVector = v3(tangentSlope, 0.0f, -1.0f);
+                                r32 tangentNormalVectorLength = length(tangentNormalVector);
+                                tangentNormalVector = (1.0f / tangentNormalVectorLength) * tangentNormalVector;
+                                reflectedDPositionVector = gameState->dPlayerPosition - 1*dot(gameState->dPlayerPosition, tangentNormalVector) * tangentNormalVector;
+                            }
+                        }
+                    }
+                }
+            }
+
+            playerDelta = playerDelta - (1*dot(playerDelta, tangentNormalVector) * tangentNormalVector);
+
+            playerPositionWorld = playerPositionWorld + (playerDelta*tMin);
+
+            debugPlayerPosition = playerPositionWorld;
+
+            gameState->dPlayerPosition = gameState->dPlayerPosition - (1*dot(gameState->dPlayerPosition, tangentNormalVector) * tangentNormalVector);
+
+            tRemaining -= tRemaining*tMin;
+
+            cameraFollowingEntity->positionWorld.x = playerPositionWorld.x;
+            cameraFollowingEntity->positionWorld.z = playerPositionWorld.z;
+        }
 
         // NOTE(dima): set up camera to look at entity it follows
         r32 offsetFromCamera = (gameState->cameraCurrDistance + 0.001f) / sine(RADIANS(gameState->cameraIsometricHorizontalAxisRotationAngleDegrees));
@@ -548,99 +700,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                          gameState->tilemapOriginPositionWorld,
                          v3(1.0f, 1.0f, 1.0f));
 
-#if 0
-    // NOTE(dima): code to calculate vertices of bounding sphere
-    V3 min = v3(vertices[0], vertices[1], vertices[2]),
-        max = v3(min.x, min.y, min.z);
-    V3 centerCoordinateWorld;
-    r32 radius = 0.0f;
-    const u32 numberOfSlices = 16;
-    const u32 numberOfStacks = 16;
-    V3 sphereVertices[numberOfSlices * numberOfStacks];
-    {
-        /* NOTE(dima): calculating AABB */
-
-        for (u32 vertexIndex = 0;
-             vertexIndex < ARRAY_COUNT(vertices);
-             vertexIndex += 6)
-        {
-            V3 *vertex = (V3 *) &vertices[vertexIndex];
-            if (vertex->x < min.x)
-            {
-                min.x = vertex->x;
-            }
-            if (vertex->y < min.y)
-            {
-                min.y = vertex->y;
-            }
-            if (vertex->z < min.z)
-            {
-                min.z = vertex->z;
-            }
-
-            if (vertex->x > max.x)
-            {
-                max.x = vertex->x;
-            }
-            if (vertex->y > max.y)
-            {
-                max.y = vertex->y;
-            }
-            if (vertex->z > max.z)
-            {
-                max.z = vertex->z;
-            }
-        }
-
-        centerCoordinateWorld.x = (min.x + max.x) / 2;
-        centerCoordinateWorld.y = (min.y + max.y) / 2;
-        centerCoordinateWorld.z = (min.z + max.z) / 2;
-
-        for (u32 vertexIndex = 0;
-             vertexIndex < ARRAY_COUNT(vertices);
-             vertexIndex += 6)
-        {
-            V3 *vertex = (V3 *) &vertices[vertexIndex];
-            r32 squareDistance = squareLength(centerCoordinateWorld - *vertex);
-            if (squareDistance > radius)
-            {
-                radius = squareDistance;
-            }
-        }
-
-        radius = sqrt(radius);
-
-        for (u32 stackIndex = 0;
-             stackIndex < numberOfStacks;
-             ++stackIndex)
-        {
-            r32 phiArcLength = (stackIndex / (r32) numberOfStacks) * 2.0f * PI32 * radius;
-            r32 phi = (phiArcLength * 360.0f) / (2.0f * PI32 * radius);
-            for (u32 sliceIndex = 0;
-                 sliceIndex < numberOfSlices;
-                 ++sliceIndex)
-            {
-                r32 thetaArcLength = (sliceIndex / (r32) numberOfSlices) * 2.0f * PI32 * radius;
-                r32 theta = (thetaArcLength * 360.f) / (2.0f * PI32 * radius);
-                r32 x = radius * sine(phi) * cosine(theta);
-                r32 y = radius * cosine(phi);
-                r32 z = radius * sine(theta) * sine(phi);
-                sphereVertices[stackIndex * numberOfStacks + sliceIndex] = v3(x, y, z);
-            }
-        }
-    }
-
-//    for (u32 sphereVertexIndex = 0;
-//         sphereVertexIndex < ARRAY_COUNT(sphereVertices);
-//         ++sphereVertexIndex)
-//    {
-//        pushRenderEntryPoint(&renderGroupArena,
-//                             &renderGroup,
-//                             sphereVertices[sphereVertexIndex],
-//                             v3(1.0f, 0.0f, 0.0f));
-//    }
-#endif
-
     for (s32 entityIndex = gameState->entityCount - 1;
          entityIndex >= 0;
          --entityIndex)
@@ -666,6 +725,25 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                             gameState->cameraDirectonPosVectorStartWorld,
                             gameState->cameraDirectonPosVectorEndWorld);
     }
+    for (u32 ellipsePointIndex = 0;
+         ellipsePointIndex < ARRAY_COUNT(boundingEllipsePoints);
+         ++ellipsePointIndex)
+    {
+        pushRenderEntryPoint(&renderGroupArena,
+                             &renderGroup,
+                             boundingEllipsePoints[ellipsePointIndex],
+                             v3(1.0f, 0.0f, 0.0f));
+    }
+    pushRenderEntryLine(&renderGroupArena,
+                        &renderGroup,
+                        v3(1.0f, 0.0f, 0.0f),
+                        gameState->entities[0].positionWorld,
+                        gameState->entities[0].positionWorld + gameState->dPlayerPosition);
+    pushRenderEntryPoint(&renderGroupArena,
+                         &renderGroup,
+                         collisionPointDebug,
+                         v3(1.0f, 1.0f, 0.0f));
+    debugPlayerPosition.y = 0.0f;
     pushRenderEntryPoint(&renderGroupArena,
                          &renderGroup,
                          v3(screenCenterPosNearPlaneWorld),

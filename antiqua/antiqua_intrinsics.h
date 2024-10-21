@@ -152,4 +152,17 @@ inline r32 arccosine(r32 valDegrees)
     return result;
 }
 
+inline r32 minimum(r32 one, r32 two)
+{
+    r32 result;
+
+#if COMPILER_LLVM
+    result = __builtin_fmin(one, two);
+#else
+    result = fminf(one, two);
+#endif
+
+    return result;
+}
+
 #endif

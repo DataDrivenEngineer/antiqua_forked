@@ -8,6 +8,19 @@
 
 // NOTE(dima): Operator override: multiply 4x4 matrix by 4x1 vector
 
+inline V3 operator*(M33 a, V3 b)
+{
+    V3 result;
+
+    M33 aT = transpose(&a);
+
+    result.x = dot(*aT[0], b);
+    result.y = dot(*aT[1], b);
+    result.z = dot(*aT[2], b);
+
+    return result;
+}
+
 inline V4 operator*(M44 a, V4 b)
 {
     V4 result;
