@@ -6,6 +6,16 @@
 
 #include "antiqua_math_generated.h"
 
+// NOTE(dima): 2D cross product
+
+inline r32 crossXZ(V3 a, V3 b)
+{
+    r32 result;
+
+    result = a.x*b.z - a.z*b.x;
+
+    return result;
+}
 // NOTE(dima): Operator override: multiply 4x4 matrix by 4x1 vector
 
 inline V3 operator*(M33 a, V3 b)

@@ -13,7 +13,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #endif
 {
     /* TODO(dima):
-       - implement collision detection using bounding circles and/or rectangles
+       - implement collision detection using AABB (DONE)
      */
 
     r32 vertices[] =
@@ -258,9 +258,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     V3 tangentVectorNormalized;
     V3 collisionPointDebug;
     r32 zAtZero;
-    V3 tangentNormalVector = {0};
-    V3 reflectedDPositionVector;
-    V3 debugPlayerPosition;
+    V3 lineNormalVector = {0};
 
     if (gameState->debugCameraEnabled)
     {
@@ -345,22 +343,17 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         {
             V3 uWithoutY = cross(gameState->v, gameState->n);
             uWithoutY.y = 0.0f;
-            normalize(&uWithoutY);
             V3 vWithoutY = v3(gameState->v.x, 0.0f, gameState->v.z);
-            r32 vWithoutYLength = length(vWithoutY);
-            vWithoutY = (1.0f / vWithoutYLength) * vWithoutY;
 
             if (gcInput->up.endedDown)
             {
                 V3 diagonalDirectionVector = vWithoutY + uWithoutY;
-                normalize(&diagonalDirectionVector);
                 playerAcceleration.x = diagonalDirectionVector.x;
                 playerAcceleration.z = diagonalDirectionVector.z;
             }
             else if (gcInput->down.endedDown)
             {
                 V3 diagonalDirectionVector = -vWithoutY + uWithoutY;
-                normalize(&diagonalDirectionVector);
                 playerAcceleration.x = diagonalDirectionVector.x;
                 playerAcceleration.z = diagonalDirectionVector.z;
             }
@@ -375,22 +368,17 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         {
             V3 uWithoutY = cross(gameState->n, gameState->v);
             uWithoutY.y = 0.0f;
-            normalize(&uWithoutY);
             V3 vWithoutY = v3(gameState->v.x, 0.0f, gameState->v.z);
-            r32 vWithoutYLength = length(vWithoutY);
-            vWithoutY = (1.0f / vWithoutYLength) * vWithoutY;
 
             if (gcInput->up.endedDown)
             {
                 V3 diagonalDirectionVector = vWithoutY + uWithoutY;
-                normalize(&diagonalDirectionVector);
                 playerAcceleration.x = diagonalDirectionVector.x;
                 playerAcceleration.z = diagonalDirectionVector.z;
             }
             else if (gcInput->down.endedDown)
             {
                 V3 diagonalDirectionVector = -vWithoutY + uWithoutY;
-                normalize(&diagonalDirectionVector);
                 playerAcceleration.x = diagonalDirectionVector.x;
                 playerAcceleration.z = diagonalDirectionVector.z;
             }
@@ -401,6 +389,9 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             }
         }
 
+        r32 playerAccelerationLength = squareLength(playerAcceleration);
+        normalize(&playerAcceleration);
+
         playerAcceleration *= gameState->playerSpeed;
         playerAcceleration = playerAcceleration + -3.0f * gameState->dPlayerPosition;
 
@@ -408,7 +399,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->dPlayerPosition = playerAcceleration * deltaTimeSec + gameState->dPlayerPosition;
 
         // NOTE(dima): collision detection and response using bounding ellipse
-        r32 epsilon = 0.00001f;
+        r32 epsilon = 0.01f;
         V3 playerPositionWorld = {0};
 
         r32 tRemaining = 1.0f;
@@ -455,8 +446,11 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                 minX *= entity->scaleFactor.x;
                 maxX *= entity->scaleFactor.x;
 
-                entity->axisAlignedBoundingEllipseRadiuses.x = absoluteValue((maxX - minX) / 2);
-                entity->axisAlignedBoundingEllipseRadiuses.y = absoluteValue((maxZ - minZ) / 2);
+                minZ *= entity->scaleFactor.z;
+                maxZ *= entity->scaleFactor.z;
+
+                entity->axisAlignedBoundingBox[0] = v3(minX, 0.0f, maxZ);
+                entity->axisAlignedBoundingBox[1] = v3(maxX, 0.0f, minZ);
 
                 Entity *cameraFollowingEntity = gameState->entities + gameState->cameraFollowingEntityIndex;
 
@@ -465,78 +459,105 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                     playerPositionWorld = v3(cameraFollowingEntity->positionWorld.x,
                                                    0.0f,
                                                    cameraFollowingEntity->positionWorld.z);
-                    V3 ro = playerPositionWorld - entity->positionWorld;
+
+                    V3 aabbAfterMinkowskiSum[2];
+
+                    r32 fromEntitysAABBHalfRadiusX = (cameraFollowingEntity->axisAlignedBoundingBox[1].x - cameraFollowingEntity->axisAlignedBoundingBox[0].x) / 2;
+                    r32 fromEntitysAABBHalfRadiusZ = (cameraFollowingEntity->axisAlignedBoundingBox[0].z - cameraFollowingEntity->axisAlignedBoundingBox[1].z) / 2;
+
+                    aabbAfterMinkowskiSum[0].x = entity->axisAlignedBoundingBox[0].x - fromEntitysAABBHalfRadiusX;
+                    aabbAfterMinkowskiSum[0].z = entity->axisAlignedBoundingBox[0].z + fromEntitysAABBHalfRadiusZ;
+                    aabbAfterMinkowskiSum[1].x = entity->axisAlignedBoundingBox[1].x + fromEntitysAABBHalfRadiusX;
+                    aabbAfterMinkowskiSum[1].z = entity->axisAlignedBoundingBox[1].z - fromEntitysAABBHalfRadiusZ;
+
+                    V3 lines[4*2];
+                    /* NOTE(dima): index 0 - left bottom to right bottom
+                                   index 1 - left bottom to left top
+                                   index 2 - right bottom to right top
+                                   index 3 - left top to right top */
+
+                    V3 leftTop = aabbAfterMinkowskiSum[0] + entity->positionWorld;
+                    leftTop.y = 0.0f;
+                    V3 rightTop = v3(aabbAfterMinkowskiSum[1].x,
+                                     0.0f,
+                                     aabbAfterMinkowskiSum[0].z) + entity->positionWorld;
+                    rightTop.y = 0.0f;
+                    V3 leftBottom = v3(aabbAfterMinkowskiSum[0].x,
+                                       0.0f,
+                                       aabbAfterMinkowskiSum[1].z) + entity->positionWorld;
+                    leftBottom.y = 0.0f;
+                    V3 rightBottom = aabbAfterMinkowskiSum[1] + entity->positionWorld;
+                    rightBottom.y = 0.0f;
+
+                    // NOTE(dima): for visualizing purposes only
+                    boundingEllipsePoints[0] = leftTop;
+                    boundingEllipsePoints[1] = rightTop;
+                    boundingEllipsePoints[2] = leftBottom;
+                    boundingEllipsePoints[3] = rightBottom;
+
+                    lines[0] = leftBottom;
+                    lines[1] = rightBottom;
+                    lines[2] = leftBottom;
+                    lines[3] = leftTop;
+                    lines[4] = rightBottom;
+                    lines[5] = rightTop;
+                    lines[6] = leftTop;
+                    lines[7] = rightTop;
+
+                    V3 ro = playerPositionWorld;
                     ro.y = 0.0f;
-                    r32 rax = (entity->axisAlignedBoundingEllipseRadiuses.x + cameraFollowingEntity->axisAlignedBoundingEllipseRadiuses.x) * squareRoot(2.0f);
-                    r32 raz = (entity->axisAlignedBoundingEllipseRadiuses.y + cameraFollowingEntity->axisAlignedBoundingEllipseRadiuses.y) * squareRoot(2.0f);
-                    r32 rdx = gameState->dPlayerPosition.x;
-                    r32 rdz = gameState->dPlayerPosition.z;
-                    r32 rox = ro.x;
-                    r32 roz = ro.z;
 
-                    // NOTE(dima): for visualizing ellipse only
-                    // left
-                    boundingEllipsePoints[0] = v3(entity->positionWorld.x - rax, 0.0f, entity->positionWorld.z);
-                    // right
-                    boundingEllipsePoints[1] = v3(entity->positionWorld.x + rax, 0.0f, entity->positionWorld.z);
-                    // top
-                    boundingEllipsePoints[2] = v3(entity->positionWorld.x, 0.0f, entity->positionWorld.z + raz);
-                    // bottom
-                    boundingEllipsePoints[3] = v3(entity->positionWorld.x, 0.0f, entity->positionWorld.z - raz);
+                    r32 dx = 0.0f;
+                    r32 dz = 0.0f;
 
-                    r32 a = raz*raz*rdx*rdx + rax*rax*rdz*rdz;
-                    r32 b = 2*raz*raz*rox*rdx + 2*rax*rax*roz*rdz;
-                    r32 c = raz*raz*rox*rox + rax*rax*roz*roz - rax*rax*raz*raz;
-
-                    r32 d = b*b - 4*a*c;
-
-                    if (d >= 0)
+                    for (u32 lineIndex = 0;
+                         lineIndex < 7;
+                         ++lineIndex)
                     {
-                        r32 tOne = (-b + squareRoot(d)) / (2*a);
-                        r32 tTwo = (-b - squareRoot(d)) / (2*a);
-                        if (tOne >= 0 || tTwo >= 0)
+                        V3 qo = lines[lineIndex];
+                        V3 q1 = lines[lineIndex + 1];
+                        V3 d = playerDelta;
+                        V3 s = q1 - qo;
+
+                        r32 denominator = crossXZ(d, s);
+                        r32 t = crossXZ(qo - ro, s) / denominator;
+                        r32 u = crossXZ(qo - ro, d) / denominator;
+
+                        if (t >= 0.0f
+                            && t <= 1.0f
+                            && u >= 0.0f
+                            && u <= 1.0f)
                         {
-                            r32 distanceTillCollision = minimum(tOne, tTwo) - epsilon;
-                            distanceTillCollision = length(gameState->dPlayerPosition*distanceTillCollision);
-
-                            r32 maxPossibleDistanceForCurrentFrame = length(playerDelta);
-                            if (maxPossibleDistanceForCurrentFrame >= 0 &&
-                                maxPossibleDistanceForCurrentFrame >= distanceTillCollision)
+                            if (t < tMin)
                             {
-                                tMin = distanceTillCollision / maxPossibleDistanceForCurrentFrame;
-                                if (tMin < 0.0f)
-                                {
-                                    tMin = 0.0f;
-                                }
-
-                                V3 collisionPointPositionWorld = playerPositionWorld + tMin * playerDelta;
-                                collisionPointPositionWorld.y = 0.0f;
-                                collisionPointDebug = v3(collisionPointPositionWorld.x, collisionPointPositionWorld.y, collisionPointPositionWorld.z);
-
-                                r32 tangentSlope = -((collisionPointPositionWorld.x - entity->positionWorld.x) * square(raz)) / ((collisionPointPositionWorld.z - entity->positionWorld.z) * square(rax));
-                                zAtZero = collisionPointPositionWorld.z - tangentSlope * collisionPointPositionWorld.x;
-                                V3 tangentVector = v3(collisionPointPositionWorld.x - 0.0f, 0.0f, collisionPointPositionWorld.z - zAtZero);
-                                r32 tangentVectorLength = length(tangentVector);
-                                tangentVectorNormalized = (1.0f / tangentVectorLength) * tangentVector;
-
-                                tangentNormalVector = v3(tangentSlope, 0.0f, -1.0f);
-                                r32 tangentNormalVectorLength = length(tangentNormalVector);
-                                tangentNormalVector = (1.0f / tangentNormalVectorLength) * tangentNormalVector;
-                                reflectedDPositionVector = gameState->dPlayerPosition - 1*dot(gameState->dPlayerPosition, tangentNormalVector) * tangentNormalVector;
+                                tMin = t - epsilon;
+                                dx = q1.x - qo.x;
+                                dz = q1.z - qo.z;
                             }
                         }
                     }
+
+                    if (tMin < 0.0f)
+                    {
+                        tMin = 0.0f;
+                    }
+
+                    V3 collisionPointPositionWorld = (playerPositionWorld
+                                                      + tMin * playerDelta);
+                    collisionPointPositionWorld.y = 0.0f;
+                    collisionPointDebug = v3(collisionPointPositionWorld.x,
+                                             collisionPointPositionWorld.y,
+                                             collisionPointPositionWorld.z);
+
+                    lineNormalVector = v3(-dz, 0.0f, dx);
+                    r32 lineNormalVectorLength = length(lineNormalVector);
+                    normalize(&lineNormalVector);
                 }
             }
 
-            playerDelta = playerDelta - (1*dot(playerDelta, tangentNormalVector) * tangentNormalVector);
-
             playerPositionWorld = playerPositionWorld + (playerDelta*tMin);
-
-            debugPlayerPosition = playerPositionWorld;
-
-            gameState->dPlayerPosition = gameState->dPlayerPosition - (1*dot(gameState->dPlayerPosition, tangentNormalVector) * tangentNormalVector);
-
+            playerDelta = playerDelta - (1*dot(playerDelta, lineNormalVector) * lineNormalVector);
+            gameState->dPlayerPosition = gameState->dPlayerPosition - (1*dot(gameState->dPlayerPosition, lineNormalVector) * lineNormalVector);
             tRemaining -= tRemaining*tMin;
 
             cameraFollowingEntity->positionWorld.x = playerPositionWorld.x;
@@ -743,7 +764,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                          &renderGroup,
                          collisionPointDebug,
                          v3(1.0f, 1.0f, 0.0f));
-    debugPlayerPosition.y = 0.0f;
     pushRenderEntryPoint(&renderGroupArena,
                          &renderGroup,
                          v3(screenCenterPosNearPlaneWorld),

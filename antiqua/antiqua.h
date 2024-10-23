@@ -54,7 +54,8 @@ typedef struct
     EntityType type;
     V3 positionWorld;
     V3 scaleFactor;
-    V2 axisAlignedBoundingEllipseRadiuses;
+    // NOTE(dima): index 0 - top left corner, index 1 - bottom right corner
+    V3 axisAlignedBoundingBox[2];
 } Entity;
 
 typedef struct

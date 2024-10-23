@@ -413,25 +413,28 @@ inline r32 length(V4 a)
 inline void normalize(V2 *a)
 {
     r32 len = length(*a);
-    a->x /= len;
-    a->y /= len;
+    if (len != 0.0f && len != 1.0f)
+    {
+        *a = (1.0f / len) * *a;
+    }
 }
 
 inline void normalize(V3 *a)
 {
     r32 len = length(*a);
-    a->x /= len;
-    a->y /= len;
-    a->z /= len;
+    if (len != 0.0f && len != 1.0f)
+    {
+        *a = (1.0f / len) * *a;
+    }
 }
 
 inline void normalize(V4 *a)
 {
     r32 len = length(*a);
-    a->x /= len;
-    a->y /= len;
-    a->z /= len;
-    a->w /= len;
+    if (len != 0.0f && len != 1.0f)
+    {
+        *a = (1.0f / len) * *a;
+    }
 }
 
 // NOTE(dima): Matrix definitions

@@ -254,15 +254,15 @@ void generateLength(FILE *file, int size)
     fprintf(file, "\n");
 }
 
-void generateVectorNormalize(FILE *file, char *dim, int size)
+void generateVectorNormalize(FILE *file, int size)
 {
     fprintf(file, "inline void normalize(V%d *a)\n", size);
     fprintf(file, "{\n");
     fprintf(file, "%sr32 len = length(*a);\n", TAB);
-    for (int i = 0; i < size; i++)
-    {
-        fprintf(file, "%sa->%c /= len;\n", TAB, dim[i]);
-    }
+    fprintf(file, "%sif (len != 0.0f && len != 1.0f)\n", TAB);
+    fprintf(file, "%s{\n", TAB);
+    fprintf(file, "%s%s*a = (1.0f / len) * *a;\n", TAB, TAB);
+    fprintf(file, "%s}\n", TAB);
     fprintf(file, "}\n");
     fprintf(file, "\n");
 }
@@ -419,9 +419,9 @@ int main(int argc, char **argv)
     generateLength(result, ARRAY_COUNT(v4));
 
     fprintf(result, "// NOTE(dima): Vector normalization\n\n");
-    generateVectorNormalize(result, v2, ARRAY_COUNT(v2));
-    generateVectorNormalize(result, v3, ARRAY_COUNT(v3));
-    generateVectorNormalize(result, v4, ARRAY_COUNT(v4));
+    generateVectorNormalize(result, ARRAY_COUNT(v2));
+    generateVectorNormalize(result, ARRAY_COUNT(v3));
+    generateVectorNormalize(result, ARRAY_COUNT(v4));
 
     fprintf(result, "// NOTE(dima): Matrix definitions\n\n");
     fprintf(result, "// NOTE(dima): all matrices are in column-major order\n\n");
