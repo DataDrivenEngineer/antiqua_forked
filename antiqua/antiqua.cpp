@@ -166,7 +166,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->far = 100.0f;
         gameState->fov = 45.0f;
 
-        gameState->playerSpeed = 20.0f;
+        gameState->playerSpeed = 17.0f;
 
         gameState->cameraMinDistance = 5.0f;
         gameState->cameraMaxDistance = 20.0f;
@@ -256,7 +256,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     V3 boundingEllipsePoints[4];
 
     V3 tangentVectorNormalized;
-    V3 collisionPointDebug;
+    V3 collisionPointDebug = {0};
     r32 zAtZero;
     V3 lineNormalVector = {0};
 
@@ -533,6 +533,13 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                                 tMin = t - epsilon;
                                 dx = q1.x - qo.x;
                                 dz = q1.z - qo.z;
+
+                                V3 collisionPointPositionWorld = (playerPositionWorld
+                                                                  + tMin * playerDelta);
+                                collisionPointPositionWorld.y = 0.0f;
+                                collisionPointDebug = v3(collisionPointPositionWorld.x,
+                                                         collisionPointPositionWorld.y,
+                                                         collisionPointPositionWorld.z);
                             }
                         }
                     }
@@ -541,13 +548,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                     {
                         tMin = 0.0f;
                     }
-
-                    V3 collisionPointPositionWorld = (playerPositionWorld
-                                                      + tMin * playerDelta);
-                    collisionPointPositionWorld.y = 0.0f;
-                    collisionPointDebug = v3(collisionPointPositionWorld.x,
-                                             collisionPointPositionWorld.y,
-                                             collisionPointPositionWorld.z);
 
                     lineNormalVector = v3(-dz, 0.0f, dx);
                     r32 lineNormalVectorLength = length(lineNormalVector);
