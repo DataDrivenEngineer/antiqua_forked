@@ -6,6 +6,23 @@
 
 #include "antiqua_render_group.cpp"
 
+/* NOTE(dima): as a result of this, we will expand the AABB of the entity
+               we are checking the collision against */
+static Rect MinkowskiSum(Rect collideAgainstBox, Rect testEntityBox)
+{
+    Rect result = {};
+
+    r32 collideAgainstBoxAABBHalfWidth = collideAgainstBox.width / 2;
+    r32 collideAgainstBoxAABBHalfHeight = collideAgainstBox.height / 2;
+
+    result.topLeft.x = testEntityBox.topLeft.x - collideAgainstBoxAABBHalfWidth;
+    result.topLeft.z = testEntityBox.topLeft.z + collideAgainstBoxAABBHalfHeight;
+    result.width = testEntityBox.width + collideAgainstBox.width;
+    result.height = testEntityBox.height + collideAgainstBox.height;
+
+    return result;
+}
+
 #if !XCODE_BUILD
 EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #else
@@ -222,13 +239,18 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
             newEntity->type = EntityType_Cube;
             newEntity->positionWorld = v3(5.0f, 0.5f, 5.0f);
-#if 1
             newEntity->scaleFactor = v3(20.0f, 1.0f, 1.0f);
-#else
-            newEntity->scaleFactor = v3(1.0f, 1.0f, 1.0f);
-#endif
             gameState->entityCount++;
         }
+#if 0
+        {
+            Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
+            newEntity->type = EntityType_Cube;
+            newEntity->positionWorld = v3(10.0f, 1.0f, 10.0f);
+            newEntity->scaleFactor = v3(1.0f, 2.0f, 1.0f);
+            gameState->entityCount++;
+        }
+#endif
 
         gameState->cameraFollowingEntityIndex = 0;
 
@@ -408,13 +430,13 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
              ++iteration)
         {
             r32 tMin = 1.0f;
+            Entity *cameraFollowingEntity = gameState->entities + gameState->cameraFollowingEntityIndex;
 
-            Entity *entity = 0;
             for (u32 entityIndex = 0;
                  entityIndex < gameState->entityCount;
                  ++entityIndex)
             {
-                entity = gameState->entities + entityIndex;
+                Entity *entity = gameState->entities + entityIndex;
 
                 r32 minX = 0.0f, maxX = 0.0f, minZ = 0.0f, maxZ = 0.0f;
                 for (u32 vertexIndex = 0;
@@ -449,10 +471,9 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                 minZ *= entity->scaleFactor.z;
                 maxZ *= entity->scaleFactor.z;
 
-                entity->axisAlignedBoundingBox[0] = v3(minX, 0.0f, maxZ);
-                entity->axisAlignedBoundingBox[1] = v3(maxX, 0.0f, minZ);
-
-                Entity *cameraFollowingEntity = gameState->entities + gameState->cameraFollowingEntityIndex;
+                entity->axisAlignedBoundingBox.topLeft = v3(minX, 0.0f, maxZ);
+                entity->axisAlignedBoundingBox.width = maxX - minX;
+                entity->axisAlignedBoundingBox.height = maxZ - minZ;
 
                 if (entityIndex != gameState->cameraFollowingEntityIndex)
                 {
@@ -460,49 +481,43 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                                                    0.0f,
                                                    cameraFollowingEntity->positionWorld.z);
 
-                    V3 aabbAfterMinkowskiSum[2];
+                    Rect aabbAfterMinkowskiSum = MinkowskiSum(entity->axisAlignedBoundingBox,
+                                                              cameraFollowingEntity->axisAlignedBoundingBox);
 
-                    r32 fromEntitysAABBHalfRadiusX = (cameraFollowingEntity->axisAlignedBoundingBox[1].x - cameraFollowingEntity->axisAlignedBoundingBox[0].x) / 2;
-                    r32 fromEntitysAABBHalfRadiusZ = (cameraFollowingEntity->axisAlignedBoundingBox[0].z - cameraFollowingEntity->axisAlignedBoundingBox[1].z) / 2;
-
-                    aabbAfterMinkowskiSum[0].x = entity->axisAlignedBoundingBox[0].x - fromEntitysAABBHalfRadiusX;
-                    aabbAfterMinkowskiSum[0].z = entity->axisAlignedBoundingBox[0].z + fromEntitysAABBHalfRadiusZ;
-                    aabbAfterMinkowskiSum[1].x = entity->axisAlignedBoundingBox[1].x + fromEntitysAABBHalfRadiusX;
-                    aabbAfterMinkowskiSum[1].z = entity->axisAlignedBoundingBox[1].z - fromEntitysAABBHalfRadiusZ;
-
-                    V3 lines[4*2];
-                    /* NOTE(dima): index 0 - left bottom to right bottom
-                                   index 1 - left bottom to left top
-                                   index 2 - right bottom to right top
-                                   index 3 - left top to right top */
-
-                    V3 leftTop = aabbAfterMinkowskiSum[0] + entity->positionWorld;
-                    leftTop.y = 0.0f;
-                    V3 rightTop = v3(aabbAfterMinkowskiSum[1].x,
+                    V3 topLeft = aabbAfterMinkowskiSum.topLeft + entity->positionWorld;
+                    topLeft.y = 0.0f;
+                    V3 topRight = v3(topLeft.x + aabbAfterMinkowskiSum.width,
                                      0.0f,
-                                     aabbAfterMinkowskiSum[0].z) + entity->positionWorld;
-                    rightTop.y = 0.0f;
-                    V3 leftBottom = v3(aabbAfterMinkowskiSum[0].x,
+                                     topLeft.z);
+                    topRight.y = 0.0f;
+                    V3 bottomLeft = v3(topLeft.x,
                                        0.0f,
-                                       aabbAfterMinkowskiSum[1].z) + entity->positionWorld;
-                    leftBottom.y = 0.0f;
-                    V3 rightBottom = aabbAfterMinkowskiSum[1] + entity->positionWorld;
-                    rightBottom.y = 0.0f;
+                                       topLeft.z - aabbAfterMinkowskiSum.height);
+                    bottomLeft.y = 0.0f;
+                    V3 bottomRight = v3(topLeft.x + aabbAfterMinkowskiSum.width,
+                                        0.0f,
+                                        topLeft.z - aabbAfterMinkowskiSum.height);
+                    bottomRight.y = 0.0f;
 
                     // NOTE(dima): for visualizing purposes only
-                    boundingEllipsePoints[0] = leftTop;
-                    boundingEllipsePoints[1] = rightTop;
-                    boundingEllipsePoints[2] = leftBottom;
-                    boundingEllipsePoints[3] = rightBottom;
+                    boundingEllipsePoints[0] = topLeft;
+                    boundingEllipsePoints[1] = topRight;
+                    boundingEllipsePoints[2] = bottomLeft;
+                    boundingEllipsePoints[3] = bottomRight;
 
-                    lines[0] = leftBottom;
-                    lines[1] = rightBottom;
-                    lines[2] = leftBottom;
-                    lines[3] = leftTop;
-                    lines[4] = rightBottom;
-                    lines[5] = rightTop;
-                    lines[6] = leftTop;
-                    lines[7] = rightTop;
+                    /* NOTE(dima): indices 0,1 - left bottom to right bottom
+                                   indices 2,3 - left bottom to left top
+                                   indices 4,5 - right bottom to right top
+                                   indices 6,7 - left top to right top */
+                    V3 lines[4*2];
+                    lines[0] = bottomLeft;
+                    lines[1] = bottomRight;
+                    lines[2] = bottomLeft;
+                    lines[3] = topLeft;
+                    lines[4] = bottomRight;
+                    lines[5] = topRight;
+                    lines[6] = topLeft;
+                    lines[7] = topRight;
 
                     V3 ro = playerPositionWorld;
                     ro.y = 0.0f;

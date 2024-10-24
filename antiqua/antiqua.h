@@ -23,25 +23,12 @@ void * pushSize_(MemoryArena *arena, MemoryIndex size)
   return result;
 }
 
-typedef struct
+typedef struct Rect
 {
-} World;
-
-typedef struct
-{
-  s32 width;
-  s32 height;
-  u32 *pixels;
-} LoadedBitmap;
-
-typedef struct
-{
-  s32 alignX;
-  s32 alignY;
-  LoadedBitmap head;
-  LoadedBitmap cape;
-  LoadedBitmap torso;
-} HeroBitmaps;
+    V3 topLeft;
+    r32 width;
+    r32 height;
+} Rect;
 
 enum EntityType
 {
@@ -55,13 +42,12 @@ typedef struct
     V3 positionWorld;
     V3 scaleFactor;
     // NOTE(dima): index 0 - top left corner, index 1 - bottom right corner
-    V3 axisAlignedBoundingBox[2];
+    Rect axisAlignedBoundingBox;
 } Entity;
 
 typedef struct
 {
     MemoryArena worldArena;
-    World *world;
 
     u32 cameraFollowingEntityIndex;
 
