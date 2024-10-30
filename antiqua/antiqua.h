@@ -30,19 +30,26 @@ typedef struct Rect
     r32 height;
 } Rect;
 
-enum EntityType
+enum EntityFlags
 {
-    EntityType_Null,
-    EntityType_Cube,
+    EntityFlags_Static = 1 << 0,
+    EntityFlags_Moving = 1 << 1,
+
+    EntityFlags_PlayerControlled = 1 << 10,
+    EntityFlags_Enemy = 1 << 11,
 };
 
 typedef struct
 {
-    EntityType type;
-    V3 positionWorld;
+    EntityFlags flags;
+
+    V3 posWorld;
+    V3 dPos;
     V3 scaleFactor;
+
     // NOTE(dima): index 0 - top left corner, index 1 - bottom right corner
-    Rect axisAlignedBoundingBox;
+    Rect regularAxisAlignedBoundingBox;
+    Rect longAxisAlignedBoundingBox;
 } Entity;
 
 typedef struct
@@ -67,7 +74,6 @@ typedef struct
     r32 cameraCurrDistance;
 
     r32 playerSpeed;
-    V3 dPlayerPosition;
 
     r32 cameraIsometricVerticalAxisRotationAngleDegrees;
     r32 cameraIsometricHorizontalAxisRotationAngleDegrees;
@@ -96,6 +102,11 @@ typedef struct
     V3 cameraDirectonPosVectorEndWorld;
     V3 mouseDirectionVectorWorld;
     V3 mouseDirectionVectorHorizontalWorld;
+
+#if ANTIQUA_SLOW
+    V3 boundingBoxPoints[4];
+    V3 collisionPointDebug;
+#endif
     V3 mouseDirectionVectorVerticalWorld;
 } GameState;
 

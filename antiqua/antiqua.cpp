@@ -6,21 +6,308 @@
 
 #include "antiqua_render_group.cpp"
 
-/* NOTE(dima): as a result of this, we will expand the AABB of the entity
-               we are checking the collision against */
-static Rect MinkowskiSum(Rect collideAgainstBox, Rect testEntityBox)
+static Rect LongAABB(Rect currentLongBox, Rect regularBox, V3 posDelta)
 {
     Rect result = {};
 
-    r32 collideAgainstBoxAABBHalfWidth = collideAgainstBox.width / 2;
-    r32 collideAgainstBoxAABBHalfHeight = collideAgainstBox.height / 2;
+    result.topLeft = regularBox.topLeft + posDelta;
+    result.width = absoluteValue(regularBox.topLeft.x - result.topLeft.x) + regularBox.width;
+    result.height = absoluteValue(regularBox.topLeft.z - result.topLeft.z) + regularBox.height;
 
-    result.topLeft.x = testEntityBox.topLeft.x - collideAgainstBoxAABBHalfWidth;
-    result.topLeft.z = testEntityBox.topLeft.z + collideAgainstBoxAABBHalfHeight;
-    result.width = testEntityBox.width + collideAgainstBox.width;
-    result.height = testEntityBox.height + collideAgainstBox.height;
+    if (result.width * result.height <= currentLongBox.width * currentLongBox.height)
+    {
+        return currentLongBox;
+    }
 
     return result;
+}
+
+/* NOTE(dima): as a result of this, we will expand the AABB of the entity
+               we are checking the collision against */
+static Rect MinkowskiSum(Rect testEntityBox, Rect collideAgainstEntityBox)
+{
+    Rect result = {};
+
+    r32 testEntityBoxAABBHalfWidth = testEntityBox.width / 2;
+    r32 testEntityBoxAABBHalfHeight = testEntityBox.height / 2;
+
+    result.topLeft.x = collideAgainstEntityBox.topLeft.x - testEntityBoxAABBHalfWidth;
+    result.topLeft.z = collideAgainstEntityBox.topLeft.z + testEntityBoxAABBHalfHeight;
+    result.width = collideAgainstEntityBox.width + testEntityBox.width;
+    result.height = collideAgainstEntityBox.height + testEntityBox.height;
+
+    return result;
+}
+
+static void MoveEntity(GameState *gameState,
+                       Entity *testEntity,
+                       u32 testEntityIndex,
+                       r32 deltaTimeSec,
+                       V3 acceleration,
+                       V3 posDelta)
+{
+    testEntity->dPos = acceleration * deltaTimeSec + testEntity->dPos;
+
+    // NOTE(dima): collision detection and response using AABB
+
+    r32 epsilon = 0.01f;
+    V3 posWorld = {0};
+
+    r32 tRemaining = 1.0f;
+    for (u32 iteration = 0;
+         iteration < 4 && tRemaining > 0.0f;
+         ++iteration)
+    {
+        r32 tMin = 1.0f;
+        V3 lineNormalVector = {0};
+
+        for (u32 entityIndex = 0;
+             entityIndex < gameState->entityCount;
+             ++entityIndex)
+        {
+            if (testEntityIndex == entityIndex)
+            {
+                continue;
+            }
+
+            Entity *entity = gameState->entities + entityIndex;
+
+            posWorld = v3(testEntity->posWorld.x,
+                                           0.0f,
+                                           testEntity->posWorld.z);
+
+            Rect aabbAfterMinkowskiSum;
+            if (testEntity->flags & EntityFlags_Moving
+                && entity->flags & EntityFlags_Moving)
+            {
+                aabbAfterMinkowskiSum = MinkowskiSum(testEntity->longAxisAlignedBoundingBox,
+                                      entity->regularAxisAlignedBoundingBox);
+            }
+            else if (testEntity->flags & EntityFlags_Moving
+                     && entity->flags & EntityFlags_Static)
+            {
+                aabbAfterMinkowskiSum = MinkowskiSum(testEntity->regularAxisAlignedBoundingBox,
+                                                     entity->regularAxisAlignedBoundingBox);
+            }
+            else
+            {
+                INVALID_CODE_PATH;
+            }
+
+#if ANTIQUA_SLOW
+            // NOTE(dima): for visualizing purposes only
+            Rect box = aabbAfterMinkowskiSum;
+            gameState->boundingBoxPoints[0] = box.topLeft;
+            gameState->boundingBoxPoints[0].y = 0.0f;
+            gameState->boundingBoxPoints[1] = v3(box.topLeft.x + box.width,
+                                              0.0f,
+                                              box.topLeft.z);
+            gameState->boundingBoxPoints[2] = v3(box.topLeft.x,
+                                              0.0f,
+                                              box.topLeft.z - box.height);
+            gameState->boundingBoxPoints[3] = v3(box.topLeft.x + box.width,
+                                              0.0f,
+                                              box.topLeft.z - box.height);
+#endif
+
+            V3 topLeft = aabbAfterMinkowskiSum.topLeft;
+            topLeft.y = 0.0f;
+            V3 topRight = v3(topLeft.x + aabbAfterMinkowskiSum.width,
+                             0.0f,
+                             topLeft.z);
+            V3 bottomLeft = v3(topLeft.x,
+                               0.0f,
+                               topLeft.z - aabbAfterMinkowskiSum.height);
+            V3 bottomRight = v3(topLeft.x + aabbAfterMinkowskiSum.width,
+                                0.0f,
+                                topLeft.z - aabbAfterMinkowskiSum.height);
+
+            /* NOTE(dima): indices 0,1 - left bottom to right bottom
+                           indices 2,3 - left bottom to left top
+                           indices 4,5 - right bottom to right top
+                           indices 6,7 - left top to right top */
+            V3 lines[4*2];
+            lines[0] = bottomLeft;
+            lines[1] = bottomRight;
+            lines[2] = bottomLeft;
+            lines[3] = topLeft;
+            lines[4] = bottomRight;
+            lines[5] = topRight;
+            lines[6] = topLeft;
+            lines[7] = topRight;
+
+            V3 ro = posWorld;
+            ro.y = 0.0f;
+
+            r32 dx = 0.0f;
+            r32 dz = 0.0f;
+
+            for (u32 lineIndex = 0;
+                 lineIndex < 7;
+                 ++lineIndex)
+            {
+                V3 qo = lines[lineIndex];
+                V3 q1 = lines[lineIndex + 1];
+                V3 d = posDelta;
+                V3 s = q1 - qo;
+
+                r32 denominator = crossXZ(d, s);
+                r32 t = crossXZ(qo - ro, s) / denominator;
+                r32 u = crossXZ(qo - ro, d) / denominator;
+
+                if (t > 0.0f
+                    && t < 1.0f
+                    && u > 0.0f
+                    && u < 1.0f)
+                {
+                    if (t < tMin)
+                    {
+                        tMin = t - epsilon;
+                        dx = q1.x - qo.x;
+                        dz = q1.z - qo.z;
+
+                        V3 collisionPointPositionWorld = (posWorld
+                                                          + tMin * posDelta);
+                        if (testEntityIndex == gameState->cameraFollowingEntityIndex)
+                        {
+                            gameState->collisionPointDebug = v3(collisionPointPositionWorld.x,
+                                                             0.0f,
+                                                             collisionPointPositionWorld.z);
+                        }
+                    }
+                }
+            }
+
+            if (tMin < 0.0f)
+            {
+                tMin = 0.0f;
+            }
+
+            lineNormalVector = v3(-dz, 0.0f, dx);
+            r32 lineNormalVectorLength = length(lineNormalVector);
+            normalize(&lineNormalVector);
+        }
+
+        posWorld = posWorld + (posDelta*tMin);
+        posDelta = posDelta - (1*dot(posDelta, lineNormalVector) * lineNormalVector);
+        testEntity->dPos = testEntity->dPos - (1*dot(testEntity->dPos, lineNormalVector) * lineNormalVector);
+        tRemaining -= tRemaining*tMin;
+
+        testEntity->posWorld.x = posWorld.x;
+        testEntity->posWorld.z = posWorld.z;
+    }
+}
+
+static void UpdatePlayer(GameState *gameState,
+                         r32* vertices,
+                         u32 verticesSize,
+                         Entity *entity,
+                         u32 entityIndex,
+                         r32 deltaTimeSec,
+                         V3 playerAcceleration)
+{
+    r32 minX = 0.0f, maxX = 0.0f, minZ = 0.0f, maxZ = 0.0f;
+    for (u32 vertexIndex = 0;
+         vertexIndex < verticesSize - 3;
+         vertexIndex += 6)
+    {
+        r32 x = vertices[vertexIndex];
+        r32 z = vertices[vertexIndex + 2];
+
+        if (x < minX)
+        {
+            minX = x;
+        }
+        if (x > maxX)
+        {
+            maxX = x;
+        }
+
+        if (z < minZ)
+        {
+            minZ = z;
+        }
+        if (z > maxZ)
+        {
+            maxZ = z;
+        }
+    }
+
+    minX *= entity->scaleFactor.x;
+    maxX *= entity->scaleFactor.x;
+
+    minZ *= entity->scaleFactor.z;
+    maxZ *= entity->scaleFactor.z;
+
+    entity->regularAxisAlignedBoundingBox.topLeft = v3(minX, 0.0f, maxZ) + entity->posWorld;
+    entity->regularAxisAlignedBoundingBox.width = maxX - minX;
+    entity->regularAxisAlignedBoundingBox.height = maxZ - minZ;
+
+    r32 playerAccelerationLength = squareLength(playerAcceleration);
+    normalize(&playerAcceleration);
+    playerAcceleration *= gameState->playerSpeed;
+    playerAcceleration = playerAcceleration + -3.0f * entity->dPos;
+    V3 posDelta = 0.5f * playerAcceleration * square(deltaTimeSec) + entity->dPos * deltaTimeSec;
+
+    entity->longAxisAlignedBoundingBox = LongAABB(entity->longAxisAlignedBoundingBox,
+                                                  entity->regularAxisAlignedBoundingBox,
+                                                  posDelta);
+
+#if ANTIQUA_SLOW
+    // NOTE(dima): for visualizing purposes only
+    gameState->collisionPointDebug = {0};
+#endif
+
+    MoveEntity(gameState, entity, entityIndex, deltaTimeSec, playerAcceleration, posDelta);
+}
+
+static void UpdateEnemy(GameState *gameState,
+                        Entity *entity,
+                        r32 deltaTimeSec)
+{
+}
+
+static void UpdateStaticEntity(GameState *gameState,
+                               r32* vertices,
+                               u32 verticesSize,
+                               Entity *entity)
+{
+    r32 minX = 0.0f, maxX = 0.0f, minZ = 0.0f, maxZ = 0.0f;
+    for (u32 vertexIndex = 0;
+         vertexIndex < verticesSize - 3;
+         vertexIndex += 6)
+    {
+        r32 x = vertices[vertexIndex];
+        r32 z = vertices[vertexIndex + 2];
+
+        if (x < minX)
+        {
+            minX = x;
+        }
+        if (x > maxX)
+        {
+            maxX = x;
+        }
+
+        if (z < minZ)
+        {
+            minZ = z;
+        }
+        if (z > maxZ)
+        {
+            maxZ = z;
+        }
+    }
+
+    minX *= entity->scaleFactor.x;
+    maxX *= entity->scaleFactor.x;
+
+    minZ *= entity->scaleFactor.z;
+    maxZ *= entity->scaleFactor.z;
+
+    entity->regularAxisAlignedBoundingBox.topLeft = v3(minX, 0.0f, maxZ) + entity->posWorld;
+    entity->regularAxisAlignedBoundingBox.width = maxX - minX;
+    entity->regularAxisAlignedBoundingBox.height = maxZ - minZ;
 }
 
 #if !XCODE_BUILD
@@ -230,27 +517,27 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         // NOTE(dima): below is code to initially position entities in the world
         {
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
-            newEntity->type = EntityType_Cube;
-            newEntity->positionWorld = v3(0.0f, 0.5f, 0.0f);
+            newEntity->flags = (EntityFlags)(EntityFlags_Moving | EntityFlags_PlayerControlled);
+            newEntity->posWorld = v3(0.0f, 0.5f, 0.0f);
             newEntity->scaleFactor = v3(1.0f, 1.0f, 1.0f);
             gameState->entityCount++;
         }
         {
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
-            newEntity->type = EntityType_Cube;
-            newEntity->positionWorld = v3(5.0f, 0.5f, 5.0f);
+            newEntity->flags = (EntityFlags)(EntityFlags_Static);
+            newEntity->posWorld = v3(5.0f, 0.5f, 5.0f);
             newEntity->scaleFactor = v3(20.0f, 1.0f, 1.0f);
             gameState->entityCount++;
         }
-#if 0
         {
+#if 0
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
-            newEntity->type = EntityType_Cube;
-            newEntity->positionWorld = v3(10.0f, 1.0f, 10.0f);
+            newEntity->flags = (EntityFlags)(EntityFlags_Moving | EntityFlags_Enemy);
+            newEntity->posWorld = v3(10.0f, 1.0f, 10.0f);
             newEntity->scaleFactor = v3(1.0f, 2.0f, 1.0f);
             gameState->entityCount++;
-        }
 #endif
+        }
 
         gameState->cameraFollowingEntityIndex = 0;
 
@@ -275,12 +562,26 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->debugCameraEnabled = !gameState->debugCameraEnabled;
     }
 
-    V3 boundingEllipsePoints[4];
+    MemoryArena renderGroupArena;
+    u64 renderGroupArenaSize = KB(256);
+    ASSERT(renderGroupArenaSize <= memory->transientStorageSize);
+    initializeArena(&renderGroupArena,
+                    KB(256),
+                    (u8 *) memory->transientStorage);
 
-    V3 tangentVectorNormalized;
-    V3 collisionPointDebug = {0};
-    r32 zAtZero;
-    V3 lineNormalVector = {0};
+    RenderGroup renderGroup = {0};
+    renderGroup.maxPushBufferSize = renderGroupArenaSize;
+    renderGroup.pushBufferBase = renderGroupArena.base;
+
+    pushRenderEntryClear(&renderGroupArena,
+                         &renderGroup,
+                         v3(0.3f, 0.3f, 0.3f));
+    pushRenderEntryTile(&renderGroupArena,
+                         &renderGroup,
+                         gameState->tileCountPerSide,
+                         gameState->tileSideLength,
+                         gameState->tilemapOriginPositionWorld,
+                         v3(1.0f, 1.0f, 1.0f));
 
     if (gameState->debugCameraEnabled)
     {
@@ -341,6 +642,20 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
             gameState->mousePos[0] = gcInput->mouseX;
             gameState->mousePos[1] = gcInput->mouseY;
+        }
+
+        for (s32 entityIndex = gameState->entityCount - 1;
+             entityIndex >= 0;
+             --entityIndex)
+        {
+            Entity *entity = gameState->entities + entityIndex;
+
+            pushRenderEntryMesh(&renderGroupArena,
+                                &renderGroup,
+                                entity->posWorld,
+                                entity->scaleFactor,
+                                vertices,
+                                ARRAY_COUNT(vertices));
         }
     }
     else
@@ -411,177 +726,51 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             }
         }
 
-        r32 playerAccelerationLength = squareLength(playerAcceleration);
-        normalize(&playerAcceleration);
-
-        playerAcceleration *= gameState->playerSpeed;
-        playerAcceleration = playerAcceleration + -3.0f * gameState->dPlayerPosition;
-
-        V3 playerDelta = 0.5f * playerAcceleration * square(deltaTimeSec) + gameState->dPlayerPosition * deltaTimeSec;
-        gameState->dPlayerPosition = playerAcceleration * deltaTimeSec + gameState->dPlayerPosition;
-
-        // NOTE(dima): collision detection and response using bounding ellipse
-        r32 epsilon = 0.01f;
-        V3 playerPositionWorld = {0};
-
-        r32 tRemaining = 1.0f;
-        for (u32 iteration = 0;
-             iteration < 4 && tRemaining > 0.0f;
-             ++iteration)
+        for (s32 entityIndex = gameState->entityCount - 1;
+             entityIndex >= 0;
+             --entityIndex)
         {
-            r32 tMin = 1.0f;
-            Entity *cameraFollowingEntity = gameState->entities + gameState->cameraFollowingEntityIndex;
-
-            for (u32 entityIndex = 0;
-                 entityIndex < gameState->entityCount;
-                 ++entityIndex)
+            Entity *entity = gameState->entities + entityIndex;
+            EntityFlags flags = entity->flags;
+            if ((flags & EntityFlags_PlayerControlled) == EntityFlags_PlayerControlled)
             {
-                Entity *entity = gameState->entities + entityIndex;
-
-                r32 minX = 0.0f, maxX = 0.0f, minZ = 0.0f, maxZ = 0.0f;
-                for (u32 vertexIndex = 0;
-                     vertexIndex < ARRAY_COUNT(vertices) - 3;
-                     vertexIndex += 6)
-                {
-                    r32 x = vertices[vertexIndex];
-                    r32 z = vertices[vertexIndex + 2];
-
-                    if (x < minX)
-                    {
-                        minX = x;
-                    }
-                    if (x > maxX)
-                    {
-                        maxX = x;
-                    }
-
-                    if (z < minZ)
-                    {
-                        minZ = z;
-                    }
-                    if (z > maxZ)
-                    {
-                        maxZ = z;
-                    }
-                }
-
-                minX *= entity->scaleFactor.x;
-                maxX *= entity->scaleFactor.x;
-
-                minZ *= entity->scaleFactor.z;
-                maxZ *= entity->scaleFactor.z;
-
-                entity->axisAlignedBoundingBox.topLeft = v3(minX, 0.0f, maxZ);
-                entity->axisAlignedBoundingBox.width = maxX - minX;
-                entity->axisAlignedBoundingBox.height = maxZ - minZ;
-
-                if (entityIndex != gameState->cameraFollowingEntityIndex)
-                {
-                    playerPositionWorld = v3(cameraFollowingEntity->positionWorld.x,
-                                                   0.0f,
-                                                   cameraFollowingEntity->positionWorld.z);
-
-                    Rect aabbAfterMinkowskiSum = MinkowskiSum(entity->axisAlignedBoundingBox,
-                                                              cameraFollowingEntity->axisAlignedBoundingBox);
-
-                    V3 topLeft = aabbAfterMinkowskiSum.topLeft + entity->positionWorld;
-                    topLeft.y = 0.0f;
-                    V3 topRight = v3(topLeft.x + aabbAfterMinkowskiSum.width,
-                                     0.0f,
-                                     topLeft.z);
-                    topRight.y = 0.0f;
-                    V3 bottomLeft = v3(topLeft.x,
-                                       0.0f,
-                                       topLeft.z - aabbAfterMinkowskiSum.height);
-                    bottomLeft.y = 0.0f;
-                    V3 bottomRight = v3(topLeft.x + aabbAfterMinkowskiSum.width,
-                                        0.0f,
-                                        topLeft.z - aabbAfterMinkowskiSum.height);
-                    bottomRight.y = 0.0f;
-
-                    // NOTE(dima): for visualizing purposes only
-                    boundingEllipsePoints[0] = topLeft;
-                    boundingEllipsePoints[1] = topRight;
-                    boundingEllipsePoints[2] = bottomLeft;
-                    boundingEllipsePoints[3] = bottomRight;
-
-                    /* NOTE(dima): indices 0,1 - left bottom to right bottom
-                                   indices 2,3 - left bottom to left top
-                                   indices 4,5 - right bottom to right top
-                                   indices 6,7 - left top to right top */
-                    V3 lines[4*2];
-                    lines[0] = bottomLeft;
-                    lines[1] = bottomRight;
-                    lines[2] = bottomLeft;
-                    lines[3] = topLeft;
-                    lines[4] = bottomRight;
-                    lines[5] = topRight;
-                    lines[6] = topLeft;
-                    lines[7] = topRight;
-
-                    V3 ro = playerPositionWorld;
-                    ro.y = 0.0f;
-
-                    r32 dx = 0.0f;
-                    r32 dz = 0.0f;
-
-                    for (u32 lineIndex = 0;
-                         lineIndex < 7;
-                         ++lineIndex)
-                    {
-                        V3 qo = lines[lineIndex];
-                        V3 q1 = lines[lineIndex + 1];
-                        V3 d = playerDelta;
-                        V3 s = q1 - qo;
-
-                        r32 denominator = crossXZ(d, s);
-                        r32 t = crossXZ(qo - ro, s) / denominator;
-                        r32 u = crossXZ(qo - ro, d) / denominator;
-
-                        if (t >= 0.0f
-                            && t <= 1.0f
-                            && u >= 0.0f
-                            && u <= 1.0f)
-                        {
-                            if (t < tMin)
-                            {
-                                tMin = t - epsilon;
-                                dx = q1.x - qo.x;
-                                dz = q1.z - qo.z;
-
-                                V3 collisionPointPositionWorld = (playerPositionWorld
-                                                                  + tMin * playerDelta);
-                                collisionPointPositionWorld.y = 0.0f;
-                                collisionPointDebug = v3(collisionPointPositionWorld.x,
-                                                         collisionPointPositionWorld.y,
-                                                         collisionPointPositionWorld.z);
-                            }
-                        }
-                    }
-
-                    if (tMin < 0.0f)
-                    {
-                        tMin = 0.0f;
-                    }
-
-                    lineNormalVector = v3(-dz, 0.0f, dx);
-                    r32 lineNormalVectorLength = length(lineNormalVector);
-                    normalize(&lineNormalVector);
-                }
+                UpdatePlayer(gameState,
+                             vertices,
+                             ARRAY_COUNT(vertices),
+                             entity,
+                             entityIndex,
+                             deltaTimeSec,
+                             playerAcceleration);
+            }
+            else if ((flags & EntityFlags_Enemy) == EntityFlags_Enemy)
+            {
+                UpdateEnemy(gameState, entity, deltaTimeSec);
+            }
+            else if ((flags & EntityFlags_Static) == EntityFlags_Static)
+            {
+                /* TODO(dima): this only calculates AABB!
+                               DON'T do it every frame. Do it only once at loading! */
+                UpdateStaticEntity(gameState,
+                                   vertices,
+                                   ARRAY_COUNT(vertices),
+                                   entity);
+            }
+            else
+            {
+                INVALID_CODE_PATH;
             }
 
-            playerPositionWorld = playerPositionWorld + (playerDelta*tMin);
-            playerDelta = playerDelta - (1*dot(playerDelta, lineNormalVector) * lineNormalVector);
-            gameState->dPlayerPosition = gameState->dPlayerPosition - (1*dot(gameState->dPlayerPosition, lineNormalVector) * lineNormalVector);
-            tRemaining -= tRemaining*tMin;
-
-            cameraFollowingEntity->positionWorld.x = playerPositionWorld.x;
-            cameraFollowingEntity->positionWorld.z = playerPositionWorld.z;
+            pushRenderEntryMesh(&renderGroupArena,
+                                &renderGroup,
+                                entity->posWorld,
+                                entity->scaleFactor,
+                                vertices,
+                                ARRAY_COUNT(vertices));
         }
 
         // NOTE(dima): set up camera to look at entity it follows
         r32 offsetFromCamera = (gameState->cameraCurrDistance + 0.001f) / sine(RADIANS(gameState->cameraIsometricHorizontalAxisRotationAngleDegrees));
-        gameState->cameraPosWorld = cameraFollowingEntity->positionWorld - offsetFromCamera * gameState->isometricN;
+        gameState->cameraPosWorld = cameraFollowingEntity->posWorld - offsetFromCamera * gameState->isometricN;
 
         gameState->mousePos[0] = gcInput->mouseX;
         gameState->mousePos[1] = gcInput->mouseY;
@@ -715,38 +904,14 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     V4 screenCenterPointPosCamera = v4(0.0f, 0.0f, gameState->near + 0.001f, 1.0f);
     V4 screenCenterPosNearPlaneWorld = inverseViewMatrix * screenCenterPointPosCamera;
 
-    MemoryArena renderGroupArena;
-    u64 renderGroupArenaSize = KB(256);
-    ASSERT(renderGroupArenaSize <= memory->transientStorageSize);
-    initializeArena(&renderGroupArena,
-                    KB(256),
-                    (u8 *) memory->transientStorage);
-
-    RenderGroup renderGroup = {0};
-    renderGroup.maxPushBufferSize = renderGroupArenaSize;
-    renderGroup.pushBufferBase = renderGroupArena.base;
-
-    pushRenderEntryClear(&renderGroupArena,
-                         &renderGroup,
-                         v3(0.3f, 0.3f, 0.3f));
-    pushRenderEntryTile(&renderGroupArena,
-                         &renderGroup,
-                         gameState->tileCountPerSide,
-                         gameState->tileSideLength,
-                         gameState->tilemapOriginPositionWorld,
-                         v3(1.0f, 1.0f, 1.0f));
-
-    for (s32 entityIndex = gameState->entityCount - 1;
-         entityIndex >= 0;
-         --entityIndex)
+    for (u32 aabbPointIndex = 0;
+         aabbPointIndex < ARRAY_COUNT(gameState->boundingBoxPoints);
+         ++aabbPointIndex)
     {
-        Entity *entity = gameState->entities + entityIndex;
-        pushRenderEntryMesh(&renderGroupArena,
-                            &renderGroup,
-                            entity->positionWorld,
-                            entity->scaleFactor,
-                            vertices,
-                            ARRAY_COUNT(vertices));
+        pushRenderEntryPoint(&renderGroupArena,
+                             &renderGroup,
+                             gameState->boundingBoxPoints[aabbPointIndex],
+                             v3(1.0f, 0.0f, 0.0f));
     }
 
     pushRenderEntryPoint(&renderGroupArena,
@@ -761,24 +926,21 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                             gameState->cameraDirectonPosVectorStartWorld,
                             gameState->cameraDirectonPosVectorEndWorld);
     }
-    for (u32 ellipsePointIndex = 0;
-         ellipsePointIndex < ARRAY_COUNT(boundingEllipsePoints);
-         ++ellipsePointIndex)
-    {
-        pushRenderEntryPoint(&renderGroupArena,
-                             &renderGroup,
-                             boundingEllipsePoints[ellipsePointIndex],
-                             v3(1.0f, 0.0f, 0.0f));
-    }
     pushRenderEntryLine(&renderGroupArena,
                         &renderGroup,
                         v3(1.0f, 0.0f, 0.0f),
-                        gameState->entities[0].positionWorld,
-                        gameState->entities[0].positionWorld + gameState->dPlayerPosition);
-    pushRenderEntryPoint(&renderGroupArena,
-                         &renderGroup,
-                         collisionPointDebug,
-                         v3(1.0f, 1.0f, 0.0f));
+                        gameState->entities[gameState->cameraFollowingEntityIndex].posWorld,
+                        gameState->entities[gameState->cameraFollowingEntityIndex].posWorld
+                        + gameState->entities[gameState->cameraFollowingEntityIndex].dPos);
+    V3 cameraFollowingEntityCollisionPoint = gameState->collisionPointDebug;
+    if (cameraFollowingEntityCollisionPoint.x != 0.0f
+        || cameraFollowingEntityCollisionPoint.z != 0.0f)
+    {
+        pushRenderEntryPoint(&renderGroupArena,
+                             &renderGroup,
+                             cameraFollowingEntityCollisionPoint,
+                             v3(1.0f, 1.0f, 0.0f));
+    }
     pushRenderEntryPoint(&renderGroupArena,
                          &renderGroup,
                          v3(screenCenterPosNearPlaneWorld),
