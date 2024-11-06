@@ -165,4 +165,17 @@ inline r32 minimum(r32 one, r32 two)
     return result;
 }
 
+inline r32 maximum(r32 one, r32 two)
+{
+    r32 result;
+
+#if COMPILER_LLVM
+    result = __builtin_fmax(one, two);
+#else
+    result = fmaxf(one, two);
+#endif
+
+    return result;
+}
+
 #endif

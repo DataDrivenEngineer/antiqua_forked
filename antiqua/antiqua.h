@@ -25,9 +25,8 @@ void * pushSize_(MemoryArena *arena, MemoryIndex size)
 
 typedef struct Rect
 {
-    V3 topLeft;
-    r32 width;
-    r32 height;
+    r32 diameterW;
+    r32 diameterH;
 } Rect;
 
 enum EntityFlags
@@ -47,9 +46,7 @@ typedef struct
     V3 dPos;
     V3 scaleFactor;
 
-    // NOTE(dima): index 0 - top left corner, index 1 - bottom right corner
     Rect regularAxisAlignedBoundingBox;
-    Rect longAxisAlignedBoundingBox;
 } Entity;
 
 typedef struct
@@ -106,6 +103,7 @@ typedef struct
 #if ANTIQUA_SLOW
     V3 boundingBoxPoints[4];
     V3 collisionPointDebug;
+    V3 lineNormalVector;
 #endif
     V3 mouseDirectionVectorVerticalWorld;
 } GameState;
