@@ -150,13 +150,27 @@ static void MoveEntity(GameState *gameState,
 
                 if (denominator != 0.0f)
                 {
-                    r32 t = crossXZ(qo - ro, s) / denominator;
-                    r32 u = crossXZ(qo - ro, d) / denominator;
+                    r32 numeratorT = crossXZ(qo - ro, s);
+                    r32 t = numeratorT / denominator;
+                    r32 numeratorU = crossXZ(qo - ro, d);
+                    r32 u = numeratorU / denominator;
 
-                    if (t >= 0.0f
-                        && t <= 1.0f
-                        && u >= 0.0f
-                        && u <= 1.0f)
+                    b32 intersectAtEndpoints = ((numeratorT == 0
+                                                || numeratorT == denominator
+                                                || (numeratorU == 0
+                                                    || numeratorU == denominator)));
+                    b32 intersectNotAtEndpoints = (t > 0.0f
+                                                   && t < 1.0f
+                                                   && u > 0.0f
+                                                   && u < 1.0f);
+
+                    b32 testEntityMoving = testEntity->flags & EntityFlags_Moving;
+                    b32 entityMoving = entity->flags & EntityFlags_Moving;
+                    b32 collide = ((testEntityMoving && entityMoving)
+                                   ? (intersectAtEndpoints || intersectNotAtEndpoints)
+                                   : intersectNotAtEndpoints);
+
+                    if (collide)
                     {
                         if (t < tMin)
                         {
@@ -186,7 +200,7 @@ static void MoveEntity(GameState *gameState,
             gameState->lineNormalVector = lineNormalVector;
         }
 
-        r32 posDeltaEpsilon = 0.1f;
+        r32 posDeltaEpsilon = 0.11f;
         posWorld = posWorld + (posDelta*(tMin - posDeltaEpsilon));
         posDelta = posDelta - (1*dot(posDelta, lineNormalVector) * lineNormalVector);
         testEntity->dPos = (testEntity->dPos
