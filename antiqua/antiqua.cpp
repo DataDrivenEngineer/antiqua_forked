@@ -6,6 +6,47 @@
 
 #include "antiqua_render_group.cpp"
 
+static void CalculateAABB(Entity *entity,
+                          r32 *vertices,
+                          u32 verticesSize)
+{
+    r32 minX = 0.0f, maxX = 0.0f, minZ = 0.0f, maxZ = 0.0f;
+    for (u32 vertexIndex = 0;
+         vertexIndex < verticesSize - 3;
+         vertexIndex += 6)
+    {
+        r32 x = vertices[vertexIndex];
+        r32 z = vertices[vertexIndex + 2];
+
+        if (x < minX)
+        {
+            minX = x;
+        }
+        if (x > maxX)
+        {
+            maxX = x;
+        }
+
+        if (z < minZ)
+        {
+            minZ = z;
+        }
+        if (z > maxZ)
+        {
+            maxZ = z;
+        }
+    }
+
+    minX *= entity->scaleFactor.x;
+    maxX *= entity->scaleFactor.x;
+
+    minZ *= entity->scaleFactor.z;
+    maxZ *= entity->scaleFactor.z;
+
+    entity->regularAxisAlignedBoundingBox.diameterW = maxX - minX;
+    entity->regularAxisAlignedBoundingBox.diameterH = maxZ - minZ;
+}
+
 static void MoveEntity(GameState *gameState,
                        Entity *testEntity,
                        u32 testEntityIndex,
@@ -44,7 +85,7 @@ static void MoveEntity(GameState *gameState,
 
             Rect aabbAfterMinkowskiSum;
             aabbAfterMinkowskiSum.diameterW =
-                (testEntity->regularAxisAlignedBoundingBox.diameterH
+                (testEntity->regularAxisAlignedBoundingBox.diameterW
                  + entity->regularAxisAlignedBoundingBox.diameterW);
             aabbAfterMinkowskiSum.diameterH =
                 (testEntity->regularAxisAlignedBoundingBox.diameterH
@@ -145,7 +186,7 @@ static void MoveEntity(GameState *gameState,
             gameState->lineNormalVector = lineNormalVector;
         }
 
-        r32 posDeltaEpsilon = 0.011f;
+        r32 posDeltaEpsilon = 0.1f;
         posWorld = posWorld + (posDelta*(tMin - posDeltaEpsilon));
         posDelta = posDelta - (1*dot(posDelta, lineNormalVector) * lineNormalVector);
         testEntity->dPos = (testEntity->dPos
@@ -165,47 +206,10 @@ static void UpdatePlayer(GameState *gameState,
                          r32 deltaTimeSec,
                          V3 playerAcceleration)
 {
-    r32 minX = 0.0f, maxX = 0.0f, minZ = 0.0f, maxZ = 0.0f;
-    for (u32 vertexIndex = 0;
-         vertexIndex < verticesSize - 3;
-         vertexIndex += 6)
-    {
-        r32 x = vertices[vertexIndex];
-        r32 z = vertices[vertexIndex + 2];
-
-        if (x < minX)
-        {
-            minX = x;
-        }
-        if (x > maxX)
-        {
-            maxX = x;
-        }
-
-        if (z < minZ)
-        {
-            minZ = z;
-        }
-        if (z > maxZ)
-        {
-            maxZ = z;
-        }
-    }
-
-    minX *= entity->scaleFactor.x;
-    maxX *= entity->scaleFactor.x;
-
-    minZ *= entity->scaleFactor.z;
-    maxZ *= entity->scaleFactor.z;
-
-    r32 playerAccelerationLength = squareLength(playerAcceleration);
     normalize(&playerAcceleration);
     playerAcceleration *= gameState->playerSpeed;
     playerAcceleration = playerAcceleration + -3.0f * entity->dPos;
     V3 posDelta = (0.5f * playerAcceleration * square(deltaTimeSec) + entity->dPos * deltaTimeSec);
-
-    entity->regularAxisAlignedBoundingBox.diameterW = maxX - minX;
-    entity->regularAxisAlignedBoundingBox.diameterH = maxZ - minZ;
 
     MoveEntity(gameState, entity, entityIndex, deltaTimeSec, playerAcceleration, posDelta);
 }
@@ -217,39 +221,6 @@ static void UpdateEnemy(GameState *gameState,
                         u32 entityIndex,
                         r32 deltaTimeSec)
 {
-    r32 minX = 0.0f, maxX = 0.0f, minZ = 0.0f, maxZ = 0.0f;
-    for (u32 vertexIndex = 0;
-         vertexIndex < verticesSize - 3;
-         vertexIndex += 6)
-    {
-        r32 x = vertices[vertexIndex];
-        r32 z = vertices[vertexIndex + 2];
-
-        if (x < minX)
-        {
-            minX = x;
-        }
-        if (x > maxX)
-        {
-            maxX = x;
-        }
-
-        if (z < minZ)
-        {
-            minZ = z;
-        }
-        if (z > maxZ)
-        {
-            maxZ = z;
-        }
-    }
-
-    minX *= entity->scaleFactor.x;
-    maxX *= entity->scaleFactor.x;
-
-    minZ *= entity->scaleFactor.z;
-    maxZ *= entity->scaleFactor.z;
-
     static r32 counter = 0.0f;
     counter += 0.01f;
     if (counter > 10000.0f)
@@ -261,6 +232,7 @@ static void UpdateEnemy(GameState *gameState,
                          0.0f,
                          sine((counter)));
 
+    normalize(&acceleration);
     acceleration *= 0.5f*gameState->playerSpeed;
     acceleration = acceleration + -3.0f * entity->dPos;
     if (deltaTimeSec > 100.0f)
@@ -268,9 +240,6 @@ static void UpdateEnemy(GameState *gameState,
         deltaTimeSec = 0.0f;
     }
     V3 posDelta = 0.5f * acceleration * square(deltaTimeSec) + entity->dPos * deltaTimeSec;
-
-    entity->regularAxisAlignedBoundingBox.diameterW = maxX - minX;
-    entity->regularAxisAlignedBoundingBox.diameterH = maxZ - minZ;
 
     MoveEntity(gameState, entity, entityIndex, deltaTimeSec, acceleration, posDelta);
 }
@@ -280,41 +249,6 @@ static void UpdateStaticEntity(GameState *gameState,
                                u32 verticesSize,
                                Entity *entity)
 {
-    r32 minX = 0.0f, maxX = 0.0f, minZ = 0.0f, maxZ = 0.0f;
-    for (u32 vertexIndex = 0;
-         vertexIndex < verticesSize - 3;
-         vertexIndex += 6)
-    {
-        r32 x = vertices[vertexIndex];
-        r32 z = vertices[vertexIndex + 2];
-
-        if (x < minX)
-        {
-            minX = x;
-        }
-        if (x > maxX)
-        {
-            maxX = x;
-        }
-
-        if (z < minZ)
-        {
-            minZ = z;
-        }
-        if (z > maxZ)
-        {
-            maxZ = z;
-        }
-    }
-
-    minX *= entity->scaleFactor.x;
-    maxX *= entity->scaleFactor.x;
-
-    minZ *= entity->scaleFactor.z;
-    maxZ *= entity->scaleFactor.z;
-
-    entity->regularAxisAlignedBoundingBox.diameterW = maxX - minX;
-    entity->regularAxisAlignedBoundingBox.diameterH = maxZ - minZ;
 }
 
 #if !XCODE_BUILD
@@ -528,6 +462,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             newEntity->posWorld = v3(0.0f, 0.5f, 0.0f);
             newEntity->scaleFactor = v3(1.0f, 1.0f, 1.0f);
             gameState->entityCount++;
+
+            CalculateAABB(newEntity, vertices, ARRAY_COUNT(vertices));
         }
         {
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
@@ -535,13 +471,17 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             newEntity->posWorld = v3(5.0f, 0.5f, 5.0f);
             newEntity->scaleFactor = v3(20.0f, 1.0f, 1.0f);
             gameState->entityCount++;
+
+            CalculateAABB(newEntity, vertices, ARRAY_COUNT(vertices));
         }
         {
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
             newEntity->flags = (EntityFlags)(EntityFlags_Moving | EntityFlags_Enemy);
-            newEntity->posWorld = v3(7.0f, 1.0f, 6.8f);
+            newEntity->posWorld = v3(7.0f, 1.0f, 6.0f);
             newEntity->scaleFactor = v3(1.0f, 2.0f, 1.0f);
             gameState->entityCount++;
+
+            CalculateAABB(newEntity, vertices, ARRAY_COUNT(vertices));
         }
 
         gameState->cameraFollowingEntityIndex = 0;
