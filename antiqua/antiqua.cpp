@@ -105,22 +105,6 @@ static void MoveEntity(GameState *gameState,
                                 0.0f,
                                 -0.5f*box.diameterH);
 
-#if ANTIQUA_SLOW
-            // NOTE(dima): for visualizing purposes only
-            if (testEntityIndex == 2
-                && entityIndex == gameState->cameraFollowingEntityIndex)
-            {
-                // top left
-                gameState->boundingBoxPoints[0] = topLeft;
-                // top right
-                gameState->boundingBoxPoints[1] = topRight;
-                // bottom left
-                gameState->boundingBoxPoints[2] = bottomLeft;
-                // bottom right
-                gameState->boundingBoxPoints[3] = bottomRight;
-            }
-#endif
-
             /* NOTE(dima): indices 0,1 - left bottom to right bottom
                            indices 2,3 - left bottom to left top
                            indices 4,5 - right bottom to right top
@@ -166,6 +150,15 @@ static void MoveEntity(GameState *gameState,
 
                     b32 testEntityMoving = testEntity->flags & EntityFlags_Moving;
                     b32 entityMoving = entity->flags & EntityFlags_Moving;
+                    /* NOTE(dima): from purely mathematical standpoint, we would check only
+                       non-endpoints to determine collisions - because our approach is
+                       to never allow collisions in the first place. However, probably
+                       due to floating point rounding errors, when both objects are moving,
+                       sometimes they collide at endpoints. In this case, to avoid increasing
+                       epsilon value, we are checking for intersection using
+                       both endpoints and non-endpoints. We want to keep epsilon as low as
+                       possible, because that ensures smoother collision response - less
+                       backward jerking */
                     b32 collide = ((testEntityMoving && entityMoving)
                                    ? (intersectAtEndpoints || intersectNotAtEndpoints)
                                    : intersectNotAtEndpoints);
@@ -542,7 +535,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                          gameState->tilemapOriginPositionWorld,
                          v3(1.0f, 1.0f, 1.0f));
 
-#if ANTIQUA_SLOW
+#if ANTIQUA_INTERNAL
     // NOTE(dima): for visualizing purposes only
     gameState->collisionPointDebug = {0};
 #endif
@@ -873,16 +866,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     V4 screenCenterPointPosCamera = v4(0.0f, 0.0f, gameState->near + 0.001f, 1.0f);
     V4 screenCenterPosNearPlaneWorld = inverseViewMatrix * screenCenterPointPosCamera;
 
-    for (u32 aabbPointIndex = 0;
-         aabbPointIndex < ARRAY_COUNT(gameState->boundingBoxPoints);
-         ++aabbPointIndex)
-    {
-        pushRenderEntryPoint(&renderGroupArena,
-                             &renderGroup,
-                             gameState->boundingBoxPoints[aabbPointIndex],
-                             v3(1.0f, 0.0f, 0.0f));
-    }
-
     pushRenderEntryPoint(&renderGroupArena,
                          &renderGroup,
                          v3(mousePosNearPlaneWorld),
@@ -895,6 +878,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                             gameState->cameraDirectonPosVectorStartWorld,
                             gameState->cameraDirectonPosVectorEndWorld);
     }
+
+#if ANTIQUA_INTERNAL
     pushRenderEntryLine(&renderGroupArena,
                         &renderGroup,
                         v3(1.0f, 0.0f, 0.0f),
@@ -926,6 +911,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                          &renderGroup,
                          v3(screenCenterPosNearPlaneWorld),
                          v3(0.0f, 1.0f, 0.0f));
+#endif
 
     renderGroup.uniforms[0] = gameState->viewMatrix;
     renderGroup.uniforms[1] = gameState->projectionMatrix;

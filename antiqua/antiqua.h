@@ -99,13 +99,13 @@ typedef struct
     V3 cameraDirectonPosVectorEndWorld;
     V3 mouseDirectionVectorWorld;
     V3 mouseDirectionVectorHorizontalWorld;
+    V3 mouseDirectionVectorVerticalWorld;
 
-#if ANTIQUA_SLOW
+#if ANTIQUA_INTERNAL
     V3 boundingBoxPoints[4];
     V3 collisionPointDebug;
     V3 lineNormalVector;
 #endif
-    V3 mouseDirectionVectorVerticalWorld;
 } GameState;
 
 #endif
