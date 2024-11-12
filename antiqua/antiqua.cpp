@@ -200,8 +200,8 @@ static void MoveEntity(GameState *gameState,
             gameState->lineNormalVector = lineNormalVector;
         }
 
-        r32 posDeltaEpsilon = 0.11f;
-        posWorld = posWorld + (posDelta*(tMin - posDeltaEpsilon));
+        r32 posDeltaEpsilon = 0.002f;
+        posWorld = posWorld + (posDelta*maximum(-posDeltaEpsilon, (tMin - posDeltaEpsilon)));
         posDelta = posDelta - (1*dot(posDelta, lineNormalVector) * lineNormalVector);
         testEntity->dPos = (testEntity->dPos
                             - (1*dot(testEntity->dPos, lineNormalVector)*lineNormalVector));
