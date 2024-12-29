@@ -78,7 +78,9 @@ void pushRenderEntryMesh(MemoryArena *arena,
                          V3 positionWorld,
                          V3 scaleFactor,
                          r32 *vertices,
-                         u32 totalCountOfElementsInArray)
+                         u32 totalCountOfVertices,
+                         s16 *indices,
+                         u32 totalCountOfIndices)
 {
     ASSERT(renderGroup->pushBufferElementCount > 0);
 
@@ -88,7 +90,7 @@ void pushRenderEntryMesh(MemoryArena *arena,
     renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
     RenderEntryMesh *entry =
         (RenderEntryMesh *)(PUSH_STRUCT(arena, RenderEntryMesh));
-    entry->size = sizeof(r32) * totalCountOfElementsInArray;
+    entry->sizeOfVertices = sizeof(r32) * totalCountOfVertices;
     entry->modelMatrix = {scaleFactor.x, 0.0f, 0.0f, 0.0f,
                           0.0f, scaleFactor.y, 0.0f, 0.0f,
                           0.0f, 0.0f, scaleFactor.z, 0.0f,
@@ -96,7 +98,9 @@ void pushRenderEntryMesh(MemoryArena *arena,
                           positionWorld.y,
                           positionWorld.z,
                           1.0f};
-    entry->data = vertices;
+    entry->vertices = vertices;
+    entry->sizeOfIndices = sizeof(s16) * totalCountOfIndices;
+    entry->indices = indices;
     renderGroup->pushBufferSize += sizeof(RenderEntryMesh);
     renderGroup->pushBufferElementCount++;
 

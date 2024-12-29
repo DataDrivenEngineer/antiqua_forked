@@ -15,6 +15,15 @@ struct VertexOut {
     float pointSize [[point_size]];
 };
 
+struct MeshVertexIn {
+    packed_float3 position;
+};
+
+struct MeshVertexOut {
+    float4 position [[position]];
+    float pointSize [[point_size]];
+};
+
 struct Uniforms
 {
     float4x4 viewMatrix;
@@ -109,26 +118,25 @@ fragment float4 fragmentShaderTile(VertexOut in [[stage_in]]) {
   return float4(in.color, 1.0f);
 }
 
-vertex VertexOut vertexShaderMesh(
-							   const constant VertexIn * vertices [[buffer(5)]],
+vertex MeshVertexOut vertexShaderMesh(
+							   const constant MeshVertexIn *vertices [[buffer(5)]],
 							   const ushort vertexIndex [[vertex_id]],
 							   constant const Uniforms &uniforms [[buffer(7)]],
 							   constant const float4x4 &modelMatrix [[buffer(8)]])
 {
-    const constant VertexIn &vData = vertices[vertexIndex];
+    const constant MeshVertexIn &vData = vertices[vertexIndex];
 
     float4x4 viewMatrix = uniforms.viewMatrix;
     float4x4 projectionMatrix = uniforms.projectionMatrix;
 
-    VertexOut ret
+    MeshVertexOut ret
     {
         .position = projectionMatrix * viewMatrix * modelMatrix * float4(vData.position, 1.0f),
-        .color = vData.color,
         .pointSize = 10.0f
     };
     return ret;
 }
 
-fragment float4 fragmentShaderMesh(VertexOut in [[stage_in]]) {
-  return float4(in.color, 1.0f);
+fragment float4 fragmentShaderMesh(MeshVertexOut in [[stage_in]]) {
+  return float4(1.0f, 1.0f, 1.0f, 1.0f);
 }

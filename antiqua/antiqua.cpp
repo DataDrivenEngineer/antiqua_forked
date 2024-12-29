@@ -12,8 +12,8 @@ static void CalculateAABB(Entity *entity,
 {
     r32 minX = 0.0f, maxX = 0.0f, minZ = 0.0f, maxZ = 0.0f;
     for (u32 vertexIndex = 0;
-         vertexIndex < verticesSize - 3;
-         vertexIndex += 6)
+         vertexIndex < verticesSize;
+         vertexIndex += 3)
     {
         r32 x = vertices[vertexIndex];
         r32 z = vertices[vertexIndex + 2];
@@ -193,7 +193,7 @@ static void MoveEntity(GameState *gameState,
             gameState->lineNormalVector = lineNormalVector;
         }
 
-        r32 posDeltaEpsilon = 0.002f;
+        r32 posDeltaEpsilon = 0.005f;
         posWorld = posWorld + (posDelta*maximum(-posDeltaEpsilon, (tMin - posDeltaEpsilon)));
         posDelta = posDelta - (1*dot(posDelta, lineNormalVector) * lineNormalVector);
         testEntity->dPos = (testEntity->dPos
@@ -266,98 +266,45 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 {
     /* TODO(dima):
        - implement collision detection using AABB (DONE)
-     */
+       - implement indexed drawing for meshes (DONE)
+       - implement mesh importing from custom format based on glTF 2.0
+    */
+
+    s16 indices[] =
+    {
+        0,1,2,
+        2,3,0,
+        4,5,6,
+        6,7,4,
+        4,5,1,
+        1,0,4,
+        3,2,6,
+        6,7,3,
+        4,0,3,
+        3,7,4,
+        5,1,2,
+        2,6,5
+    };
 
     r32 vertices[] =
     {
-        // front face
         -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
-        1.0f, 0.0f, 0.0f, // color = red
         -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
-        1.0f, 0.0f, 0.0f, // color = red
         0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-        1.0f, 0.0f, 0.0f, // color = red
-        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-        1.0f, 0.0f, 0.0f, // color = red
         0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-        1.0f, 0.0f, 0.0f, // color = red
-        -0.5f, 0.5f, 0.0f, // vertex #0 - coordinates
-        1.0f, 0.0f, 0.0f, // color = red
-        // back face
         -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-        0.0f, 1.0f, 0.0f, // color = green
         -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
-        0.0f, 1.0f, 0.0f, // color = green
         0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-        0.0f, 1.0f, 0.0f, // color = green
-        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-        0.0f, 1.0f, 0.0f, // color = green
         0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
-        0.0f, 1.0f, 0.0f, // color = green
-        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-        0.0f, 1.0f, 0.0f, // color = green
-        // left face
-        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-        0.0f, 0.0f, 1.0f, // color = blue
-        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
-        0.0f, 0.0f, 1.0f, // color = blue
-        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
-        0.0f, 0.0f, 1.0f, // color = blue
-        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
-        0.0f, 0.0f, 1.0f, // color = blue
-        -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
-        0.0f, 0.0f, 1.0f, // color = blue
-        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-        0.0f, 0.0f, 1.0f, // color = blue
-        // right face
-        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-        1.0f, 0.4f, 0.0f, // color = orange
-        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-        1.0f, 0.4f, 0.0f, // color = orange
-        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-        1.0f, 0.4f, 0.0f, // color = orange
-        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-        1.0f, 0.4f, 0.0f, // color = orange
-        0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
-        1.0f, 0.4f, 0.0f, // color = orange
-        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-        1.0f, 0.4f, 0.0f, // color = orange
-        // top face
-        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-        1.0f, 0.0f, 1.0f, // color = purple
-        -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
-        1.0f, 0.0f, 1.0f, // color = purple
-        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-        1.0f, 0.0f, 1.0f, // color = purple
-        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-        1.0f, 0.0f, 1.0f, // color = purple
-        0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
-        1.0f, 0.0f, 1.0f, // color = purple
-        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-        1.0f, 0.0f, 1.0f, // color = purple
-        // bottom face
-        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
-        0.0f, 1.0f, 1.0f, // color = cyan
-        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
-        0.0f, 1.0f, 1.0f, // color = cyan
-        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-        0.0f, 1.0f, 1.0f, // color = cyan
-        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-        0.0f, 1.0f, 1.0f, // color = cyan
-        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-        0.0f, 1.0f, 1.0f, // color = cyan
-        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
-        0.0f, 1.0f, 1.0f, // color = cyan
     };
 
     {
-
         // NOTE(dima): move mesh center to (0;0;0)
         // TODO(dima): don't do it every frame - just do it once when loading a mesh
         r32 minX = 0.0f, maxX = 0.0f, minY = 0.0f, maxY = 0.0f, minZ = 0.0f, maxZ = 0.0f;
         for (u32 vertexIndex = 0;
-             vertexIndex < ARRAY_COUNT(vertices) - 3;
-             vertexIndex += 6)
+             vertexIndex < ARRAY_COUNT(vertices);
+             vertexIndex += 3)
         {
             r32 x = vertices[vertexIndex];
             r32 y = vertices[vertexIndex + 1];
@@ -397,8 +344,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
 
         for (u32 vertexIndex = 0;
-             vertexIndex < ARRAY_COUNT(vertices) - 3;
-             vertexIndex += 6)
+             vertexIndex < ARRAY_COUNT(vertices);
+             vertexIndex += 3)
         {
             vertices[vertexIndex] -= centerX;
             vertices[vertexIndex + 1] -= centerY;
@@ -612,7 +559,9 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                                 entity->posWorld,
                                 entity->scaleFactor,
                                 vertices,
-                                ARRAY_COUNT(vertices));
+                                ARRAY_COUNT(vertices),
+                                indices,
+                                ARRAY_COUNT(indices));
         }
     }
     else
@@ -727,7 +676,9 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                                 entity->posWorld,
                                 entity->scaleFactor,
                                 vertices,
-                                ARRAY_COUNT(vertices));
+                                ARRAY_COUNT(vertices),
+                                indices,
+                                ARRAY_COUNT(indices));
         }
 
         // NOTE(dima): set up camera to look at entity it follows

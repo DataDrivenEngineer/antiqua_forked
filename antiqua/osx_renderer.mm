@@ -1,4 +1,3 @@
-//
 #include "types.h"
 #include "osx_renderer.h"
 #include "antiqua_render_group.h"
@@ -14,8 +13,10 @@ static CAMetalLayer *layer;
 static id<MTLTexture> depthTex = 0;
 static id<MTLRenderPipelineState> renderPipelineStates[5];
 static id<MTLDepthStencilState> depthStencilState;
-static id<MTLBuffer> renderGroupBuffer;
-static u32 renderGroupBufferCurrentSize;
+static id<MTLBuffer> renderGroupVertexBuffer;
+static u32 renderGroupVertexBufferCurrentSize;
+static id<MTLBuffer> renderGroupIndexBuffer;
+static u32 renderGroupIndexBufferCurrentSize;
 
 MONExternC INIT_RENDERER(initRenderer)
 {
@@ -116,11 +117,15 @@ MONExternC INIT_RENDERER(initRenderer)
         [depthStencilDesc release];
     }
 
-    // NOTE(dima): creating GPU buffer for render group
+    // NOTE(dima): creating GPU buffers for render group
     {
-        renderGroupBuffer = [metalDevice newBufferWithLength:KB(256)
+        renderGroupVertexBuffer = [metalDevice newBufferWithLength:KB(256)
                                     options:MTLResourceStorageModeShared];
-        ASSERT(renderGroupBuffer != 0);
+        ASSERT(renderGroupVertexBuffer != 0);
+
+        renderGroupIndexBuffer = [metalDevice newBufferWithLength:KB(128)
+                                    options:MTLResourceStorageModeShared];
+        ASSERT(renderGroupIndexBuffer != 0);
     }
 }
 
@@ -132,7 +137,8 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
            - do not have a standalone clear entry
            - do not store depth / color texture after the last render entry */
 
-        renderGroupBufferCurrentSize = 0;
+        renderGroupVertexBufferCurrentSize = 0;
+        renderGroupIndexBufferCurrentSize = 0;
 
         id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
         id<CAMetalDrawable> drawable = [layer nextDrawable];
@@ -205,22 +211,22 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                     memcpy(vertices, (void*)&Entry->position, sizeof(V3));
                     memcpy(vertices + 3, (void*)&Entry->color, sizeof(Entry->color));
 
-                    u8 *renderGroupBufferDestStart = ((u8 *)[renderGroupBuffer contents])
-                                                     + renderGroupBufferCurrentSize;
+                    u8 *renderGroupVertexBufferDestStart = ((u8 *)[renderGroupVertexBuffer contents])
+                                                     + renderGroupVertexBufferCurrentSize;
                     u8 sizeOfData = sizeof(r32) * ARRAY_COUNT(vertices); 
-                    memcpy(renderGroupBufferDestStart,
+                    memcpy(renderGroupVertexBufferDestStart,
                            vertices,
                            sizeOfData);
-                    renderGroupBufferCurrentSize += sizeOfData;
-                    u32 renderGroupBufferOffset = renderGroupBufferDestStart
-                                               - ((u8 *)[renderGroupBuffer contents]);
+                    renderGroupVertexBufferCurrentSize += sizeOfData;
+                    u32 renderGroupVertexBufferOffset = renderGroupVertexBufferDestStart
+                                               - ((u8 *)[renderGroupVertexBuffer contents]);
 
                     id<MTLRenderCommandEncoder> renderCommandEnc =
                         [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
                     [renderCommandEnc setRenderPipelineState:renderPipelineStates[0]];
                     [renderCommandEnc setDepthStencilState:depthStencilState];
-                    [renderCommandEnc setVertexBuffer: renderGroupBuffer 
-                                      offset: renderGroupBufferOffset 
+                    [renderCommandEnc setVertexBuffer: renderGroupVertexBuffer 
+                                      offset: renderGroupVertexBufferOffset 
                                       attributeStride: 0
                                       atIndex: 5];
                     [renderCommandEnc setVertexBytes: &renderGroup->uniforms
@@ -276,22 +282,22 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                     memcpy(vertices + 6, (void*)&Entry->end, sizeof(Entry->end));
                     memcpy(vertices + 9, (void*)&Entry->color, sizeof(Entry->color));
 
-                    u8 *renderGroupBufferDestStart = ((u8 *)[renderGroupBuffer contents])
-                                                     + renderGroupBufferCurrentSize;
+                    u8 *renderGroupVertexBufferDestStart = ((u8 *)[renderGroupVertexBuffer contents])
+                                                     + renderGroupVertexBufferCurrentSize;
                     u8 sizeOfData = sizeof(r32) * ARRAY_COUNT(vertices); 
-                    memcpy(renderGroupBufferDestStart,
+                    memcpy(renderGroupVertexBufferDestStart,
                            vertices,
                            sizeOfData);
-                    renderGroupBufferCurrentSize += sizeOfData;
-                    u32 renderGroupBufferOffset = renderGroupBufferDestStart
-                                               - ((u8 *)[renderGroupBuffer contents]);
+                    renderGroupVertexBufferCurrentSize += sizeOfData;
+                    u32 renderGroupVertexBufferOffset = renderGroupVertexBufferDestStart
+                                               - ((u8 *)[renderGroupVertexBuffer contents]);
 
                     id<MTLRenderCommandEncoder> renderCommandEnc =
                         [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
                     [renderCommandEnc setRenderPipelineState:renderPipelineStates[0]];
                     [renderCommandEnc setDepthStencilState:depthStencilState];
-                    [renderCommandEnc setVertexBuffer: renderGroupBuffer 
-                                      offset: renderGroupBufferOffset 
+                    [renderCommandEnc setVertexBuffer: renderGroupVertexBuffer 
+                                      offset: renderGroupVertexBufferOffset 
                                       attributeStride: 0
                                       atIndex: 5];
                     [renderCommandEnc setVertexBytes: &renderGroup->uniforms
@@ -340,20 +346,28 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                     renderPassDesc.depthAttachment.storeAction = MTLStoreActionStore;
                     renderPassDesc.depthAttachment.clearDepth = 1.0f;
 
-                    u8 *renderGroupBufferDestStart = ((u8 *)[renderGroupBuffer contents]) + renderGroupBufferCurrentSize;
-                    memcpy(renderGroupBufferDestStart,
-                           Entry->data,
-                           Entry->size);
-                    renderGroupBufferCurrentSize += Entry->size;
-                    u32 renderGroupBufferOffset = renderGroupBufferDestStart
-                                               - ((u8 *)[renderGroupBuffer contents]);
+                    u8 *renderGroupVertexBufferDestStart = ((u8 *)[renderGroupVertexBuffer contents]) + renderGroupVertexBufferCurrentSize;
+                    memcpy(renderGroupVertexBufferDestStart,
+                           Entry->vertices,
+                           Entry->sizeOfVertices);
+                    renderGroupVertexBufferCurrentSize += Entry->sizeOfVertices;
+                    u32 renderGroupVertexBufferOffset = renderGroupVertexBufferDestStart
+                                               - ((u8 *)[renderGroupVertexBuffer contents]);
+
+                    u8 *renderGroupIndexBufferDestStart = ((u8 *)[renderGroupIndexBuffer contents]) + renderGroupIndexBufferCurrentSize;
+                    memcpy(renderGroupIndexBufferDestStart,
+                           Entry->indices,
+                           Entry->sizeOfIndices);
+                    renderGroupIndexBufferCurrentSize += Entry->sizeOfIndices;
+                    u32 renderGroupIndexBufferOffset = renderGroupIndexBufferDestStart
+                                               - ((u8 *)[renderGroupIndexBuffer contents]);
 
                     id<MTLRenderCommandEncoder> renderCommandEnc =
                         [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
                     [renderCommandEnc setRenderPipelineState:renderPipelineStates[2]];
                     [renderCommandEnc setDepthStencilState:depthStencilState];
-                    [renderCommandEnc setVertexBuffer: renderGroupBuffer 
-                                      offset: renderGroupBufferOffset
+                    [renderCommandEnc setVertexBuffer: renderGroupVertexBuffer 
+                                      offset: renderGroupVertexBufferOffset
                                       attributeStride: 0
                                       atIndex: 5];
                     [renderCommandEnc setVertexBytes: &renderGroup->uniforms
@@ -364,9 +378,11 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                                       length: sizeof(Entry->modelMatrix)
                                       attributeStride: 0
                                       atIndex: 8];
-                    [renderCommandEnc drawPrimitives:MTLPrimitiveTypeTriangle
-                                      vertexStart: 0
-                                      vertexCount: 36];
+                    [renderCommandEnc drawIndexedPrimitives: MTLPrimitiveTypeTriangle
+                                      indexCount: Entry->sizeOfIndices / sizeof(s16)
+                                      indexType: MTLIndexTypeUInt16
+                                      indexBuffer: renderGroupIndexBuffer
+                                      indexBufferOffset: renderGroupIndexBufferOffset];
                     [renderCommandEnc endEncoding];
                     break;
                 }
@@ -406,36 +422,36 @@ MONExternC RENDER_ON_GPU(renderOnGpu)
                     renderPassDesc.depthAttachment.storeAction = MTLStoreActionStore;
                     renderPassDesc.depthAttachment.clearDepth = 1.0f;
 
-                    u8 *renderGroupBufferDestStart = ((u8 *)[renderGroupBuffer contents]) + renderGroupBufferCurrentSize;
+                    u8 *renderGroupVertexBufferDestStart = ((u8 *)[renderGroupVertexBuffer contents]) + renderGroupVertexBufferCurrentSize;
                     u32 currSize = 0;
-                    memcpy(renderGroupBufferDestStart,
+                    memcpy(renderGroupVertexBufferDestStart,
                            (void *)&Entry->tileCountPerSide,
                            sizeof(Entry->tileCountPerSide));
                     currSize += sizeof(Entry->tileCountPerSide);
-                    memcpy(renderGroupBufferDestStart + currSize,
+                    memcpy(renderGroupVertexBufferDestStart + currSize,
                            (void *)&Entry->tileSideLength,
                            sizeof(Entry->tileSideLength));
                     currSize += sizeof(Entry->tileSideLength);
-                    memcpy(renderGroupBufferDestStart + currSize,
+                    memcpy(renderGroupVertexBufferDestStart + currSize,
                            (void *)&Entry->color,
                            sizeof(Entry->color));
                     currSize += sizeof(Entry->color);
-                    memcpy(renderGroupBufferDestStart + currSize,
+                    memcpy(renderGroupVertexBufferDestStart + currSize,
                            (void *)&Entry->originTileCenterPositionWorld,
                            sizeof(Entry->originTileCenterPositionWorld));
                     currSize += sizeof(Entry->originTileCenterPositionWorld);
 
-                    renderGroupBufferCurrentSize += currSize;
-                    u32 renderGroupBufferOffset = renderGroupBufferDestStart
-                                               - ((u8 *)[renderGroupBuffer contents]);
+                    renderGroupVertexBufferCurrentSize += currSize;
+                    u32 renderGroupVertexBufferOffset = renderGroupVertexBufferDestStart
+                                               - ((u8 *)[renderGroupVertexBuffer contents]);
 
                     id<MTLRenderCommandEncoder> renderCommandEnc =
                         [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
                     [renderCommandEnc setTriangleFillMode:MTLTriangleFillModeLines];
                     [renderCommandEnc setRenderPipelineState:renderPipelineStates[1]];
                     [renderCommandEnc setDepthStencilState:depthStencilState];
-                    [renderCommandEnc setVertexBuffer: renderGroupBuffer 
-                                      offset: renderGroupBufferOffset
+                    [renderCommandEnc setVertexBuffer: renderGroupVertexBuffer 
+                                      offset: renderGroupVertexBufferOffset
                                       attributeStride: 0
                                       atIndex: 5];
                     [renderCommandEnc setVertexBytes: &renderGroup->uniforms
