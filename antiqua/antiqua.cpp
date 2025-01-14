@@ -95,47 +95,6 @@ static void CastRayToClickPositionOnTilemap(GameState *gameState,
     }
 }
 
-static void CalculateAABB(Entity *entity,
-                          r32 *vertices,
-                          u32 verticesSize)
-{
-    r32 minX = 0.0f, maxX = 0.0f, minZ = 0.0f, maxZ = 0.0f;
-    for (u32 vertexIndex = 0;
-         vertexIndex < verticesSize;
-         vertexIndex += 3)
-    {
-        r32 x = vertices[vertexIndex];
-        r32 z = vertices[vertexIndex + 2];
-
-        if (x < minX)
-        {
-            minX = x;
-        }
-        if (x > maxX)
-        {
-            maxX = x;
-        }
-
-        if (z < minZ)
-        {
-            minZ = z;
-        }
-        if (z > maxZ)
-        {
-            maxZ = z;
-        }
-    }
-
-    minX *= entity->scaleFactor.x;
-    maxX *= entity->scaleFactor.x;
-
-    minZ *= entity->scaleFactor.z;
-    maxZ *= entity->scaleFactor.z;
-
-    entity->regularAxisAlignedBoundingBox.diameterW = maxX - minX;
-    entity->regularAxisAlignedBoundingBox.diameterH = maxZ - minZ;
-}
-
 static void MoveEntity(GameState *gameState,
                        Entity *testEntity,
                        u32 testEntityIndex,
@@ -143,6 +102,15 @@ static void MoveEntity(GameState *gameState,
                        V3 acceleration,
                        V3 posDelta)
 {
+#if 0
+    r32 static deltaTimeSecConst = 0;
+    if (!deltaTimeSecConst && deltaTimeSec < 1.0f)
+    {
+        deltaTimeSecConst = deltaTimeSec;
+    }
+    deltaTimeSec = deltaTimeSecConst;
+#endif
+
     testEntity->dPos = acceleration * deltaTimeSec + testEntity->dPos;
 
     // NOTE(dima): collision detection and response using AABB
@@ -156,6 +124,8 @@ static void MoveEntity(GameState *gameState,
     {
         r32 tMin = 1.0f;
         V3 lineNormalVector = {0};
+
+        r32 tEpsilon = 0.0005f;
 
         for (u32 entityIndex = 0;
              entityIndex < gameState->entityCount;
@@ -172,13 +142,19 @@ static void MoveEntity(GameState *gameState,
                           0.0f,
                           testEntity->posWorld.z);
 
+            Rect entityRegularAABB = gameState->meshModels[entity->meshModelIndex].regularAxisAlignedBoundingBox;
+            entityRegularAABB.diameterW *= entity->scaleFactor.x;
+            entityRegularAABB.diameterH *= entity->scaleFactor.z;
+
+            Rect testEntityRegularAABB = gameState->meshModels[testEntity->meshModelIndex].regularAxisAlignedBoundingBox;
+            testEntityRegularAABB.diameterW *= testEntity->scaleFactor.x;
+            testEntityRegularAABB.diameterH *= testEntity->scaleFactor.z;
+
             Rect aabbAfterMinkowskiSum;
             aabbAfterMinkowskiSum.diameterW =
-                (testEntity->regularAxisAlignedBoundingBox.diameterW
-                 + entity->regularAxisAlignedBoundingBox.diameterW);
+                testEntityRegularAABB.diameterW + entityRegularAABB.diameterW;
             aabbAfterMinkowskiSum.diameterH =
-                (testEntity->regularAxisAlignedBoundingBox.diameterH
-                 + entity->regularAxisAlignedBoundingBox.diameterH);
+                testEntityRegularAABB.diameterH + entityRegularAABB.diameterH;
 
             Rect box = aabbAfterMinkowskiSum;
             V3 topLeft = v3(-0.5f*box.diameterW,
@@ -195,21 +171,25 @@ static void MoveEntity(GameState *gameState,
                                 -0.5f*box.diameterH);
 
             /* NOTE(dima): indices 0,1 - left bottom to right bottom
-                           indices 2,3 - left bottom to left top
+                           indices 2,3 - left top to left bottom
                            indices 4,5 - right bottom to right top
-                           indices 6,7 - left top to right top */
+                           indices 6,7 - right top to left top */
             V3 lines[4*2];
-            lines[0] = bottomLeft;
-            lines[1] = bottomRight;
+            // NOTE(dima): must preserve same winding order for consistent normal calculation!
+            lines[0] = bottomRight;
+            lines[1] = bottomLeft;
             lines[2] = bottomLeft;
             lines[3] = topLeft;
-            lines[4] = bottomRight;
-            lines[5] = topRight;
+            lines[4] = topRight;
+            lines[5] = bottomRight;
             lines[6] = topLeft;
             lines[7] = topRight;
 
             V3 ro = posWorld - entity->posWorld;
             ro.y = 0.0f;
+
+            V3 lineNormalVectors[2];
+            u32 lineNormalVectorsSize = 0;
 
             for (u32 lineIndex = 0;
                  lineIndex < 7;
@@ -228,40 +208,40 @@ static void MoveEntity(GameState *gameState,
                     r32 numeratorU = crossXZ(qo - ro, d);
                     r32 u = numeratorU / denominator;
 
-                    b32 intersectAtEndpoints = ((numeratorT == 0
-                                                || numeratorT == denominator
-                                                || (numeratorU == 0
-                                                    || numeratorU == denominator)));
-                    b32 intersectNotAtEndpoints = (t > 0.0f
-                                                   && t < 1.0f
-                                                   && u > 0.0f
-                                                   && u < 1.0f);
+                    b32 collide = (t > 0.0f || numeratorT == 0)
+                                  && (t < 1.0f || numeratorT == denominator)
+                                  && (u > 0.0f || numeratorU == 0)
+                                  && (u < 1.0f || numeratorU == denominator);
 
-                    b32 testEntityMoving = testEntity->flags & EntityFlags_Moving;
-                    b32 entityMoving = entity->flags & EntityFlags_Moving;
-                    /* NOTE(dima): from purely mathematical standpoint, we would check only
-                       non-endpoints to determine collisions - because our approach is
-                       to never allow collisions in the first place. However, probably
-                       due to floating point rounding errors, when both objects are moving,
-                       sometimes they collide at endpoints. In this case, to avoid increasing
-                       epsilon value, we are checking for intersection using
-                       both endpoints and non-endpoints. We want to keep epsilon as low as
-                       possible, because that ensures smoother collision response - less
-                       backward jerking */
-                    b32 collide = ((testEntityMoving && entityMoving)
-                                   ? (intersectAtEndpoints || intersectNotAtEndpoints)
-                                   : intersectNotAtEndpoints);
+                    r32 dx = q1.x - qo.x;
+                    r32 dz = q1.z - qo.z;
 
                     if (collide)
                     {
+                        lineNormalVectors[lineNormalVectorsSize] = v3(-dz, 0.0f, dx);
+                        lineNormalVectorsSize++;
                         if (t < tMin)
                         {
-                            tMin = t;
-
-                            r32 dx = q1.x - qo.x;
-                            r32 dz = q1.z - qo.z;
                             lineNormalVector.x = -dz;
                             lineNormalVector.z = dx;
+
+                            if (!gameState->prevTimeOfCollision)
+                            {
+                               gameState->prevTimeOfCollision = t;
+                            }
+                            else
+                            {
+                                if (t > gameState->prevTimeOfCollision)
+                                {
+                                    t = gameState->prevTimeOfCollision;
+                                }
+                                else
+                                {
+                                    gameState->prevTimeOfCollision = t;
+                                }
+                            }
+
+                            tMin = t;
 
                             V3 collisionPointPositionWorld = (posWorld
                                                               + tMin * posDelta);
@@ -270,6 +250,61 @@ static void MoveEntity(GameState *gameState,
                                                              collisionPointPositionWorld.z);
                         }
                     }
+                }
+            }
+
+            ASSERT(lineNormalVectorsSize <= 2);
+
+            if (lineNormalVectorsSize == 2)
+            {
+                for (u32 idx = 0;
+                     idx < lineNormalVectorsSize;
+                     ++idx)
+                {
+                    V3 currNormal = lineNormalVectors[idx];
+                    if (currNormal.x != lineNormalVector.x
+                        || currNormal.z != lineNormalVector.z)
+                    {
+                        lineNormalVector = lineNormalVector + currNormal;
+                    }
+                }
+
+                // NOTE(dima): cheap normalization (no deletion)
+                if (lineNormalVector.x < 0.0f) {
+
+                    lineNormalVector.x = -1.0f;
+                }
+                else if (lineNormalVector.x > 0.0f)
+                {
+                    lineNormalVector.x = 1.0f;
+                }
+                if (lineNormalVector.z < 0.0f)
+                {
+                    lineNormalVector.z = -1.0f;
+                }
+                else if (lineNormalVector.z > 0.0f)
+                {
+                    lineNormalVector.z = 1.0f;
+                }
+
+                V3 dPosPlusNormal = testEntity->dPos + lineNormalVector;
+                V3 dPosRotatedBy90Degrees = testEntity->dPos;
+                rotate(&dPosRotatedBy90Degrees,
+                       v3(0.0f, 1.0f, 0.0f),
+                       90.0f);
+                b32 dPosMovingClockwise = dot(dPosRotatedBy90Degrees, dPosPlusNormal) < 0;
+#define NORMAL_ROTATION_ANGLE_DEGREES 51
+                if (dPosMovingClockwise)
+                {
+                    rotate(&lineNormalVector,
+                           v3(0.0f, 1.0f, 0.0f),
+                           -NORMAL_ROTATION_ANGLE_DEGREES);
+                }
+                else
+                {
+                    rotate(&lineNormalVector,
+                           v3(0.0f, 1.0f, 0.0f),
+                           NORMAL_ROTATION_ANGLE_DEGREES);
                 }
             }
 
@@ -282,11 +317,12 @@ static void MoveEntity(GameState *gameState,
             gameState->lineNormalVector = lineNormalVector;
         }
 
-        r32 posDeltaEpsilon = 0.005f;
-        posWorld = posWorld + (posDelta*maximum(-posDeltaEpsilon, (tMin - posDeltaEpsilon)));
-        posDelta = posDelta - (1*dot(posDelta, lineNormalVector) * lineNormalVector);
-        testEntity->dPos = (testEntity->dPos
-                            - (1*dot(testEntity->dPos, lineNormalVector)*lineNormalVector));
+        posWorld = posWorld + posDelta*maximum(0.0f, tMin - tEpsilon);
+        posDelta = posDelta - 1*dot(posDelta, lineNormalVector) * lineNormalVector;
+
+        testEntity->dPos = testEntity->dPos
+                           - (1*dot(testEntity->dPos, lineNormalVector)*lineNormalVector);
+
         tRemaining -= tRemaining*tMin;
 
         testEntity->posWorld.x = posWorld.x;
@@ -295,8 +331,6 @@ static void MoveEntity(GameState *gameState,
 }
 
 static void UpdatePlayer(GameState *gameState,
-                         r32* vertices,
-                         u32 verticesSize,
                          Entity *entity,
                          u32 entityIndex,
                          r32 deltaTimeSec,
@@ -311,8 +345,6 @@ static void UpdatePlayer(GameState *gameState,
 }
 
 static void UpdateEnemy(GameState *gameState,
-                        r32* vertices,
-                        u32 verticesSize,
                         Entity *entity,
                         u32 entityIndex,
                         r32 deltaTimeSec)
@@ -341,8 +373,6 @@ static void UpdateEnemy(GameState *gameState,
 }
 
 static void UpdateStaticEntity(GameState *gameState,
-                               r32* vertices,
-                               u32 verticesSize,
                                Entity *entity)
 {
 }
@@ -354,98 +384,39 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #endif
 {
     /* TODO(dima):
-       - implement collision detection using AABB (DONE)
-       - implement indexed drawing for meshes (DONE)
-       - implement mesh importing from custom format based on glTF 2.0
+       1. DONE add new struct type: MDLMesh. It should include array of submeshes that the model consists of
+       2. DONE switch mesh loading code to use MDLMesh instead of RenderEntryMesh
+       3. DONE Add logic to a) move center of mesh to 0;0;0 and b) lift mesh up so that all Y-coords are >= 0
+       4. DONE Fix remaining compiler errors
+
+       5. DONE Fix collision detection
     */
 
-    s16 indices[] =
-    {
-        0,1,2,
-        2,3,0,
-        4,5,6,
-        6,7,4,
-        4,5,1,
-        1,0,4,
-        3,2,6,
-        6,7,3,
-        4,0,3,
-        3,7,4,
-        5,1,2,
-        2,6,5
-    };
+    ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
+    GameState *gameState = (GameState *) memory->permanentStorage;
 
-    r32 vertices[] =
-    {
-        -0.5f, 0.5f, 0.0f,  // vertex #0 - coordinates
-        -0.5f, -0.5f, 0.0f,  // vertex #1 - coordinates
-        0.5f, -0.5f, 0.0f,   // vertex #2 - coordinates
-        0.5f, 0.5f, 0.0f,   // vertex #3 - coordinates
-        -0.5f, 0.5f, 1.0f,  // vertex #4 - coordinates
-        -0.5f, -0.5f, 1.0f,  // vertex #5 - coordinates
-        0.5f, -0.5f, 1.0f,   // vertex #6 - coordinates
-        0.5f, 0.5f, 1.0f,    // vertex #7 - coordinates
-    };
+    MemoryArena mdlArena;
+    u64 mdlArenaSize = MB(256);
+    ASSERT(mdlArenaSize <= memory->permanentStorageSize - sizeof(gameState));
+    initializeArena(&mdlArena,
+                    mdlArenaSize,
+                    (u8 *) memory->permanentStorage + sizeof(GameState));
 
-    {
-        // NOTE(dima): move mesh center to (0;0;0)
-        // TODO(dima): don't do it every frame - just do it once when loading a mesh
-        r32 minX = 0.0f, maxX = 0.0f, minY = 0.0f, maxY = 0.0f, minZ = 0.0f, maxZ = 0.0f;
-        for (u32 vertexIndex = 0;
-             vertexIndex < ARRAY_COUNT(vertices);
-             vertexIndex += 3)
-        {
-            r32 x = vertices[vertexIndex];
-            r32 y = vertices[vertexIndex + 1];
-            r32 z = vertices[vertexIndex + 2];
+    MemoryArena renderGroupArena;
+    u64 renderGroupArenaSize = KB(256);
+    ASSERT(renderGroupArenaSize <= memory->transientStorageSize);
+    initializeArena(&renderGroupArena,
+                    renderGroupArenaSize,
+                    (u8 *) memory->transientStorage);
 
-            if (x < minX)
-            {
-                minX = x;
-            }
-            if (x > maxX)
-            {
-                maxX = x;
-            }
-
-            if (y < minY)
-            {
-                minY = y;
-            }
-            if (y > maxY)
-            {
-                maxY = y;
-            }
-
-            if (z < minZ)
-            {
-                minZ = z;
-            }
-            if (z > maxZ)
-            {
-                maxZ = z;
-            }
-        }
-
-        r32 centerX = (minX + maxX) / 2;
-        r32 centerY = (minY + maxY) / 2;
-        r32 centerZ = (minZ + maxZ) / 2;
-
-
-        for (u32 vertexIndex = 0;
-             vertexIndex < ARRAY_COUNT(vertices);
-             vertexIndex += 3)
-        {
-            vertices[vertexIndex] -= centerX;
-            vertices[vertexIndex + 1] -= centerY;
-            vertices[vertexIndex + 2] -= centerZ;
-        }
-    }
+    MemoryArena scratchArena;
+    u64 scratchArenaSize = KB(256);
+    ASSERT(scratchArenaSize <= memory->transientStorageSize - renderGroupArenaSize);
+    initializeArena(&scratchArena,
+                    scratchArenaSize,
+                    (u8 *) memory->transientStorage + renderGroupArenaSize);
 
     ASSERT(&gcInput->terminator - &gcInput->buttons[0] == ARRAY_COUNT(gcInput->buttons));
-    ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
-
-    GameState *gameState = (GameState *) memory->permanentStorage;
     if (!memory->isInitialized)
     {
         // do initialization here as needed
@@ -502,32 +473,193 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         {
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
             newEntity->flags = (EntityFlags)(EntityFlags_Moving | EntityFlags_PlayerControlled);
-            newEntity->posWorld = v3(0.0f, 0.5f, 0.0f);
+            newEntity->posWorld = v3(0.0f, 0.0f, 0.0f);
             newEntity->scaleFactor = v3(1.0f, 1.0f, 1.0f);
+            newEntity->meshModelIndex = 0;
             gameState->entityCount++;
-
-            CalculateAABB(newEntity, vertices, ARRAY_COUNT(vertices));
         }
         {
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
             newEntity->flags = (EntityFlags)(EntityFlags_Static);
-            newEntity->posWorld = v3(5.0f, 0.5f, 5.0f);
+            newEntity->posWorld = v3(5.0f, 0.0f, 5.0f);
             newEntity->scaleFactor = v3(20.0f, 1.0f, 1.0f);
+            newEntity->meshModelIndex = 0;
             gameState->entityCount++;
-
-            CalculateAABB(newEntity, vertices, ARRAY_COUNT(vertices));
         }
         {
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
             newEntity->flags = (EntityFlags)(EntityFlags_Moving | EntityFlags_Enemy);
-            newEntity->posWorld = v3(7.0f, 1.0f, 6.0f);
+            newEntity->posWorld = v3(6.5f, 0.0f, 7.5f);
             newEntity->scaleFactor = v3(1.0f, 2.0f, 1.0f);
+            newEntity->meshModelIndex = 0;
             gameState->entityCount++;
-
-            CalculateAABB(newEntity, vertices, ARRAY_COUNT(vertices));
         }
 
         gameState->cameraFollowingEntityIndex = 0;
+
+        MeshMdl *meshModel = (MeshMdl *) (gameState->meshModels + gameState->meshModelCount);
+        gameState->meshModelCount++;
+
+        debug_ReadFileResult mdlFile = {};
+        memory->debug_platformReadEntireFile(thread, &mdlFile, "data/test_cube.mdl");
+        ASSERT(mdlFile.contentsSize);
+#define MAX_LINE_LENGTH 128
+        s8* line = PUSH_ARRAY(&scratchArena, MAX_LINE_LENGTH, s8);
+        s8 *tmp = PUSH_ARRAY(&scratchArena, MAX_LINE_LENGTH, s8);
+        s8 *l, *fl, *tmpPtr, *linePtr;
+        debug_ReadFileResult binFile = {};
+        b32 binFileRead = false,
+            minCornerRead = false,
+            maxCornerRead = false,
+            meshCountRead = false;
+        V3 minCorner, maxCorner;
+        u32 meshIndex = 0;
+        for (l = line, fl = (s8 *) mdlFile.contents;
+             fl - ((s8 *) mdlFile.contents) <= mdlFile.contentsSize;
+             fl++)
+        {
+            ASSERT(l - line <= MAX_LINE_LENGTH);
+
+            if (*fl == '\n')
+            {
+                if (*line == '#')
+                {
+                    goto continue_loop;
+                }
+
+                if (!binFileRead)
+                {
+                    memory->debug_platformReadEntireFile(thread, &binFile, "data/test_cube.bin");
+                    ASSERT(binFile.contentsSize);
+
+                    meshModel->data = (r32 *)binFile.contents;
+                    meshModel->dataSize = binFile.contentsSize;
+
+                    binFileRead = true;
+                }
+                else if (!meshCountRead)
+                {
+                    linePtr = line;
+                    tmpPtr = tmp;
+                    while (*linePtr != ' ')
+                    {
+                        *tmpPtr++ = *linePtr++;
+                    }
+                    u32 meshCount = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
+                    meshModel->meshCount = meshCount;
+                    meshModel->meshMtd = PUSH_ARRAY(&mdlArena, meshCount, MeshMetadata);
+
+                    meshCountRead = true;
+                }
+                else if (!minCornerRead)
+                {
+                    linePtr = line;
+                    tmpPtr = tmp;
+                    while (*linePtr != ' ')
+                    {
+                        *tmpPtr++ = *linePtr++;
+                    }
+                    *tmpPtr = '\0';
+                    minCorner.x = asciiToR32(tmp);
+
+                    linePtr++;
+                    tmpPtr = tmp;
+                    while (*linePtr != ' ')
+                    {
+                        *tmpPtr++ = *linePtr++;
+                    }
+                    *tmpPtr = '\0';
+                    minCorner.y = asciiToR32(tmp);
+
+                    linePtr++;
+                    tmpPtr = tmp;
+                    while (*linePtr != ' ')
+                    {
+                        *tmpPtr++ = *linePtr++;
+                    }
+                    *tmpPtr = '\0';
+                    minCorner.z = asciiToR32(tmp);
+
+                    minCornerRead = true;
+                }
+                else if (!maxCornerRead)
+                {
+                    linePtr = line;
+                    tmpPtr = tmp;
+                    while (*linePtr != ' ')
+                    {
+                        *tmpPtr++ = *linePtr++;
+                    }
+                    *tmpPtr = '\0';
+                    maxCorner.x = asciiToR32(tmp);
+
+                    linePtr++;
+                    tmpPtr = tmp;
+                    while (*linePtr != ' ')
+                    {
+                        *tmpPtr++ = *linePtr++;
+                    }
+                    *tmpPtr = '\0';
+                    maxCorner.y = asciiToR32(tmp);
+
+                    linePtr++;
+                    tmpPtr = tmp;
+                    while (*linePtr != ' ')
+                    {
+                        *tmpPtr++ = *linePtr++;
+                    }
+                    *tmpPtr = '\0';
+                    maxCorner.z = asciiToR32(tmp);
+
+                    maxCornerRead = true;
+
+                    meshModel->meshCenterAndMinY[0] = (minCorner.x + maxCorner.x) / 2;
+                    meshModel->meshCenterAndMinY[1] = (minCorner.y + maxCorner.y) / 2;
+                    meshModel->meshCenterAndMinY[2] = (minCorner.z + maxCorner.z) / 2;
+                    meshModel->meshCenterAndMinY[3] = minCorner.y;
+
+                    meshModel->regularAxisAlignedBoundingBox.diameterW = maxCorner.x - minCorner.x;
+                    meshModel->regularAxisAlignedBoundingBox.diameterH = maxCorner.z - minCorner.z;
+                }
+                else
+                {
+                    MeshMetadata *meshMtd = meshModel->meshMtd + meshIndex;
+
+                    linePtr = line;
+                    tmpPtr = tmp;
+                    while (*linePtr != ' ')
+                    {
+                        *tmpPtr++ = *linePtr++;
+                    }
+                    meshMtd->indicesByteOffset = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
+
+                    linePtr++;
+                    tmpPtr = tmp;
+                    while (*linePtr != ' ')
+                    {
+                        *tmpPtr++ = *linePtr++;
+                    }
+                    meshMtd->indicesCount = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
+
+                    linePtr++;
+                    tmpPtr = tmp;
+                    while (*linePtr != ' ')
+                    {
+                        *tmpPtr++ = *linePtr++;
+                    }
+                    meshMtd->posByteOffset = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
+
+                    meshIndex++;
+                }
+                
+continue_loop:
+                l = line;
+            }
+            else
+            {
+                *l++ = *fl;
+            }
+        }
 
         memory->isInitialized = true;
     }
@@ -549,13 +681,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     {
         gameState->debugCameraEnabled = !gameState->debugCameraEnabled;
     }
-
-    MemoryArena renderGroupArena;
-    u64 renderGroupArenaSize = KB(256);
-    ASSERT(renderGroupArenaSize <= memory->transientStorageSize);
-    initializeArena(&renderGroupArena,
-                    KB(256),
-                    (u8 *) memory->transientStorage);
 
     RenderGroup renderGroup = {0};
     renderGroup.maxPushBufferSize = renderGroupArenaSize;
@@ -643,14 +768,16 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         {
             Entity *entity = gameState->entities + entityIndex;
 
+            ASSERT(entity->meshModelIndex < gameState->meshModelCount);
+            MeshMdl *entityMeshMdl = gameState->meshModels + entity->meshModelIndex;
+
+#if 1
             pushRenderEntryMesh(&renderGroupArena,
                                 &renderGroup,
                                 entity->posWorld,
                                 entity->scaleFactor,
-                                vertices,
-                                ARRAY_COUNT(vertices),
-                                indices,
-                                ARRAY_COUNT(indices));
+                                entityMeshMdl);
+#endif
         }
     }
     else
@@ -730,8 +857,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             if ((flags & EntityFlags_PlayerControlled) == EntityFlags_PlayerControlled)
             {
                 UpdatePlayer(gameState,
-                             vertices,
-                             ARRAY_COUNT(vertices),
                              entity,
                              entityIndex,
                              deltaTimeSec,
@@ -739,20 +864,18 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             }
             else if ((flags & EntityFlags_Enemy) == EntityFlags_Enemy)
             {
+#if 1
                 UpdateEnemy(gameState,
-                            vertices,
-                            ARRAY_COUNT(vertices),
                             entity,
                             entityIndex,
                             deltaTimeSec);
+#endif
             }
             else if ((flags & EntityFlags_Static) == EntityFlags_Static)
             {
                 /* TODO(dima): this only calculates AABB!
                                DON'T do it every frame. Do it only once at loading! */
                 UpdateStaticEntity(gameState,
-                                   vertices,
-                                   ARRAY_COUNT(vertices),
                                    entity);
             }
             else
@@ -760,14 +883,16 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                 INVALID_CODE_PATH;
             }
 
+            ASSERT(entity->meshModelIndex < gameState->meshModelCount);
+            MeshMdl *entityMeshMdl = gameState->meshModels + entity->meshModelIndex;
+
+#if 1
             pushRenderEntryMesh(&renderGroupArena,
                                 &renderGroup,
                                 entity->posWorld,
                                 entity->scaleFactor,
-                                vertices,
-                                ARRAY_COUNT(vertices),
-                                indices,
-                                ARRAY_COUNT(indices));
+                                entityMeshMdl);
+#endif
         }
 
         // NOTE(dima): set up camera to look at entity it follows

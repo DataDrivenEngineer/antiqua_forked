@@ -1,5 +1,3 @@
-//
-
 #include <metal_stdlib>
 
 using namespace metal;
@@ -122,16 +120,36 @@ vertex MeshVertexOut vertexShaderMesh(
 							   const constant MeshVertexIn *vertices [[buffer(5)]],
 							   const ushort vertexIndex [[vertex_id]],
 							   constant const Uniforms &uniforms [[buffer(7)]],
-							   constant const float4x4 &modelMatrix [[buffer(8)]])
+							   constant const float4x4 &modelMatrix [[buffer(8)]],
+							   constant const float4 &meshCenterAndMinY [[buffer(9)]])
 {
     const constant MeshVertexIn &vData = vertices[vertexIndex];
+
+    float meshCenterX = meshCenterAndMinY.x;
+    float meshCenterY = meshCenterAndMinY.y;
+    float meshCenterZ = meshCenterAndMinY.z;
+    float meshMinY = meshCenterAndMinY.w;
+
+    float3 vDataPosModified = float3(vData.position);
+    
+    // NOTE(dima): move mesh center to (0;0;0)
+    vDataPosModified.x -= meshCenterX;
+    vDataPosModified.y -= meshCenterY;
+    vDataPosModified.z -= meshCenterZ;
+
+    /* NOTE(dima): move mesh so that its lowest Y = 0.
+                   Basically, it means: put model on the ground */
+    vDataPosModified.y += meshMinY;
+
+    // NOTE(dima): convert from right handed to left handed system
+    vDataPosModified.z = -vDataPosModified.z;
 
     float4x4 viewMatrix = uniforms.viewMatrix;
     float4x4 projectionMatrix = uniforms.projectionMatrix;
 
     MeshVertexOut ret
     {
-        .position = projectionMatrix * viewMatrix * modelMatrix * float4(vData.position, 1.0f),
+        .position = projectionMatrix * viewMatrix * modelMatrix * float4(vDataPosModified, 1.0f),
         .pointSize = 10.0f
     };
     return ret;

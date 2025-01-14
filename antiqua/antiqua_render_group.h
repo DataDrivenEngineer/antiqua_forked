@@ -38,15 +38,18 @@ typedef struct
     V3 end;
 } RenderEntryLine;
 
-typedef struct
+typedef struct RenderEntryMesh
 {
-    u32 sizeOfVertices;
-    u32 sizeOfIndices;
-    /* NOTE(dima): colors are packed together with vertices,
-                   like this: [vertex color vertex color] */
     M44 modelMatrix;
-    r32 *vertices;
-    s16 *indices;
+
+    u32 indicesByteOffset;
+    u32 indicesCount;
+    u32 posByteOffset;
+
+    r32 meshCenterAndMinY[4];
+
+    r32 *data;
+    u32 dataSize;
 } RenderEntryMesh;
 
 typedef struct

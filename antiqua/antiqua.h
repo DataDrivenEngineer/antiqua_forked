@@ -46,8 +46,30 @@ typedef struct
     V3 dPos;
     V3 scaleFactor;
 
-    Rect regularAxisAlignedBoundingBox;
+    s16 meshModelIndex;
 } Entity;
+
+typedef struct
+{
+    u32 indicesByteOffset;
+    u32 indicesCount;
+    u32 posByteOffset;
+} MeshMetadata;
+
+typedef struct
+{
+    MeshMetadata *meshMtd;
+    u32 meshCount;
+
+    r32 *data;
+    u32 dataSize;
+
+    /* NOTE(dima): first 3 members are XYZ of mesh center (global across all meshes);
+                   last float is minY - also global across all meshes */
+    r32 meshCenterAndMinY[4];
+
+    Rect regularAxisAlignedBoundingBox;
+} MeshMdl;
 
 typedef struct
 {
@@ -57,6 +79,9 @@ typedef struct
 
     u32 entityCount;
     Entity entities[256];
+
+    u32 meshModelCount;
+    MeshMdl meshModels[256];
 
     M44 worldMatrix;
     M44 viewMatrix;
@@ -100,6 +125,9 @@ typedef struct
     V3 mouseDirectionVectorWorld;
     V3 mouseDirectionVectorHorizontalWorld;
     V3 mouseDirectionVectorVerticalWorld;
+
+    // NOTE(dima): collision detection temporary variable
+    r32 prevTimeOfCollision;
 
 #if ANTIQUA_INTERNAL
     V3 boundingBoxPoints[4];

@@ -248,4 +248,35 @@ inline r32 square(r32 val)
     return result;
 }
 
+inline u32 asciiToU32OverflowUnsafe(s8 *s, u32 length)
+{
+    u32 result = 0;
+    u32 prevResult;
+
+    for (u32 idx = 0;
+         idx < length;
+         ++idx)
+    {
+        ASSERT(s[idx] >= '0' && s[idx] <= '9');
+
+        u32 digit = s[idx] - '0';
+
+        prevResult = result;
+        result = result * 10 + digit;
+        // NOTE(dima): make sure there was no overflow
+        ASSERT(result >= prevResult);
+    }
+
+    return result;
+}
+
+inline r32 asciiToR32(s8 *s)
+{
+    r32 result;
+
+    result = strtof((const char *)s, 0);
+
+    return result;
+}
+
 #endif

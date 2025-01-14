@@ -241,7 +241,7 @@ static CVReturn renderCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *
   initTimebaseInfo();
 
   // init game memory
-  gameMemory.permanentStorageSize = MB(64);
+  gameMemory.permanentStorageSize = GB(1);
   gameMemory.transientStorageSize = GB(1);
   state.totalMemorySize = gameMemory.permanentStorageSize + gameMemory.transientStorageSize;
   // allocate physical memory
