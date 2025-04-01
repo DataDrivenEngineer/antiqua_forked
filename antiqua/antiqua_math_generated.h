@@ -379,7 +379,7 @@ inline r32 length(V2 a)
     result = __builtin_sqrt(result);
 #else
 #include <math.h>
-    result = sqrt(result);
+    result = (r32)sqrt(result);
 #endif
     return result;
 }
@@ -391,7 +391,7 @@ inline r32 length(V3 a)
     result = __builtin_sqrt(result);
 #else
 #include <math.h>
-    result = sqrt(result);
+    result = (r32)sqrt(result);
 #endif
     return result;
 }
@@ -403,7 +403,7 @@ inline r32 length(V4 a)
     result = __builtin_sqrt(result);
 #else
 #include <math.h>
-    result = sqrt(result);
+    result = (r32)sqrt(result);
 #endif
     return result;
 }

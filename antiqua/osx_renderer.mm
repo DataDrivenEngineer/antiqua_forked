@@ -20,9 +20,9 @@ static u32 renderGroupBufferCurrentSize;
 
 MONExternC INIT_RENDERER(initRenderer)
 {
-    metalDevice = ((CAMetalLayer *)metalLayer).device;
+    metalDevice = ((CAMetalLayer *)data).device;
     commandQueue = [metalDevice newCommandQueue];
-    layer = (CAMetalLayer *)metalLayer;
+    layer = (CAMetalLayer *)data;
 
     // NOTE(dima): creating render pipeline states
     NSURL *libraryURL = [[NSBundle mainBundle] URLForResource:@"shaders"

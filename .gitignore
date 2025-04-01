@@ -84,3 +84,6 @@ codegen/antiqua_math_generated.h
 # Metal
 *.ir
 *.metallib
+
+# RemedyBG
+*.rdbg

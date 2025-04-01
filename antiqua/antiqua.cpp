@@ -1,5 +1,4 @@
 #include "antiqua.h"
-#include "types.h"
 #include "stdio.h"
 #include "antiqua_intrinsics.h"
 #include "antiqua_render_group.h"
@@ -23,10 +22,10 @@ static void CastRayToClickPositionOnTilemap(GameState *gameState,
     M44 inverseProjectionMatrix = inverse(&gameState->projectionMatrix);
     M44 inverseViewMatrix = inverse(&gameState->viewMatrix);
     V4 mousePosNearPlaneCamera = inverseProjectionMatrix * clipPos;
-    mousePosNearPlaneCamera.z = gameState->near + 0.001f;
+    mousePosNearPlaneCamera.z = gameState->nearPlane + 0.001f;
 
     V4 cameraDirectonPosVectorStartCamera = mousePosNearPlaneCamera;
-    cameraDirectonPosVectorStartCamera.z = gameState->near + 0.001;
+    cameraDirectonPosVectorStartCamera.z = gameState->nearPlane + 0.001f;
     V4 cameraDirectonPosVectorEndCamera = mousePosNearPlaneCamera;
     cameraDirectonPosVectorEndCamera.z = cameraDirectonPosVectorStartCamera.z + 1.0f;
     V4 cameraDirectonPosVectorStartWorld = inverseViewMatrix * cameraDirectonPosVectorStartCamera;
@@ -377,7 +376,7 @@ static void UpdateStaticEntity(GameState *gameState,
 {
 }
 
-#if !XCODE_BUILD
+#if !XCODE_BUILD && !COMPILER_MSVC
 EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #else
 UPDATE_GAME_AND_RENDER(updateGameAndRender)
@@ -403,14 +402,14 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                     (u8 *) memory->permanentStorage + sizeof(GameState));
 
     MemoryArena renderGroupArena;
-    u64 renderGroupArenaSize = KB(256);
+    u32 renderGroupArenaSize = KB(256);
     ASSERT(renderGroupArenaSize <= memory->transientStorageSize);
     initializeArena(&renderGroupArena,
                     renderGroupArenaSize,
                     (u8 *) memory->transientStorage);
 
     MemoryArena scratchArena;
-    u64 scratchArenaSize = KB(256);
+    u32 scratchArenaSize = KB(256);
     ASSERT(scratchArenaSize <= memory->transientStorageSize - renderGroupArenaSize);
     initializeArena(&scratchArena,
                     scratchArenaSize,
@@ -421,8 +420,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     {
         // do initialization here as needed
 
-        gameState->near = 1.0f;
-        gameState->far = 100.0f;
+        gameState->nearPlane = 1.0f;
+        gameState->farPlane = 100.0f;
         gameState->fov = 45.0f;
 
         gameState->playerSpeed = 17.0f;
@@ -432,7 +431,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->cameraCurrDistance = gameState->cameraMinDistance;
 
         gameState->cameraRotationSpeed = 0.3f;
-        gameState->cameraMovementSpeed = 5.0f;
+        gameState->cameraMovementSpeed = 10.0f;
 
         gameState->v = v3(0.0f, 1.0f, 0.0f);
         gameState->n = v3(0.0f, 0.0f, 1.0f);
@@ -501,9 +500,11 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->meshModelCount++;
 
         debug_ReadFileResult mdlFile = {};
-        memory->debug_platformReadEntireFile(thread, &mdlFile, "data/test_cube.mdl");
+#define FILENAME "data" DIR_SEPARATOR "test_cube.mdl"
+        memory->debug_platformReadEntireFile(thread, &mdlFile, FILENAME);
+#undef FILENAME
         ASSERT(mdlFile.contentsSize);
-#define MAX_LINE_LENGTH 128
+#define MAX_LINE_LENGTH 256
         s8* line = PUSH_ARRAY(&scratchArena, MAX_LINE_LENGTH, s8);
         s8 *tmp = PUSH_ARRAY(&scratchArena, MAX_LINE_LENGTH, s8);
         s8 *l, *fl, *tmpPtr, *linePtr;
@@ -532,7 +533,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                     memory->debug_platformReadEntireFile(thread, &binFile, "data/test_cube.bin");
                     ASSERT(binFile.contentsSize);
 
-                    meshModel->data = (r32 *)binFile.contents;
+                    meshModel->data = (u8 *)binFile.contents;
                     meshModel->dataSize = binFile.contentsSize;
 
                     binFileRead = true;
@@ -639,6 +640,14 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                     {
                         *tmpPtr++ = *linePtr++;
                     }
+                    meshMtd->indicesByteLength = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
+
+                    linePtr++;
+                    tmpPtr = tmp;
+                    while (*linePtr != ' ')
+                    {
+                        *tmpPtr++ = *linePtr++;
+                    }
                     meshMtd->indicesCount = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
 
                     linePtr++;
@@ -648,6 +657,14 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                         *tmpPtr++ = *linePtr++;
                     }
                     meshMtd->posByteOffset = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
+
+                    linePtr++;
+                    tmpPtr = tmp;
+                    while (*linePtr != ' ')
+                    {
+                        *tmpPtr++ = *linePtr++;
+                    }
+                    meshMtd->posByteLength = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
 
                     meshIndex++;
                 }
@@ -931,8 +948,8 @@ continue_loop:
 
         r32 aspectRatio = drawableWidthWithoutScaleFactor / drawableHeightWithoutScaleFactor;
 
-        r32 a = gameState->far / (gameState->far - gameState->near);
-        r32 b = (gameState->near * gameState->far) / (gameState->near - gameState->far);
+        r32 a = gameState->farPlane / (gameState->farPlane - gameState->nearPlane);
+        r32 b = (gameState->nearPlane*gameState->farPlane) / (gameState->nearPlane - gameState->farPlane);
 
         gameState->projectionMatrix = {d / aspectRatio, 0.0f, 0.0f, 0.0f,
                                        0.0f, d, 0.0f, 0.0f,
@@ -1000,15 +1017,18 @@ continue_loop:
     renderGroup.uniforms[0] = gameState->viewMatrix;
     renderGroup.uniforms[1] = gameState->projectionMatrix;
 
-    memory->renderOnGpu(0, &renderGroup);
+    memory->renderOnGPU(0, &renderGroup, (s32)drawableWidthWithoutScaleFactor, (s32)drawableHeightWithoutScaleFactor);
 
+    // TODO(dima): on macos make everything run on the same thread. Get rid of these locks!!!
+#if COMPILER_LLVM
     memory->waitIfInputBlocked(thread);
     memory->lockInputThread(thread);
     memory->resetInputStateButtons(thread);
     memory->unlockInputThread(thread);
+#endif
 }
 
-#if !XCODE_BUILD
+#if !XCODE_BUILD && !COMPILER_MSVC
 EXPORT MONExternC FILL_SOUND_BUFFER(fillSoundBuffer)
 #else
 FILL_SOUND_BUFFER(fillSoundBuffer)

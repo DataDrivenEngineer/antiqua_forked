@@ -1,27 +1,7 @@
 #ifndef _ANTIQUA_H_
-#define _ANTIQUA_H_
 
 #include "antiqua_platform.h"
 #include "antiqua_math.h"
-
-void initializeArena(MemoryArena *arena, MemoryIndex size, u8 *base)
-{
-  arena->size = size;
-  arena->base = base;
-  arena->used = 0;
-}
-
-#define PUSH_STRUCT(arena, Type) (Type *) pushSize_(arena, sizeof(Type))
-#define PUSH_ARRAY(arena, count, Type) (Type *) pushSize_(arena, (count) * sizeof(Type))
-#define PUSH_SIZE(arena, size, Type) (Type *) pushSize_(arena, (size))
-void * pushSize_(MemoryArena *arena, MemoryIndex size)
-{
-  ASSERT((arena->used + size) <= arena->size);
-  void *result = arena->base + arena->used;
-  arena->used += size;
-
-  return result;
-}
 
 typedef struct Rect
 {
@@ -46,14 +26,16 @@ typedef struct
     V3 dPos;
     V3 scaleFactor;
 
-    s16 meshModelIndex;
+    u16 meshModelIndex;
 } Entity;
 
 typedef struct
 {
     u32 indicesByteOffset;
+    u32 indicesByteLength;
     u32 indicesCount;
     u32 posByteOffset;
+    u32 posByteLength;
 } MeshMetadata;
 
 typedef struct
@@ -61,7 +43,7 @@ typedef struct
     MeshMetadata *meshMtd;
     u32 meshCount;
 
-    r32 *data;
+    u8 *data;
     u32 dataSize;
 
     /* NOTE(dima): first 3 members are XYZ of mesh center (global across all meshes);
@@ -87,8 +69,8 @@ typedef struct
     M44 viewMatrix;
     M44 projectionMatrix;
 
-    r32 near;
-    r32 far;
+    r32 nearPlane;
+    r32 farPlane;
     r32 fov;
 
     r32 cameraMinDistance;
@@ -118,7 +100,7 @@ typedef struct
 
     b32 isClickPositionInsideTilemap;
 
-    s32 mousePos[2];
+    r32 mousePos[2];
 
     V3 cameraDirectonPosVectorStartWorld;
     V3 cameraDirectonPosVectorEndWorld;
@@ -136,4 +118,5 @@ typedef struct
 #endif
 } GameState;
 
+#define _ANTIQUA_H_
 #endif

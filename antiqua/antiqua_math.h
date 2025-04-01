@@ -1,6 +1,8 @@
 #ifndef _ANTIQUA_MATH_H_
 #define _ANTIQUA_MATH_H_
 
+#include <stdlib.h>
+
 #include "types.h"
 #include "antiqua_intrinsics.h"
 
@@ -248,7 +250,7 @@ inline r32 square(r32 val)
     return result;
 }
 
-inline u32 asciiToU32OverflowUnsafe(s8 *s, u32 length)
+inline u32 asciiToU32OverflowUnsafe(s8 *s, u64 length)
 {
     u32 result = 0;
     u32 prevResult;
@@ -277,6 +279,23 @@ inline r32 asciiToR32(s8 *s)
     result = strtof((const char *)s, 0);
 
     return result;
+}
+
+inline u32 RoundToNearestMultipleOf256(u32 value)
+{
+
+    // Constant buffers must be a multiple of the minimum hardware
+    // allocation size (usually 256 bytes).  So round up to nearest
+    // multiple of 256.  We do this by adding 255 and then masking off
+    // the lower 2 bytes which store all bits < 256.
+    // Example: Suppose value = 300.
+    // (300 + 255) & ~255
+    // 555 & ~255
+    // 0x022B & ~0x00ff
+    // 0x022B & 0xff00
+    // 0x0200
+    // 512
+    return (value + 255) & ~255;
 }
 
 #endif

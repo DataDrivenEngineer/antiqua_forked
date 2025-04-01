@@ -1,12 +1,93 @@
 #ifndef _ANTIQUA_PLATFORM_H_
 #define _ANTIQUA_PLATFORM_H_
 
-#include "types.h"
+#if !defined(__cplusplus)
+#define MONExternC extern
+#else
+#define MONExternC extern "C"
+#endif
+
+#if !defined(COMPILER_LLVM)
+#define COMPILER_LLVM 0
+#endif
+
+#if !defined(COMPILER_MSVC)
+#define COMPILER_MSVC 0
+#endif
+
+#if !COMPILER_MSVC && !COMPILER_LLVM
+#if _MSC_VER
+#undef COMPILER_MSVC
+#define COMPILER_MSVC 1
+#else
+#undef COMPILER_LLVM
+#define COMPILER_LLVM 1
+#endif
+#endif
+
+#if COMPILER_LLVM
+
+#define DIR_SEPARATOR "/"
+
+#include <stddef.h>
+
+typedef unsigned int b32;
+
+typedef unsigned char u8;
+typedef unsigned short u16;
+typedef unsigned int u32;
+typedef unsigned long long u64;
+
+typedef signed char s8;
+typedef signed short s16;
+typedef signed int s32;
+typedef signed long long s64;
+
+typedef size_t MemoryIndex;
+
+typedef float r32;
+typedef double r64;
+
+#elif COMPILER_MSVC
+
+#define DIR_SEPARATOR "\\"
+
+#include <stdint.h>
+
+typedef uint32_t b32;
+
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
+
+typedef int8_t s8;
+typedef int16_t s16;
+typedef int32_t s32;
+typedef int64_t s64;
+
+typedef size_t MemoryIndex;
+
+typedef float r32;
+typedef double r64;
+#endif
+
+#define internal static
+#define local_persist static
+#define global_variable static
 
 #if ANTIQUA_SLOW
 #define ASSERT(expression) if (!(expression)) { *(u8 *) 0 = 0; }
 #else
 #define ASSERT(expression)
+#endif
+
+#if ANTIQUA_SLOW
+#define FPRINTF2(arg1, arg2) fprintf((arg1), (arg2));
+#define FPRINTF3(arg1, arg2, arg3) fprintf((arg1), (arg2), (arg3));
+#else
+#define FPRINTF2(arg1, arg2) 
+#define FPRINTF3(arg1, arg2, arg3) 
 #endif
 
 #define INVALID_CODE_PATH ASSERT(!"InvalidCodePath")
@@ -21,6 +102,37 @@
 #define GB(Value) (MB(Value) * 1024LL)
 #define MINIMUM(A, B) ((A < B) ? (A) : (B))
 #define MAXIMUM(A, B) ((A > B) ? (A) : (B))
+
+typedef struct
+{
+  MemoryIndex size;
+  u8 *base;
+  MemoryIndex used;
+} MemoryArena;
+
+typedef struct
+{
+  s32 placeholder;
+} ThreadContext;
+
+void initializeArena(MemoryArena *arena, MemoryIndex size, u8 *base)
+{
+  arena->size = size;
+  arena->base = base;
+  arena->used = 0;
+}
+
+#define PUSH_STRUCT(arena, Type) (Type *) pushSize_(arena, sizeof(Type))
+#define PUSH_ARRAY(arena, count, Type) (Type *) pushSize_(arena, (count) * sizeof(Type))
+#define PUSH_SIZE(arena, size, Type) (Type *) pushSize_(arena, (size))
+void * pushSize_(MemoryArena *arena, MemoryIndex size)
+{
+  ASSERT((arena->used + size) <= arena->size);
+  void *result = arena->base + arena->used;
+  arena->used += size;
+
+  return result;
+}
 
 typedef struct
 {
@@ -43,7 +155,7 @@ typedef struct
 {
   // Index 0 = LMB, index 1 = RMB
   GameButtonState mouseButtons[2];
-  s32 mouseX, mouseY, mouseZ;
+  r32 mouseX, mouseY, mouseZ;
   s32 scrollingDeltaX, scrollingDeltaY;
 
   b32 isAnalog;
@@ -76,18 +188,6 @@ typedef struct
     };
   };
 } GameControllerInput;
-
-typedef struct
-{
-  MemoryIndex size;
-  u8 *base;
-  MemoryIndex used;
-} MemoryArena;
-
-typedef struct
-{
-  s32 placeholder;
-} ThreadContext;
 
 // Services that the platform provides to the game
 #if ANTIQUA_INTERNAL
@@ -122,10 +222,12 @@ typedef UNLOCK_INPUT_THREAD(UnlockInputThread);
 typedef WAIT_IF_INPUT_BLOCKED(WaitIfInputBlocked);
 
 struct RenderGroup;
-#define INIT_RENDERER(name) void name(void *metalLayer)
+// NOTE(dima): data depends on the platform!
+#define INIT_RENDERER(name) void name(void *data)
 typedef INIT_RENDERER(InitRenderer);
-#define RENDER_ON_GPU(name) void name(ThreadContext *thread, struct RenderGroup *renderGroup)
-typedef RENDER_ON_GPU(RenderOnGpu);
+#define RENDER_ON_GPU(name) void name(ThreadContext *thread, struct RenderGroup *renderGroup, s32 width, s32 height)
+typedef RENDER_ON_GPU(RenderOnGPU);
+#define RESIZE_WINDOW(name) void name(void *data)
 
 typedef struct
 {
@@ -144,7 +246,7 @@ typedef struct
   UnlockInputThread *unlockInputThread;
   WaitIfInputBlocked *waitIfInputBlocked;
 
-  RenderOnGpu *renderOnGpu;
+  RenderOnGPU *renderOnGPU;
 
 #if ANTIQUA_INTERNAL
   Debug_PlatformReadEntireFile *debug_platformReadEntireFile;

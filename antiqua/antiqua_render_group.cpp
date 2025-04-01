@@ -100,8 +100,10 @@ void pushRenderEntryMesh(MemoryArena *arena,
                               1.0f};
         MeshMetadata *meshMtd = meshModel->meshMtd + meshIdx;
         entry->indicesByteOffset = meshMtd->indicesByteOffset;
+        entry->indicesByteLength = meshMtd->indicesByteLength;
         entry->indicesCount = meshMtd->indicesCount;
         entry->posByteOffset = meshMtd->posByteOffset;
+        entry->posByteLength = meshMtd->posByteLength;
         entry->data = meshModel->data;
         entry->dataSize = meshModel->dataSize;
         memcpy(entry->meshCenterAndMinY,
@@ -119,7 +121,7 @@ void pushRenderEntryMesh(MemoryArena *arena,
 void pushRenderEntryTile(MemoryArena *arena,
                          RenderGroup *renderGroup,
                          u32 tileCountPerSide,
-                         u32 tileSideLength,
+                         r32 tileSideLength,
                          V3 originTileCenterPositionWorld,
                          V3 color)
 {

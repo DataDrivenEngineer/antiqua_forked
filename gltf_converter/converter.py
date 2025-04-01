@@ -14,7 +14,7 @@ def main():
         outf.write("#number of meshes\n")
         outf.write("#min corner of bounding box - global across all meshes\n")
         outf.write("#max corner of bounding box - global across all meshes\n")
-        outf.write("#indices byte offset {space} indices count {space} position byte offset {space}\n")
+        outf.write("#indices byte offset {space} indices byte length {space} indices count {space} position byte offset {space} position byte length {space}\n")
 
         buffer_name_written = False
 
@@ -50,13 +50,13 @@ def main():
                 outf.write(f"{len(data['meshes'])} \n")
                 outf.write("\n")
                 outf.write("\n")
-            outf.write(f"{indices_byte_offset} {indices_count} ")
+            outf.write(f"{indices_byte_offset} {indices_byte_length} {indices_count} ")
 
             position_buffer_index = int(position_buffer_view["buffer"])
             position_buffer_name = data["buffers"][position_buffer_index]["uri"]
             position_byte_offset = int(position_buffer_view["byteOffset"])
             position_byte_length = int(position_buffer_view["byteLength"])
-            outf.write(f"{position_byte_offset} \n")
+            outf.write(f"{position_byte_offset} {position_byte_length} \n")
 
     with open(f"../data/{in_file_name}.mdl", "r") as outf:
         outData = outf.readlines()

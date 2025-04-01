@@ -43,12 +43,15 @@ typedef struct RenderEntryMesh
     M44 modelMatrix;
 
     u32 indicesByteOffset;
+    u32 indicesByteLength;
     u32 indicesCount;
     u32 posByteOffset;
+    u32 posByteLength;
 
-    r32 meshCenterAndMinY[4];
+#define MESH_CENTER_AND_MIN_Y_SIZE 4
+    r32 meshCenterAndMinY[MESH_CENTER_AND_MIN_Y_SIZE];
 
-    r32 *data;
+    u8 *data;
     u32 dataSize;
 } RenderEntryMesh;
 

@@ -3,6 +3,8 @@
 
 #include <math.h>
 
+#include "antiqua_platform.h"
+
 inline s32 signOf(s32 value)
 {
   s32 result = value >= 0 ? 1 : -1;
@@ -24,7 +26,7 @@ inline r32 squareRoot(r32 real32)
 
 inline r32 absoluteValue(r32 real32)
 {
-  r32 result = fabs(real32);
+  r32 result = (r32)fabs(real32);
   return result;
 }
 
@@ -74,6 +76,14 @@ inline s32 truncateReal32ToInt32(r32 v)
 {
   s32 result = (s32) v;
   return result;
+}
+
+inline u32 safeTruncateUInt64(u64 value)
+{
+    // TODO(casey): Defines for maximum values
+    ASSERT(value <= 0xFFFFFFFF);
+    u32 result = (u32)value;
+    return result;
 }
 
 typedef struct

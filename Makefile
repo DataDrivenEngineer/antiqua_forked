@@ -1,42 +1,61 @@
-build:
-	# Create lock file to prevent code hot reloading during compilation
-	echo "WAITING FOR COMPILATION" > lock.tmp
-	# Compile all Obj-C files
-	cc -c -g -std=c++17 -DANTIQUA_SLOW=1 -DANTIQUA_INTERNAL=1 -ffast-math -fno-rtti -fno-exceptions -O0 -Wall -pedantic -Wno-dtor-name -Wno-null-dereference -Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable -Wno-gnu-anonymous-struct -Wno-nested-anon-types -Wno-nullability-completeness antiqua/antiqua.mm -o mm.o
-	# Compile all C++ files
-	cc -shared -g -std=c++17 -Iinclude/metal-cpp -DANTIQUA_SLOW=1 -DANTIQUA_INTERNAL=1 -ffast-math -fno-rtti -fno-exceptions -O0 -Wall -pedantic -Wno-dtor-name -Wno-null-dereference -Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable -Wno-gnu-anonymous-struct -Wno-nested-anon-types -Wno-nullability-completeness antiqua/antiqua.cpp -fvisibility=hidden -o libantiqua.dylib
-	# Compile Metal shaders
-	xcrun -sdk macosx metal -gline-tables-only -frecord-sources -o shaders.ir -c antiqua/shaders.metal
-	xcrun -sdk macosx metallib -o shaders.metallib shaders.ir
-	# Copy compiled Metal library to the bundle
-	cp -f shaders.metallib antiqua.app/Contents/Resources/shaders.metallib
-	# Link
-	cc -g -O0 -framework Carbon -framework AppKit -framework CoreVideo -framework QuartzCore -framework CoreAudio -framework IOKit -framework Metal mm.o -o antiqua.o
-	# Generate debug symbols
-	dsymutil antiqua.o
-	# Remove lock file when compilation is done to allow code hot reloading
-	rm -rf lock.tmp
-	echo "compile success"
-package:
-	cp -f antiqua.o antiqua.app/Contents/MacOS/antiqua
-	cp -rf antiqua.o.dSYM antiqua.app/Contents/MacOS/antiqua.dSYM
-	mv libantiqua.dylib.dSYM libantiquatmp.dylib.dSYM
-	echo "package success"
-run:
-	open antiqua.app
+ROOT=D:\Projects\msvc-toolchain-portable\msvc^\
+MSVC_VERSION=14.42.34433
+MSVC_HOST=Hostx64
+MSVC_ARCH=x64
+SDK_VERSION=10.0.26100.0
+SDK_ARCH=x64
+MSVC_ROOT=$(ROOT)VC\Tools\MSVC\$(MSVC_VERSION)
+SDK_INCLUDE=$(ROOT)WindowsKits\10\Include\$(SDK_VERSION)
+SDK_LIBS=$(ROOT)WindowsKits\10\Lib\$(SDK_VERSION)
+PATH=$(MSVC_ROOT)\bin\$(MSVC_HOST)\$(MSVC_ARCH);$(ROOT)WindowsKits\10\bin\$(SDK_VERSION)\$(SDK_ARCH);$(ROOT)WindowsKits\10\bin\$(SDK_VERSION)\$(SDK_ARCH)\ucrt;$(PATH)
+
+INCLUDE= /I$(SDK_INCLUDE)\um /I$(MSVC_ROOT)\include /I$(SDK_INCLUDE)\ucrt /I$(SDK_INCLUDE)\shared /I$(SDK_INCLUDE)\winrt /I$(SDK_INCLUDE)\cppwinrt
+LIB_PATH=/LIBPATH:$(MSVC_ROOT)\lib\$(MSVC_ARCH) /LIBPATH:$(SDK_LIBS)\ucrt\$(SDK_ARCH) /LIBPATH:$(SDK_LIBS)\ucrt_enclave\$(SDK_ARCH) /LIBPATH:$(SDK_LIBS)\um\$(SDK_ARCH)
+
+COMMON_COMPILER_FLAGS=-MTd -nologo -fp:fast -Gm- -GR- -EHa- -Od -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -wd4505 -wd4701 -DANTIQUA_SLOW=1 -DANTIQUA_INTERNAL=1 -FC -Z7
+
+BUILD_DIR=..\build
+
+POINT_VSHADER_NAME=d3d11_vshader_point
+POINT_PSHADER_NAME=d3d11_pshader_point
+MESH_VSHADER_NAME=d3d11_vshader_mesh
+MESH_PSHADER_NAME=d3d11_pshader_mesh
+
+build: clean
+	pushd $(BUILD_DIR)
+#	fxc.exe /nologo /T vs_5_0 /E vs /O3 /WX /Zpc /Ges /Fh $(POINT_VSHADER_NAME).h /Vn $(POINT_VSHADER_NAME) /Qstrip_reflect /Qstrip_debug /Qstrip_priv ..\antiqua\shaders.hlsl
+#	fxc.exe /nologo /T ps_5_0 /E ps /O3 /WX /Zpc /Ges /Fh $(POINT_PSHADER_NAME).h /Vn $(POINT_PSHADER_NAME) /Qstrip_reflect /Qstrip_debug /Qstrip_priv ..\antiqua\shaders.hlsl
+#	fxc.exe /nologo /T vs_5_0 /E vsMesh /O3 /WX /Zpc /Ges /Fh $(MESH_VSHADER_NAME).h /Vn $(MESH_VSHADER_NAME) /Qstrip_reflect /Qstrip_debug /Qstrip_priv ..\antiqua\shaders.hlsl
+#	fxc.exe /nologo /T ps_5_0 /E psMesh /O3 /WX /Zpc /Ges /Fh $(MESH_PSHADER_NAME).h /Vn $(MESH_PSHADER_NAME) /Qstrip_reflect /Qstrip_debug /Qstrip_priv ..\antiqua\shaders.hlsl
+#fxc.exe /nologo /T vs_5_0 /E vs /Od /WX /Zpc /Zi /Ges /Fo $(POINT_VSHADER_NAME).cso /Fd $(BUILD_DIR)\$(POINT_VSHADER_NAME).pdb /Fc $(POINT_VSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
+#	fxc.exe /nologo /T ps_5_0 /E ps /Od /WX /Zpc /Zi /Ges /Fo $(POINT_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(POINT_PSHADER_NAME).pdb /Fc $(POINT_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
+	fxc.exe /nologo /T vs_5_0 /E vsMesh /Od /WX /Zi /Zpc /Ges /Fo $(MESH_VSHADER_NAME).cso /Fd $(BUILD_DIR)\$(MESH_VSHADER_NAME).pdb /Fc $(MESH_VSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
+	fxc.exe /nologo /T ps_5_0 /E psMesh /Od /WX /Zi /Zpc /Ges /Fo $(MESH_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(MESH_PSHADER_NAME).pdb /Fc $(MESH_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
+	cl $(COMMON_COMPILER_FLAGS) $(INCLUDE) win32.cpp -Fmwin32_main.map -Fo:win32_main /link $(LIB_PATH) /NODEFAULTLIB:LIBCMT -incremental:no -opt:ref user32.lib d3d11.lib dxgi.lib dxguid.lib d3d12.lib -PDB:win32_main.pdb
+	if not exist "$(BUILD_DIR)" mkdir $(BUILD_DIR)
+	if exist "*.dll" move *.dll $(BUILD_DIR) >NUL
+	if exist "*.lib" move *.lib $(BUILD_DIR) >NUL
+	if exist "*.exp" move *.exp $(BUILD_DIR) >NUL
+	if exist "*.map" move *.map $(BUILD_DIR) >NUL
+	if exist "*.obj" move *.obj $(BUILD_DIR) >NUL
+	if exist "*.pdb" move *.pdb $(BUILD_DIR) >NUL
+	if exist "*.log" move *.log $(BUILD_DIR) >NUL
+	if exist "*.ini" move *.ini $(BUILD_DIR) >NUL
+	if exist "*.exe" move *.exe $(BUILD_DIR) >NUL
+	if exist "*.pdb" move *.pdb $(BUILD_DIR) >NUL
+	if exist "*.cso" move *.cso $(BUILD_DIR) >NUL
+	if exist "*.asm" move *.asm $(BUILD_DIR) >NUL
+	echo compile success
 clean:
-	# Remove game's state recordings
-	# Remove XCode's build info
-	rm -rf xcode_build
-	rm -rf build
-	rm -rf libantiqua*
-	# Remove executable and debug symbols from the app's bundle
-	rm -rf antiqua.app/Contents/MacOS/*
-	# Remove executable and debug symbols from the build location
-	rm -rf *.o*
-	# Remove compiled shaders
-	rm -rf *.ir
-	rm -rf *.metallib
-	# Remove shaders library from the app's bundle
-	rm -rf antiqua.app/Contents/Resources/*
-	echo "clean success"
+	if exist "$(BUILD_DIR)\*.dll" del $(BUILD_DIR)\*.dll >NUL
+	if exist "$(BUILD_DIR)\*.lib" del $(BUILD_DIR)\*.lib >NUL
+	if exist "$(BUILD_DIR)\*.exp" del $(BUILD_DIR)\*.exp >NUL
+	if exist "$(BUILD_DIR)\*.map" del $(BUILD_DIR)\*.map >NUL
+	if exist "$(BUILD_DIR)\*.obj" del $(BUILD_DIR)\*.obj >NUL
+	if exist "$(BUILD_DIR)\*.pdb" del $(BUILD_DIR)\*.pdb >NUL
+	if exist "$(BUILD_DIR)\*.log" del $(BUILD_DIR)\*.log >NUL
+	if exist "$(BUILD_DIR)\*.ini" del $(BUILD_DIR)\*.ini >NUL
+	if exist "$(BUILD_DIR)\*.exe" del $(BUILD_DIR)\*.exe >NUL
+	if exist "$(BUILD_DIR)\*.cso" del $(BUILD_DIR)\*.cso >NUL
+	if exist "$(BUILD_DIR)\*.asm" del $(BUILD_DIR)\*.asm >NUL
+	echo clean success
