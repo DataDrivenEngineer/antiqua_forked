@@ -136,7 +136,7 @@ internal void Win32ProcessPendingMessages(GameControllerInput *NewInput)
                 {
                     if (raw->data.mouse.usButtonFlags & RI_MOUSE_WHEEL)
                     {
-                        NewInput->scrollingDeltaY = raw->data.mouse.usButtonData < 32768 ? -1 : 1;
+                        NewInput->scrollingDeltaY = raw->data.mouse.usButtonData > 32768 ? -1 : 1;
                     }
                 } else if (raw->header.dwType == RIM_TYPEKEYBOARD)
                 {

@@ -94,7 +94,7 @@ static void CastRayToClickPositionOnTilemap(GameState *gameState,
     }
 }
 
-static void MoveEntity(GameState *gameState,
+internal void MoveEntity(GameState *gameState,
                        Entity *testEntity,
                        u32 testEntityIndex,
                        r32 deltaTimeSec,
@@ -292,7 +292,7 @@ static void MoveEntity(GameState *gameState,
                        v3(0.0f, 1.0f, 0.0f),
                        90.0f);
                 b32 dPosMovingClockwise = dot(dPosRotatedBy90Degrees, dPosPlusNormal) < 0;
-#define NORMAL_ROTATION_ANGLE_DEGREES 51
+#define NORMAL_ROTATION_ANGLE_DEGREES 70
                 if (dPosMovingClockwise)
                 {
                     rotate(&lineNormalVector,
@@ -431,7 +431,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->cameraCurrDistance = gameState->cameraMinDistance;
 
         gameState->cameraRotationSpeed = 0.3f;
-        gameState->cameraMovementSpeed = 10.0f;
+        gameState->cameraMovementSpeed = 100.0f;
 
         gameState->v = v3(0.0f, 1.0f, 0.0f);
         gameState->n = v3(0.0f, 0.0f, 1.0f);
@@ -681,19 +681,6 @@ continue_loop:
         memory->isInitialized = true;
     }
 
-    if (gcInput->scrollingDeltaY != 0.0f)
-    {
-        gameState->cameraCurrDistance += gameState->cameraMovementSpeed * deltaTimeSec * -gcInput->scrollingDeltaY;
-        if (gameState->cameraCurrDistance > gameState->cameraMaxDistance)
-        {
-            gameState->cameraCurrDistance = gameState->cameraMaxDistance;
-        }
-        else if (gameState->cameraCurrDistance < gameState->cameraMinDistance)
-        {
-            gameState->cameraCurrDistance = gameState->cameraMinDistance;
-        }
-    }
-
     if (gcInput->debugCmdC.endedDown)
     {
         gameState->debugCameraEnabled = !gameState->debugCameraEnabled;
@@ -823,12 +810,16 @@ continue_loop:
 
             if (gcInput->up.endedDown)
             {
+                normalize(&vWithoutY);
+                normalize(&uWithoutY);
                 V3 diagonalDirectionVector = vWithoutY + uWithoutY;
                 playerAcceleration.x = diagonalDirectionVector.x;
                 playerAcceleration.z = diagonalDirectionVector.z;
             }
             else if (gcInput->down.endedDown)
             {
+                normalize(&vWithoutY);
+                normalize(&uWithoutY);
                 V3 diagonalDirectionVector = -vWithoutY + uWithoutY;
                 playerAcceleration.x = diagonalDirectionVector.x;
                 playerAcceleration.z = diagonalDirectionVector.z;
@@ -848,12 +839,16 @@ continue_loop:
 
             if (gcInput->up.endedDown)
             {
+                normalize(&vWithoutY);
+                normalize(&uWithoutY);
                 V3 diagonalDirectionVector = vWithoutY + uWithoutY;
                 playerAcceleration.x = diagonalDirectionVector.x;
                 playerAcceleration.z = diagonalDirectionVector.z;
             }
             else if (gcInput->down.endedDown)
             {
+                normalize(&vWithoutY);
+                normalize(&uWithoutY);
                 V3 diagonalDirectionVector = -vWithoutY + uWithoutY;
                 playerAcceleration.x = diagonalDirectionVector.x;
                 playerAcceleration.z = diagonalDirectionVector.z;
@@ -913,6 +908,33 @@ continue_loop:
         }
 
         // NOTE(dima): set up camera to look at entity it follows
+        {
+            V3 cameraAcceleration = {};
+            if (gcInput->scrollingDeltaY < 0)
+            {
+                cameraAcceleration = -gameState->n;
+            }
+            else if (gcInput->scrollingDeltaY > 0)
+            {
+                cameraAcceleration = gameState->n;
+            }
+            cameraAcceleration *= gameState->cameraMovementSpeed;
+            cameraAcceleration = cameraAcceleration + -1.5f*gameState->cameraDPos;
+            V3 cameraPosDelta = (0.5f*cameraAcceleration*square(deltaTimeSec) + gameState->cameraDPos*deltaTimeSec);
+            gameState->cameraDPos = cameraAcceleration*deltaTimeSec + gameState->cameraDPos;
+            V3 newCameraPosWorld = gameState->cameraPosWorld + cameraPosDelta;
+
+            gameState->cameraCurrDistance += newCameraPosWorld.y - gameState->cameraPosWorld.y;
+            if (gameState->cameraCurrDistance > gameState->cameraMaxDistance)
+            {
+                gameState->cameraCurrDistance = gameState->cameraMaxDistance;
+            }
+            else if (gameState->cameraCurrDistance < gameState->cameraMinDistance)
+            {
+                gameState->cameraCurrDistance = gameState->cameraMinDistance;
+            }
+        }
+
         r32 offsetFromCamera = (gameState->cameraCurrDistance + 0.001f) / sine(RADIANS(gameState->cameraIsometricHorizontalAxisRotationAngleDegrees));
         gameState->cameraPosWorld = cameraFollowingEntity->posWorld - offsetFromCamera * gameState->isometricN;
 
@@ -923,6 +945,7 @@ continue_loop:
         gameState->u = gameState->isometricU;
         gameState->v = gameState->isometricV;
     }
+
 
     M44 translationComponent = {1.0f, 0.0f, 0.0f, 0.0f,
                                 0.0f, 1.0f, 0.0f, 0.0f,

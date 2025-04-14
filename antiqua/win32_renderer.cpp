@@ -35,7 +35,10 @@ internal u32 CurrentBackBufferIdx = 0;
 internal ID3D12Resource *SwapChainBuffer[] = {NULL, NULL};
 
 internal ID3D12RootSignature *RootSignature;
-internal ID3D12PipelineState *PipelineState;
+#define PIPELINE_STATE_COUNT 4
+#define MESH_PIPELINE_STATE_IDX 0
+#define POINT_LINE_PIPELINE_STATE_IDX 1
+internal ID3D12PipelineState *PipelineState[PIPELINE_STATE_COUNT];
 
 #define MAX_RENDER_GROUP_VB_SIZE KB(256)
 internal ID3D12Resource *RenderGroupVB;
@@ -666,7 +669,75 @@ INIT_RENDERER(initRenderer)
         Desc.SampleDesc.Quality = 0;
         Desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
-        Hr = Device->CreateGraphicsPipelineState(&Desc, IID_PPV_ARGS(&PipelineState));
+        Hr = Device->CreateGraphicsPipelineState(&Desc, IID_PPV_ARGS(&PipelineState[MESH_PIPELINE_STATE_IDX]));
+        ASSERT(SUCCEEDED(Hr));
+    }
+
+    // Create PSO for lines
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC Desc = {};
+
+        {
+            D3D12_INPUT_ELEMENT_DESC InputLayout[] = { { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+                                                       { "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 } };
+
+            Desc.InputLayout = { InputLayout, ARRAY_COUNT(InputLayout) };
+        }
+
+        Desc.pRootSignature = RootSignature;
+
+        {
+            debug_ReadFileResult VSFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_vshader_point_line.cso"
+            Memory->debug_platformReadEntireFile(NULL, &VSFile, FILENAME);
+#undef FILENAME
+            ASSERT(VSFile.contentsSize);
+
+            Desc.VS = { VSFile.contents, VSFile.contentsSize };
+
+            Memory->debug_platformFreeFileMemory(NULL, &VSFile);
+        }
+
+        {
+            debug_ReadFileResult PSFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_pshader_point_line.cso"
+            Memory->debug_platformReadEntireFile(NULL, &PSFile, FILENAME);
+#undef FILENAME
+            ASSERT(PSFile.contentsSize);
+
+            Desc.PS = { PSFile.contents, PSFile.contentsSize };
+
+            Memory->debug_platformFreeFileMemory(NULL, &PSFile);
+        }
+
+        Desc.RasterizerState = RasterizerDesc;
+        Desc.BlendState = BlendDesc;
+
+        {
+            D3D12_DEPTH_STENCILOP_DESC DefaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+
+            D3D12_DEPTH_STENCIL_DESC DepthStencilDesc = {};
+            DepthStencilDesc.DepthEnable = true;
+            DepthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            DepthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+            DepthStencilDesc.StencilEnable = false;
+            DepthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+            DepthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+            DepthStencilDesc.FrontFace = DefaultStencilOp;
+            DepthStencilDesc.BackFace = DefaultStencilOp;
+
+            Desc.DepthStencilState = DepthStencilDesc;
+        }
+
+        Desc.SampleMask = UINT_MAX;
+        Desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+        Desc.NumRenderTargets = 1;
+        Desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        Desc.SampleDesc.Count = 1;
+        Desc.SampleDesc.Quality = 0;
+        Desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+        Hr = Device->CreateGraphicsPipelineState(&Desc, IID_PPV_ARGS(&PipelineState[POINT_LINE_PIPELINE_STATE_IDX]));
         ASSERT(SUCCEEDED(Hr));
     }
 }
@@ -674,7 +745,7 @@ INIT_RENDERER(initRenderer)
 RENDER_ON_GPU(renderOnGPU)
 {
     CmdAlloc->Reset();
-    CmdList->Reset(CmdAlloc, PipelineState);
+    CmdList->Reset(CmdAlloc, 0);
 
     ID3D12Resource *CurrentBackBuffer = SwapChainBuffer[CurrentBackBufferIdx];
 
@@ -765,8 +836,51 @@ RENDER_ON_GPU(renderOnGPU)
 
                 break;
             }
+            case RenderGroupEntryType_RenderEntryLine:
+            {
+                CmdList->SetPipelineState(PipelineState[POINT_LINE_PIPELINE_STATE_IDX]);
+
+                RenderEntryLine *Entry = (RenderEntryLine *)(EntryHeader + 1);
+
+                u32 renderGroupVBStartOffset = renderGroupVBCurrentSize;
+                {
+                    r32 vertices[2 * 3 * 2];
+                    memcpy(vertices, (void*)&Entry->start, sizeof(Entry->start));
+                    memcpy(vertices + 3, (void*)&Entry->color, sizeof(Entry->color));
+                    memcpy(vertices + 6, (void*)&Entry->end, sizeof(Entry->end));
+                    memcpy(vertices + 9, (void*)&Entry->color, sizeof(Entry->color));
+
+                    u32 sizeOfData = sizeof(r32)*ARRAY_COUNT(vertices);
+                    renderGroupVBCurrentSize += sizeOfData;
+
+                    u8 *MappedData;
+                    Hr = RenderGroupVB->Map(0, NULL, (void **)&MappedData);
+                    ASSERT(SUCCEEDED(Hr));
+                    MappedData += renderGroupVBStartOffset;
+
+                    memcpy(MappedData, vertices, sizeOfData);
+
+                    RenderGroupVB->Unmap(0, NULL);
+
+                    D3D12_VERTEX_BUFFER_VIEW View;
+                    View.BufferLocation = RenderGroupVB->GetGPUVirtualAddress() + renderGroupVBStartOffset;
+                    View.SizeInBytes = renderGroupVBCurrentSize - renderGroupVBStartOffset;
+                    // TODO(dima): currently, will have to modify this every time InputLayout changes
+                    View.StrideInBytes = 2*sizeof(V3);
+
+                    CmdList->IASetVertexBuffers(0, 1, &View);
+                }
+
+                CmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+
+                CmdList->DrawInstanced(2, 1, 0, 0);
+
+                break;
+            }
             case RenderGroupEntryType_RenderEntryMesh:
             {
+                CmdList->SetPipelineState(PipelineState[MESH_PIPELINE_STATE_IDX]);
+
                 RenderEntryMesh *Entry = (RenderEntryMesh *)(EntryHeader + 1);
 
                 D3D12_GPU_DESCRIPTOR_HANDLE PerObjectCBVGPUHndl = GetGPUDescriptorHandle(CBVHeap, CBVDescriptorSize, CurrentCBDescriptorIdx);

@@ -46,8 +46,8 @@ VS_OUTPUT vs(VS_INPUT input)
 {
     VS_OUTPUT output;
     
-    output.position = mul(float4(input.position, 1.0f), viewMatrix);
-    output.position = mul(output.position, projectionMatrix);
+    output.position = mul(float4(input.position, 1.0f), transpose(viewMatrix));
+    output.position = mul(output.position, transpose(projectionMatrix));
     output.color = input.color;
     
     return output;

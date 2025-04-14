@@ -16,19 +16,19 @@ COMMON_COMPILER_FLAGS=-MTd -nologo -fp:fast -Gm- -GR- -EHa- -Od -Oi -WX -W4 -wd4
 
 BUILD_DIR=..\build
 
-POINT_VSHADER_NAME=d3d11_vshader_point
-POINT_PSHADER_NAME=d3d11_pshader_point
+POINT_LINE_VSHADER_NAME=d3d11_vshader_point_line
+POINT_LINE_PSHADER_NAME=d3d11_pshader_point_line
 MESH_VSHADER_NAME=d3d11_vshader_mesh
 MESH_PSHADER_NAME=d3d11_pshader_mesh
 
 build: clean
 	pushd $(BUILD_DIR)
-#	fxc.exe /nologo /T vs_5_0 /E vs /O3 /WX /Zpc /Ges /Fh $(POINT_VSHADER_NAME).h /Vn $(POINT_VSHADER_NAME) /Qstrip_reflect /Qstrip_debug /Qstrip_priv ..\antiqua\shaders.hlsl
-#	fxc.exe /nologo /T ps_5_0 /E ps /O3 /WX /Zpc /Ges /Fh $(POINT_PSHADER_NAME).h /Vn $(POINT_PSHADER_NAME) /Qstrip_reflect /Qstrip_debug /Qstrip_priv ..\antiqua\shaders.hlsl
+#	fxc.exe /nologo /T vs_5_0 /E vs /O3 /WX /Zpc /Ges /Fh $(POINT_LINE_VSHADER_NAME).h /Vn $(POINT_LINE_VSHADER_NAME) /Qstrip_reflect /Qstrip_debug /Qstrip_priv ..\antiqua\shaders.hlsl
+#	fxc.exe /nologo /T ps_5_0 /E ps /O3 /WX /Zpc /Ges /Fh $(POINT_LINE_PSHADER_NAME).h /Vn $(POINT_LINE_PSHADER_NAME) /Qstrip_reflect /Qstrip_debug /Qstrip_priv ..\antiqua\shaders.hlsl
 #	fxc.exe /nologo /T vs_5_0 /E vsMesh /O3 /WX /Zpc /Ges /Fh $(MESH_VSHADER_NAME).h /Vn $(MESH_VSHADER_NAME) /Qstrip_reflect /Qstrip_debug /Qstrip_priv ..\antiqua\shaders.hlsl
 #	fxc.exe /nologo /T ps_5_0 /E psMesh /O3 /WX /Zpc /Ges /Fh $(MESH_PSHADER_NAME).h /Vn $(MESH_PSHADER_NAME) /Qstrip_reflect /Qstrip_debug /Qstrip_priv ..\antiqua\shaders.hlsl
-#fxc.exe /nologo /T vs_5_0 /E vs /Od /WX /Zpc /Zi /Ges /Fo $(POINT_VSHADER_NAME).cso /Fd $(BUILD_DIR)\$(POINT_VSHADER_NAME).pdb /Fc $(POINT_VSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
-#	fxc.exe /nologo /T ps_5_0 /E ps /Od /WX /Zpc /Zi /Ges /Fo $(POINT_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(POINT_PSHADER_NAME).pdb /Fc $(POINT_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
+	fxc.exe /nologo /T vs_5_0 /E vs /Od /WX /Zpc /Zi /Ges /Fo $(POINT_LINE_VSHADER_NAME).cso /Fd $(BUILD_DIR)\$(POINT_LINE_VSHADER_NAME).pdb /Fc $(POINT_LINE_VSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
+	fxc.exe /nologo /T ps_5_0 /E ps /Od /WX /Zpc /Zi /Ges /Fo $(POINT_LINE_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(POINT_LINE_PSHADER_NAME).pdb /Fc $(POINT_LINE_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
 	fxc.exe /nologo /T vs_5_0 /E vsMesh /Od /WX /Zi /Zpc /Ges /Fo $(MESH_VSHADER_NAME).cso /Fd $(BUILD_DIR)\$(MESH_VSHADER_NAME).pdb /Fc $(MESH_VSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
 	fxc.exe /nologo /T ps_5_0 /E psMesh /Od /WX /Zi /Zpc /Ges /Fo $(MESH_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(MESH_PSHADER_NAME).pdb /Fc $(MESH_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
 	cl $(COMMON_COMPILER_FLAGS) $(INCLUDE) win32.cpp -Fmwin32_main.map -Fo:win32_main /link $(LIB_PATH) /NODEFAULTLIB:LIBCMT -incremental:no -opt:ref user32.lib d3d11.lib dxgi.lib dxguid.lib d3d12.lib -PDB:win32_main.pdb

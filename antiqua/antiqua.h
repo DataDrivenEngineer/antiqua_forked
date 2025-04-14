@@ -86,6 +86,7 @@ typedef struct
     r32 cameraRotationSpeed;
     r32 cameraMovementSpeed;
     V3 cameraPosWorld;
+    V3 cameraDPos;
     V3 v;
     V3 n;
     V3 u;
