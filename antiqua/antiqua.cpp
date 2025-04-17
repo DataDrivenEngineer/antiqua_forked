@@ -124,7 +124,7 @@ internal void MoveEntity(GameState *gameState,
         r32 tMin = 1.0f;
         V3 lineNormalVector = {0};
 
-        r32 tEpsilon = 0.0005f;
+        r32 tEpsilon = 0.001f;
 
         for (u32 entityIndex = 0;
              entityIndex < gameState->entityCount;
@@ -292,7 +292,7 @@ internal void MoveEntity(GameState *gameState,
                        v3(0.0f, 1.0f, 0.0f),
                        90.0f);
                 b32 dPosMovingClockwise = dot(dPosRotatedBy90Degrees, dPosPlusNormal) < 0;
-#define NORMAL_ROTATION_ANGLE_DEGREES 70
+#define NORMAL_ROTATION_ANGLE_DEGREES 51
                 if (dPosMovingClockwise)
                 {
                     rotate(&lineNormalVector,
@@ -1029,6 +1029,7 @@ continue_loop:
                              cameraFollowingEntityCollisionPoint,
                              v3(1.0f, 1.0f, 0.0f));
     }
+
 #if 0
     pushRenderEntryPoint(&renderGroupArena,
                          &renderGroup,
