@@ -15,6 +15,14 @@ cbuffer cbPerObject : register(b1)
     float4          meshCenterAndMinY;
 };
 
+cbuffer cbPerTile : register(b2)
+{
+    float3          color;
+    float3          originTileCenterPositionWorld;
+    uint            tileCountPerSide;
+    float           tileSideLength;
+};
+
 #define POINT_SIZE_PX 10
 
 //--------------------------------------------------------------------------------------
@@ -41,6 +49,12 @@ struct VS_OUTPUT_MESH
 {
     float4 position     : SV_POSITION;
     float4 color        : COLOR;
+};
+
+struct VS_OUTPUT_TILE
+{
+    float4 position     : SV_POSITION;
+    float3 color        : COLOR;
 };
 
 //--------------------------------------------------------------------------------------
@@ -123,6 +137,51 @@ VS_OUTPUT_MESH vsMesh(VS_INPUT_MESH input)
     return output;
 }
 
+VS_OUTPUT_TILE vsTile(uint vertexID : SV_VertexID,
+                      uint instanceID : SV_InstanceID)
+{
+    float3 topLeftCornerPosWorld;
+    topLeftCornerPosWorld.x = originTileCenterPositionWorld.x - tileCountPerSide / 2;
+    topLeftCornerPosWorld.y = 0.0f;
+    topLeftCornerPosWorld.z = originTileCenterPositionWorld.z + tileCountPerSide / 2;
+
+    uint rowOfTopLeftCornerPos = instanceID / tileCountPerSide;
+    uint colOfTopLeftCornerPos = instanceID % tileCountPerSide;
+
+    float4 tileVertexPositionsWorld[4];
+    /* NOTE(dima): index 0 - top left corner of a tile
+                   index 1 - top right corner of a tile
+                   index 2 - bottom left corner of a tile
+                   index 3 - bottom right corner of a tile
+    */
+    tileVertexPositionsWorld[0].x = topLeftCornerPosWorld.x + tileSideLength * colOfTopLeftCornerPos;
+    tileVertexPositionsWorld[0].y = 0.0f;
+    tileVertexPositionsWorld[0].z = topLeftCornerPosWorld.z - tileSideLength * rowOfTopLeftCornerPos;
+    tileVertexPositionsWorld[0].w = 1.0f;
+
+    tileVertexPositionsWorld[1].x = tileVertexPositionsWorld[0].x + tileSideLength;
+    tileVertexPositionsWorld[1].y = 0.0f;
+    tileVertexPositionsWorld[1].z = tileVertexPositionsWorld[0].z;
+    tileVertexPositionsWorld[1].w = 1.0f;
+
+    tileVertexPositionsWorld[2].x = tileVertexPositionsWorld[0].x;
+    tileVertexPositionsWorld[2].y = 0.0f;
+    tileVertexPositionsWorld[2].z = tileVertexPositionsWorld[0].z - tileSideLength;
+    tileVertexPositionsWorld[2].w = 1.0f;
+
+    tileVertexPositionsWorld[3].x = tileVertexPositionsWorld[0].x + tileSideLength;
+    tileVertexPositionsWorld[3].y = 0.0f;
+    tileVertexPositionsWorld[3].z = tileVertexPositionsWorld[0].z - tileSideLength;
+    tileVertexPositionsWorld[3].w = 1.0f;
+
+    VS_OUTPUT_TILE output;
+    output.position = mul(tileVertexPositionsWorld[vertexID], transpose(viewMatrix));
+    output.position = mul(output.position, transpose(projectionMatrix));
+    output.color = color;
+
+    return output;
+}
+
 //--------------------------------------------------------------------------------------
 // Pixel Shader
 //--------------------------------------------------------------------------------------
@@ -139,4 +198,9 @@ float4 ps(VS_OUTPUT input) : SV_TARGET
 float4 psMesh(VS_OUTPUT_MESH input) : SV_TARGET
 {
     return input.color;
+}
+
+float4 psTile(VS_OUTPUT_TILE input) : SV_TARGET
+{
+    return float4(input.color, 1.0f);
 }

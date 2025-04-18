@@ -230,7 +230,8 @@ internal void MoveEntity(GameState *gameState,
                             }
                             else
                             {
-                                if (t > gameState->prevTimeOfCollision)
+                                if (t > 0.0005f
+                                    && t > gameState->prevTimeOfCollision)
                                 {
                                     t = gameState->prevTimeOfCollision;
                                 }

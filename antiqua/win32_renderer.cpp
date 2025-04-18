@@ -39,6 +39,7 @@ internal ID3D12RootSignature *RootSignature;
 #define MESH_PIPELINE_STATE_IDX 0
 #define LINE_PIPELINE_STATE_IDX 1
 #define POINT_PIPELINE_STATE_IDX 2
+#define TILE_PIPELINE_STATE_IDX 3
 internal ID3D12PipelineState *PipelineState[PIPELINE_STATE_COUNT];
 
 #define MAX_RENDER_GROUP_VB_SIZE KB(256)
@@ -437,7 +438,7 @@ INIT_RENDERER(initRenderer)
         ASSERT(SUCCEEDED(Hr));
     }
 
-    // NOTE(dima): create CB Heap
+    // NOTE(dima): create CB Descriptor Heap
     {
         // NOTE(dima): descriptor per entity + 1 for per pass descirptor
         // TODO(dima): do not hardcode max entity count!
@@ -577,16 +578,23 @@ INIT_RENDERER(initRenderer)
         PerObjectRootDescriptorTable.NumDescriptorRanges = 1;
         PerObjectRootDescriptorTable.pDescriptorRanges = &PerObjectRange;
 
-        D3D12_ROOT_PARAMETER SlotRootParameters[2];
+        D3D12_ROOT_DESCRIPTOR TileRootDescriptor;
+        TileRootDescriptor.ShaderRegister = 2;
+        TileRootDescriptor.RegisterSpace = 0;
+
+        D3D12_ROOT_PARAMETER SlotRootParameters[3];
         SlotRootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         SlotRootParameters[0].DescriptorTable = PerPassRootDescriptorTable;
         SlotRootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         SlotRootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         SlotRootParameters[1].DescriptorTable = PerObjectRootDescriptorTable;
         SlotRootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        SlotRootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+        SlotRootParameters[2].Descriptor = TileRootDescriptor;
+        SlotRootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         D3D12_ROOT_SIGNATURE_DESC RootSignatureDesc = {};
-        RootSignatureDesc.NumParameters = 2;
+        RootSignatureDesc.NumParameters = 3;
         RootSignatureDesc.pParameters = SlotRootParameters;
         RootSignatureDesc.NumStaticSamplers = 0;
         RootSignatureDesc.pStaticSamplers = NULL;
@@ -808,6 +816,67 @@ INIT_RENDERER(initRenderer)
         Desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
         Hr = Device->CreateGraphicsPipelineState(&Desc, IID_PPV_ARGS(&PipelineState[POINT_PIPELINE_STATE_IDX]));
+        ASSERT(SUCCEEDED(Hr));
+    }
+
+    // NOTE(dima): create PSO for tiles
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC Desc = {};
+
+        Desc.pRootSignature = RootSignature;
+
+        {
+            debug_ReadFileResult VSFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_vshader_tile.cso"
+            Memory->debug_platformReadEntireFile(NULL, &VSFile, FILENAME);
+#undef FILENAME
+            ASSERT(VSFile.contentsSize);
+
+            Desc.VS = { VSFile.contents, VSFile.contentsSize };
+
+            Memory->debug_platformFreeFileMemory(NULL, &VSFile);
+        }
+
+        {
+            debug_ReadFileResult PSFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_pshader_tile.cso"
+            Memory->debug_platformReadEntireFile(NULL, &PSFile, FILENAME);
+#undef FILENAME
+            ASSERT(PSFile.contentsSize);
+
+            Desc.PS = { PSFile.contents, PSFile.contentsSize };
+
+            Memory->debug_platformFreeFileMemory(NULL, &PSFile);
+        }
+
+        Desc.RasterizerState = RasterizerDesc;
+        Desc.BlendState = BlendDesc;
+
+        {
+            D3D12_DEPTH_STENCILOP_DESC DefaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+
+            D3D12_DEPTH_STENCIL_DESC DepthStencilDesc = {};
+            DepthStencilDesc.DepthEnable = true;  
+            DepthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            DepthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+            DepthStencilDesc.StencilEnable = false;
+            DepthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+            DepthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+            DepthStencilDesc.FrontFace = DefaultStencilOp;
+            DepthStencilDesc.BackFace = DefaultStencilOp;
+
+            Desc.DepthStencilState = DepthStencilDesc;
+        }
+
+        Desc.SampleMask = UINT_MAX;
+        Desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        Desc.NumRenderTargets = 1;
+        Desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        Desc.SampleDesc.Count = 1;
+        Desc.SampleDesc.Quality = 0;
+        Desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+        Hr = Device->CreateGraphicsPipelineState(&Desc, IID_PPV_ARGS(&PipelineState[TILE_PIPELINE_STATE_IDX]));
         ASSERT(SUCCEEDED(Hr));
     }
 }
@@ -1088,6 +1157,59 @@ RENDER_ON_GPU(renderOnGPU)
 
                 break;
             }
+            case RenderGroupEntryType_RenderEntryTile:
+            {
+                CmdList->SetPipelineState(PipelineState[TILE_PIPELINE_STATE_IDX]);
+
+                RenderEntryTile *Entry = (RenderEntryTile *)(EntryHeader + 1);
+
+                D3D12_GPU_VIRTUAL_ADDRESS CBAddress = RenderGroupPerObjectCB->GetGPUVirtualAddress() 
+                                                      + CurrentPerObjectCBOffset;
+                CmdList->SetGraphicsRootConstantBufferView(2, CBAddress);
+
+                {
+                    u32 LengthOfTileCountPerSide = sizeof(Entry->tileCountPerSide);
+                    u32 LengthOfTileSideLength = sizeof(Entry->tileSideLength);
+                    u32 LengthOfTileColor = sizeof(Entry->color);
+                    u32 LengthOfOriginTileCenterPositionWorld = sizeof(Entry->originTileCenterPositionWorld);
+                    u32 TotalSize = RoundToNearestMultipleOf256(LengthOfTileCountPerSide
+                                                                + LengthOfTileSideLength
+                                                                + LengthOfTileColor
+                                                                + LengthOfOriginTileCenterPositionWorld);
+                    u8 *MappedData;
+                    Hr = RenderGroupPerObjectCB->Map(0, NULL, (void **)&MappedData);
+                    ASSERT(SUCCEEDED(Hr));
+
+                    MappedData += CurrentPerObjectCBOffset;
+                    memcpy(MappedData, &Entry->color, LengthOfTileColor);
+                    MappedData += LengthOfTileColor
+                                  // NOTE(dima): padding to respect HLSL constant buffer's memory alignment rules
+                                  + sizeof(r32);
+                    memcpy(MappedData, &Entry->originTileCenterPositionWorld, LengthOfOriginTileCenterPositionWorld);
+                    MappedData += LengthOfOriginTileCenterPositionWorld;
+                    memcpy(MappedData, &Entry->tileCountPerSide, LengthOfTileCountPerSide);
+                    MappedData += LengthOfTileCountPerSide;
+                    memcpy(MappedData, &Entry->tileSideLength, LengthOfTileSideLength);
+
+                    RenderGroupPerObjectCB->Unmap(0, NULL);
+
+                    // NOTE(dima): create CBV for the data we just copied
+                    CreateConstantBufferView(RenderGroupPerObjectCB,
+                                             CBVHeap,
+                                             CBVDescriptorSize,
+                                             CurrentCBDescriptorIdx,
+                                             CurrentPerObjectCBOffset,
+                                             TotalSize);
+                    ++CurrentCBDescriptorIdx;
+
+                    CurrentPerObjectCBOffset += TotalSize;
+                }
+
+                CmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+                CmdList->DrawInstanced(4, Entry->tileCountPerSide * Entry->tileCountPerSide, 0, 0);
+
+            } break;
             default:
                 break;
         }
