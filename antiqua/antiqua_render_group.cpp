@@ -73,51 +73,6 @@ void pushRenderEntryLine(MemoryArena *arena,
     entryHeader->next = 0;
 }
 
-void pushRenderEntryMesh(MemoryArena *arena,
-                         RenderGroup *renderGroup,
-                         V3 positionWorld,
-                         V3 scaleFactor,
-                         MeshMdl *meshModel)
-{
-    ASSERT(renderGroup->pushBufferElementCount > 0);
-
-    for (u32 meshIdx = 0;
-         meshIdx < meshModel->meshCount;
-         ++meshIdx)
-    {
-        RenderGroupEntryHeader *entryHeader =
-            (RenderGroupEntryHeader *)PUSH_STRUCT(arena, RenderGroupEntryHeader);
-        entryHeader->type = RenderGroupEntryType_RenderEntryMesh;
-        renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
-        RenderEntryMesh *entry =
-            (RenderEntryMesh *)(PUSH_STRUCT(arena, RenderEntryMesh));
-        entry->modelMatrix = {scaleFactor.x, 0.0f, 0.0f, 0.0f,
-                              0.0f, scaleFactor.y, 0.0f, 0.0f,
-                              0.0f, 0.0f, scaleFactor.z, 0.0f,
-                              positionWorld.x,
-                              positionWorld.y,
-                              positionWorld.z,
-                              1.0f};
-        MeshMetadata *meshMtd = meshModel->meshMtd + meshIdx;
-        entry->indicesByteOffset = meshMtd->indicesByteOffset;
-        entry->indicesByteLength = meshMtd->indicesByteLength;
-        entry->indicesCount = meshMtd->indicesCount;
-        entry->posByteOffset = meshMtd->posByteOffset;
-        entry->posByteLength = meshMtd->posByteLength;
-        entry->data = meshModel->data;
-        entry->dataSize = meshModel->dataSize;
-        memcpy(entry->meshCenterAndMinY,
-               meshModel->meshCenterAndMinY,
-               sizeof(entry->meshCenterAndMinY[0])*ARRAY_COUNT(entry->meshCenterAndMinY));
-        renderGroup->pushBufferSize += sizeof(RenderEntryMesh);
-        renderGroup->pushBufferElementCount++;
-
-        renderGroup->prevHeader->next = entryHeader;
-        renderGroup->prevHeader = entryHeader;
-        entryHeader->next = 0;
-    }
-}
-
 void pushRenderEntryTile(MemoryArena *arena,
                          RenderGroup *renderGroup,
                          u32 tileCountPerSide,
@@ -136,6 +91,31 @@ void pushRenderEntryTile(MemoryArena *arena,
     entry->color = color;
     entry->originTileCenterPositionWorld = originTileCenterPositionWorld;
     renderGroup->pushBufferSize += sizeof(RenderEntryTile);
+    renderGroup->pushBufferElementCount++;
+
+    renderGroup->prevHeader->next = entryHeader;
+    renderGroup->prevHeader = entryHeader;
+    entryHeader->next = 0;
+}
+
+void pushRenderEntryRect(MemoryArena *arena,
+                         RenderGroup *renderGroup,
+                         V3 rectCenterPositionWorld,
+                         r32 scaledSideLengthW,
+                         r32 scaledSideLengthH)
+{
+    ASSERT(renderGroup->pushBufferElementCount > 0);
+
+    RenderGroupEntryHeader *entryHeader = PUSH_STRUCT(arena, RenderGroupEntryHeader);
+    entryHeader->type = RenderGroupEntryType_RenderEntryRect;
+    renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
+    RenderEntryRect *entry = PUSH_STRUCT(arena, RenderEntryRect);
+    entry->sideLengthW = scaledSideLengthW;
+    entry->sideLengthH = scaledSideLengthH;
+    entry->rectCenterPositionWorld = rectCenterPositionWorld;
+    entry->color = v3(0.0f, 1.0f, 1.0f);
+
+    renderGroup->pushBufferSize += sizeof(RenderEntryRect);
     renderGroup->pushBufferElementCount++;
 
     renderGroup->prevHeader->next = entryHeader;

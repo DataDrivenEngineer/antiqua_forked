@@ -11,8 +11,10 @@ cbuffer cbPerPass : register(b0)
 
 cbuffer cbPerObject : register(b1)
 {
-    float4x4        modelMatrix;
-    float4          meshCenterAndMinY;
+    float3          rectCenterPositionWorld;
+    float           sideLengthW;
+    float3          rectColor;
+    float           sideLengthH;
 };
 
 cbuffer cbPerTile : register(b2)
@@ -22,6 +24,8 @@ cbuffer cbPerTile : register(b2)
     uint            tileCountPerSide;
     float           tileSideLength;
 };
+
+#define NORMALIZE(OldValue, OldMin, NewRange, OldRange, NewMin) ((((OldValue) - (OldMin)) * (NewRange)) / (OldRange)) + (NewMin) 
 
 #define POINT_SIZE_PX 10
 
@@ -40,15 +44,10 @@ struct VS_OUTPUT
     float3 color        : COLOR;
 };
 
-struct VS_INPUT_MESH
-{
-    float3 position     : POSITION;
-};
-
-struct VS_OUTPUT_MESH
+struct VS_OUTPUT_RECT
 {
     float4 position     : SV_POSITION;
-    float4 color        : COLOR;
+    float3 color        : COLOR;
 };
 
 struct VS_OUTPUT_TILE
@@ -66,8 +65,6 @@ VS_OUTPUT vsPoint(VS_INPUT input, uint vertexID : SV_VertexID)
     
     output.position = mul(float4(input.position, 1.0f), transpose(viewMatrix));
     output.position = mul(output.position, transpose(projectionMatrix));
-
-#define NORMALIZE(OldValue, OldMin, NewRange, OldRange, NewMin) ((((OldValue) - (OldMin)) * (NewRange)) / (OldRange)) + (NewMin) 
 
 	float pointCenterX = (output.position.x / output.position.w + 1) * 0.5f * windowWidth;
 	float pointCenterY = (output.position.y / output.position.w + 1) * 0.5f * windowHeight;
@@ -105,44 +102,15 @@ VS_OUTPUT vs(VS_INPUT input)
     return output;
 }
 
-VS_OUTPUT_MESH vsMesh(VS_INPUT_MESH input)
-{
-    VS_OUTPUT_MESH output;
-
-    float meshCenterX = meshCenterAndMinY.x;
-    float meshCenterY = meshCenterAndMinY.y;
-    float meshCenterZ = meshCenterAndMinY.z;
-    float meshMinY = meshCenterAndMinY.w;
-
-    float3 vDataPosModified = float3(input.position);
-    
-    // NOTE(dima): move mesh center to (0;0;0)
-    vDataPosModified.x -= meshCenterX;
-    vDataPosModified.y -= meshCenterY;
-    vDataPosModified.z -= meshCenterZ;
-
-    /* NOTE(dima): move mesh so that its lowest Y = 0.
-                   Basically, it means: put model on the ground */
-    vDataPosModified.y += meshMinY;
-
-    // NOTE(dima): convert from right handed to left handed system
-    vDataPosModified.z = -vDataPosModified.z;
-
-    output.position = mul(float4(vDataPosModified, 1.0f), transpose(modelMatrix));
-    output.position = mul(output.position, transpose(viewMatrix));
-    output.position = mul(output.position, transpose(projectionMatrix));
-
-    output.color = float4(1.0f, 1.0f, 1.0f, 1.0f);
- 
-    return output;
-}
-
 VS_OUTPUT_TILE vsTile(uint vertexID : SV_VertexID,
                       uint instanceID : SV_InstanceID)
 {
+// NOTE(dima): this is to prevent flickering between tiles and sprites
+#define Y -0.001f
+
     float3 topLeftCornerPosWorld;
     topLeftCornerPosWorld.x = originTileCenterPositionWorld.x - tileCountPerSide / 2;
-    topLeftCornerPosWorld.y = 0.0f;
+    topLeftCornerPosWorld.y = Y;
     topLeftCornerPosWorld.z = originTileCenterPositionWorld.z + tileCountPerSide / 2;
 
     uint rowOfTopLeftCornerPos = instanceID / tileCountPerSide;
@@ -155,30 +123,68 @@ VS_OUTPUT_TILE vsTile(uint vertexID : SV_VertexID,
                    index 3 - bottom right corner of a tile
     */
     tileVertexPositionsWorld[0].x = topLeftCornerPosWorld.x + tileSideLength * colOfTopLeftCornerPos;
-    tileVertexPositionsWorld[0].y = 0.0f;
+    tileVertexPositionsWorld[0].y = Y;
     tileVertexPositionsWorld[0].z = topLeftCornerPosWorld.z - tileSideLength * rowOfTopLeftCornerPos;
     tileVertexPositionsWorld[0].w = 1.0f;
 
     tileVertexPositionsWorld[1].x = tileVertexPositionsWorld[0].x + tileSideLength;
-    tileVertexPositionsWorld[1].y = 0.0f;
+    tileVertexPositionsWorld[1].y = Y;
     tileVertexPositionsWorld[1].z = tileVertexPositionsWorld[0].z;
     tileVertexPositionsWorld[1].w = 1.0f;
 
     tileVertexPositionsWorld[2].x = tileVertexPositionsWorld[0].x;
-    tileVertexPositionsWorld[2].y = 0.0f;
+    tileVertexPositionsWorld[2].y = Y;
     tileVertexPositionsWorld[2].z = tileVertexPositionsWorld[0].z - tileSideLength;
     tileVertexPositionsWorld[2].w = 1.0f;
 
     tileVertexPositionsWorld[3].x = tileVertexPositionsWorld[0].x + tileSideLength;
-    tileVertexPositionsWorld[3].y = 0.0f;
+    tileVertexPositionsWorld[3].y = Y;
     tileVertexPositionsWorld[3].z = tileVertexPositionsWorld[0].z - tileSideLength;
     tileVertexPositionsWorld[3].w = 1.0f;
+
+#undef Y
 
     VS_OUTPUT_TILE output;
     output.position = mul(tileVertexPositionsWorld[vertexID], transpose(viewMatrix));
     output.position = mul(output.position, transpose(projectionMatrix));
     output.color = color;
 
+    return output;
+}
+
+VS_OUTPUT_RECT vsRect(uint vertexID : SV_VertexID)
+{
+    float4 rectVertexPositionsWorld[4];
+    /* NOTE(dima): index 0 - top left corner of a rect
+                   index 1 - top right corner of a rect
+                   index 2 - bottom left corner of a rect
+                   index 3 - bottom right corner of a rect
+    */
+    rectVertexPositionsWorld[0].x = rectCenterPositionWorld.x - sideLengthW / 2;
+    rectVertexPositionsWorld[0].y = 0.0f;
+    rectVertexPositionsWorld[0].z = rectCenterPositionWorld.z + sideLengthH / 2;
+    rectVertexPositionsWorld[0].w = 1.0f;
+
+    rectVertexPositionsWorld[1].x = rectVertexPositionsWorld[0].x + sideLengthW;
+    rectVertexPositionsWorld[1].y = 0.0f;
+    rectVertexPositionsWorld[1].z = rectVertexPositionsWorld[0].z;
+    rectVertexPositionsWorld[1].w = 1.0f;
+
+    rectVertexPositionsWorld[2].x = rectVertexPositionsWorld[0].x;
+    rectVertexPositionsWorld[2].y = 0.0f;
+    rectVertexPositionsWorld[2].z = rectVertexPositionsWorld[0].z - sideLengthH;
+    rectVertexPositionsWorld[2].w = 1.0f;
+
+    rectVertexPositionsWorld[3].x = rectVertexPositionsWorld[0].x + sideLengthW;
+    rectVertexPositionsWorld[3].y = 0.0f;
+    rectVertexPositionsWorld[3].z = rectVertexPositionsWorld[0].z - sideLengthH;
+    rectVertexPositionsWorld[3].w = 1.0f;
+
+    VS_OUTPUT_RECT output;
+    output.position = mul(rectVertexPositionsWorld[vertexID], transpose(viewMatrix));
+    output.position = mul(output.position, transpose(projectionMatrix));
+    output.color = rectColor;
+    
     return output;
 }
 
@@ -195,12 +201,12 @@ float4 ps(VS_OUTPUT input) : SV_TARGET
     return float4(input.color, 1.0f);
 }
 
-float4 psMesh(VS_OUTPUT_MESH input) : SV_TARGET
+float4 psTile(VS_OUTPUT_TILE input) : SV_TARGET
 {
-    return input.color;
+    return float4(input.color, 1.0f);
 }
 
-float4 psTile(VS_OUTPUT_TILE input) : SV_TARGET
+float4 psRect(VS_OUTPUT_RECT input) : SV_TARGET
 {
     return float4(input.color, 1.0f);
 }

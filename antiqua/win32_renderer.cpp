@@ -7,7 +7,7 @@
 #include "antiqua.h"
 #include "antiqua_render_group.h"
 
-#define CULLING_ENABLED 0
+#define CULLING_ENABLED 1
 #define WIREFRAME_MODE_ENABLED 1
 
 internal ID3D12Device *Device;
@@ -36,7 +36,7 @@ internal ID3D12Resource *SwapChainBuffer[] = {NULL, NULL};
 
 internal ID3D12RootSignature *RootSignature;
 #define PIPELINE_STATE_COUNT 4
-#define MESH_PIPELINE_STATE_IDX 0
+#define RECT_PIPELINE_STATE_IDX 0
 #define LINE_PIPELINE_STATE_IDX 1
 #define POINT_PIPELINE_STATE_IDX 2
 #define TILE_PIPELINE_STATE_IDX 3
@@ -45,10 +45,6 @@ internal ID3D12PipelineState *PipelineState[PIPELINE_STATE_COUNT];
 #define MAX_RENDER_GROUP_VB_SIZE KB(256)
 internal ID3D12Resource *RenderGroupVB;
 internal u32 renderGroupVBCurrentSize = 0;
-
-#define MAX_RENDER_GROUP_IB_SIZE KB(256)
-internal ID3D12Resource *RenderGroupIB;
-internal u32 renderGroupIBCurrentSize = 0;
 
 // NOTE(dima): CB must be of size which is multiple of 256 bytes
 #define MAX_RENDER_GROUP_PER_OBJECT_CB_SIZE KB(512)
@@ -407,37 +403,6 @@ INIT_RENDERER(initRenderer)
         ASSERT(SUCCEEDED(Hr));
     }
 
-    // NOTE(dima): create IB
-    {
-        D3D12_RESOURCE_DESC	Desc = {};
-        Desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        Desc.Alignment = 0;
-        Desc.Width = MAX_RENDER_GROUP_IB_SIZE;
-        Desc.Height = 1;
-        Desc.DepthOrArraySize = 1;
-        Desc.MipLevels = 1;
-        Desc.Format = DXGI_FORMAT_UNKNOWN;
-        Desc.SampleDesc.Count = 1;
-        Desc.SampleDesc.Quality = 0;
-        Desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        Desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-        D3D12_HEAP_PROPERTIES HeapProperties = {};
-        HeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-        HeapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        HeapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        HeapProperties.CreationNodeMask = 1;
-        HeapProperties.VisibleNodeMask = 1;
-
-        Hr = Device->CreateCommittedResource(&HeapProperties,
-                                             D3D12_HEAP_FLAG_NONE,
-                                             &Desc,
-                                             D3D12_RESOURCE_STATE_GENERIC_READ,
-                                             NULL,
-                                             IID_PPV_ARGS(&RenderGroupIB));
-        ASSERT(SUCCEEDED(Hr));
-    }
-
     // NOTE(dima): create CB Descriptor Heap
     {
         // NOTE(dima): descriptor per entity + 1 for per pass descirptor
@@ -523,7 +488,7 @@ INIT_RENDERER(initRenderer)
         RasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 #endif
 #if CULLING_ENABLED
-        RasterizerDesc.FrontCounterClockwise = true;
+        RasterizerDesc.FrontCounterClockwise = false;
         RasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
 #else
         RasterizerDesc.FrontCounterClockwise = false;
@@ -616,20 +581,15 @@ INIT_RENDERER(initRenderer)
         SerializedRootSignature->Release();
     }
 
-    // Create PSO for meshes
+    // Create PSO for rects
     {
         D3D12_GRAPHICS_PIPELINE_STATE_DESC Desc = {};
-
-        {
-            D3D12_INPUT_ELEMENT_DESC InputLayout[] = { { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 } };
-            Desc.InputLayout = { InputLayout, ARRAY_COUNT(InputLayout) };
-        }
 
         Desc.pRootSignature = RootSignature;
 
         {
             debug_ReadFileResult VSFile = {};
-#define FILENAME "build" DIR_SEPARATOR "d3d11_vshader_mesh.cso"
+#define FILENAME "build" DIR_SEPARATOR "d3d11_vshader_rect.cso"
             Memory->debug_platformReadEntireFile(NULL, &VSFile, FILENAME);
 #undef FILENAME
             ASSERT(VSFile.contentsSize);
@@ -641,7 +601,7 @@ INIT_RENDERER(initRenderer)
 
         {
             debug_ReadFileResult PSFile = {};
-#define FILENAME "build" DIR_SEPARATOR "d3d11_pshader_mesh.cso"
+#define FILENAME "build" DIR_SEPARATOR "d3d11_pshader_rect.cso"
             Memory->debug_platformReadEntireFile(NULL, &PSFile, FILENAME);
 #undef FILENAME
             ASSERT(PSFile.contentsSize);
@@ -678,7 +638,7 @@ INIT_RENDERER(initRenderer)
         Desc.SampleDesc.Quality = 0;
         Desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
-        Hr = Device->CreateGraphicsPipelineState(&Desc, IID_PPV_ARGS(&PipelineState[MESH_PIPELINE_STATE_IDX]));
+        Hr = Device->CreateGraphicsPipelineState(&Desc, IID_PPV_ARGS(&PipelineState[RECT_PIPELINE_STATE_IDX]));
         ASSERT(SUCCEEDED(Hr));
     }
 
@@ -908,7 +868,6 @@ RENDER_ON_GPU(renderOnGPU)
     CmdList->RSSetScissorRects(1, &ScissorRect);
 
     renderGroupVBCurrentSize = 0;
-    renderGroupIBCurrentSize = 0;
     CurrentCBDescriptorIdx = 0;
     CurrentPerObjectCBOffset = 0;
 
@@ -966,7 +925,6 @@ RENDER_ON_GPU(renderOnGPU)
     while (EntryHeader)
     {
         ASSERT(renderGroupVBCurrentSize < MAX_RENDER_GROUP_VB_SIZE);
-        ASSERT(renderGroupIBCurrentSize < MAX_RENDER_GROUP_IB_SIZE);
         ASSERT(renderGroupCBCurrentSize < MAX_RENDER_GROUP_PER_OBJECT_CB_SIZE);
         switch (EntryHeader->type)
         {
@@ -1067,96 +1025,6 @@ RENDER_ON_GPU(renderOnGPU)
 
                 break;
             }
-            case RenderGroupEntryType_RenderEntryMesh:
-            {
-                CmdList->SetPipelineState(PipelineState[MESH_PIPELINE_STATE_IDX]);
-
-                RenderEntryMesh *Entry = (RenderEntryMesh *)(EntryHeader + 1);
-
-                D3D12_GPU_DESCRIPTOR_HANDLE PerObjectCBVGPUHndl = GetGPUDescriptorHandle(CBVHeap, CBVDescriptorSize, CurrentCBDescriptorIdx);
-                CmdList->SetGraphicsRootDescriptorTable(1, PerObjectCBVGPUHndl);
-
-                {
-                    u32 ModelMatrixLength = sizeof(Entry->modelMatrix);
-                    u32 MeshMetadataLength = sizeof(Entry->meshCenterAndMinY[0])*ARRAY_COUNT(Entry->meshCenterAndMinY);
-                    u32 TotalSize = RoundToNearestMultipleOf256(ModelMatrixLength + MeshMetadataLength);
-
-                    u8 *MappedData;
-                    Hr = RenderGroupPerObjectCB->Map(0, NULL, (void **)&MappedData);
-                    ASSERT(SUCCEEDED(Hr));
-
-                    MappedData += CurrentPerObjectCBOffset;
-
-                    memcpy(MappedData, &Entry->modelMatrix, ModelMatrixLength);
-                    MappedData += ModelMatrixLength;
-                    memcpy(MappedData, Entry->meshCenterAndMinY, MeshMetadataLength);
-
-                    RenderGroupPerObjectCB->Unmap(0, NULL);
-
-                    // NOTE(dima): create CBV for the data we just copied
-                    CreateConstantBufferView(RenderGroupPerObjectCB,
-                                             CBVHeap,
-                                             CBVDescriptorSize,
-                                             CurrentCBDescriptorIdx,
-                                             CurrentPerObjectCBOffset,
-                                             TotalSize);
-                    ++CurrentCBDescriptorIdx;
-
-                    CurrentPerObjectCBOffset += TotalSize;
-                }
-
-                u32 renderGroupIBStartOffset = renderGroupIBCurrentSize;
-                {
-                    renderGroupIBCurrentSize += Entry->indicesByteLength;
-
-                    u8 *MappedData;
-                    Hr = RenderGroupIB->Map(0, NULL, (void **)&MappedData);
-                    ASSERT(SUCCEEDED(Hr));
-                    MappedData += renderGroupIBStartOffset;
-
-                    u8 *DataStartPosition = Entry->data + Entry->indicesByteOffset;
-                    memcpy(MappedData, DataStartPosition, Entry->indicesByteLength);
-
-                    RenderGroupIB->Unmap(0, NULL);
-
-                    D3D12_INDEX_BUFFER_VIEW View;
-                    View.BufferLocation = RenderGroupIB->GetGPUVirtualAddress() + renderGroupIBStartOffset;
-                    // TODO(dima): currently have to change this every time index buffer format changes
-                    View.Format = DXGI_FORMAT_R16_UINT;
-                    View.SizeInBytes = renderGroupIBCurrentSize - renderGroupIBStartOffset;
-
-                    CmdList->IASetIndexBuffer(&View);
-                }
-
-                u32 renderGroupVBStartOffset = renderGroupVBCurrentSize;
-                {
-                    renderGroupVBCurrentSize += Entry->posByteLength;
-
-                    u8 *MappedData;
-                    Hr = RenderGroupVB->Map(0, NULL, (void **)&MappedData);
-                    ASSERT(SUCCEEDED(Hr));
-                    MappedData += renderGroupVBStartOffset;
-
-                    u8 *DataStartPosition = Entry->data + Entry->posByteOffset;
-                    memcpy(MappedData, DataStartPosition, Entry->posByteLength);
-
-                    RenderGroupVB->Unmap(0, NULL);
-
-                    D3D12_VERTEX_BUFFER_VIEW View;
-                    View.BufferLocation = RenderGroupVB->GetGPUVirtualAddress() + renderGroupVBStartOffset;
-                    View.SizeInBytes = renderGroupVBCurrentSize - renderGroupVBStartOffset;
-                    // TODO(dima): currently, will have to modify this every time InputLayout changes
-                    View.StrideInBytes = sizeof(V3);
-
-                    CmdList->IASetVertexBuffers(0, 1, &View);
-                }
-
-                CmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-                CmdList->DrawIndexedInstanced(Entry->indicesCount, 1, 0, 0, 0);
-
-                break;
-            }
             case RenderGroupEntryType_RenderEntryTile:
             {
                 CmdList->SetPipelineState(PipelineState[TILE_PIPELINE_STATE_IDX]);
@@ -1210,6 +1078,62 @@ RENDER_ON_GPU(renderOnGPU)
                 CmdList->DrawInstanced(4, Entry->tileCountPerSide * Entry->tileCountPerSide, 0, 0);
 
             } break;
+            case RenderGroupEntryType_RenderEntryRect:
+            {
+                CmdList->SetPipelineState(PipelineState[RECT_PIPELINE_STATE_IDX]);
+
+                RenderEntryRect *Entry = (RenderEntryRect *)(EntryHeader + 1);
+
+                D3D12_GPU_DESCRIPTOR_HANDLE PerObjectCBVGPUHndl = GetGPUDescriptorHandle(CBVHeap, CBVDescriptorSize, CurrentCBDescriptorIdx);
+                CmdList->SetGraphicsRootDescriptorTable(1, PerObjectCBVGPUHndl);
+
+                {
+                    u32 SideLengthWLength = sizeof(Entry->sideLengthW);
+                    u32 SideLengthHLength = sizeof(Entry->sideLengthH);
+                    u32 RectCenterPositionWorldLength = sizeof(Entry->rectCenterPositionWorld);
+                    u32 ColorLength = sizeof(Entry->color);
+                    u32 TotalSize = RoundToNearestMultipleOf256(SideLengthWLength
+                                                                + SideLengthHLength
+                                                                + RectCenterPositionWorldLength
+                                                                + ColorLength);
+
+                    u8 *MappedData;
+                    Hr = RenderGroupPerObjectCB->Map(0, NULL, (void **)&MappedData);
+                    ASSERT(SUCCEEDED(Hr));
+
+                    MappedData += CurrentPerObjectCBOffset;
+
+                    memcpy(MappedData, &Entry->rectCenterPositionWorld, RectCenterPositionWorldLength);
+                    MappedData += RectCenterPositionWorldLength;
+
+                    memcpy(MappedData, &Entry->sideLengthW, SideLengthWLength);
+                    MappedData += SideLengthWLength;
+
+                    memcpy(MappedData, &Entry->color, ColorLength);
+                    MappedData += ColorLength;
+
+                    memcpy(MappedData, &Entry->sideLengthH, SideLengthHLength);
+
+                    RenderGroupPerObjectCB->Unmap(0, NULL);
+
+                    // NOTE(dima): create CBV for the data we just copied
+                    CreateConstantBufferView(RenderGroupPerObjectCB,
+                                             CBVHeap,
+                                             CBVDescriptorSize,
+                                             CurrentCBDescriptorIdx,
+                                             CurrentPerObjectCBOffset,
+                                             TotalSize);
+                    ++CurrentCBDescriptorIdx;
+
+                    CurrentPerObjectCBOffset += TotalSize;
+                }
+
+                CmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+                CmdList->DrawInstanced(4, 1, 0, 0);
+
+                break;
+            }
             default:
                 break;
         }

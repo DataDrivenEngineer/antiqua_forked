@@ -25,33 +25,7 @@ typedef struct
     V3 posWorld;
     V3 dPos;
     V3 scaleFactor;
-
-    u16 meshModelIndex;
 } Entity;
-
-typedef struct
-{
-    u32 indicesByteOffset;
-    u32 indicesByteLength;
-    u32 indicesCount;
-    u32 posByteOffset;
-    u32 posByteLength;
-} MeshMetadata;
-
-typedef struct
-{
-    MeshMetadata *meshMtd;
-    u32 meshCount;
-
-    u8 *data;
-    u32 dataSize;
-
-    /* NOTE(dima): first 3 members are XYZ of mesh center (global across all meshes);
-                   last float is minY - also global across all meshes */
-    r32 meshCenterAndMinY[4];
-
-    Rect regularAxisAlignedBoundingBox;
-} MeshMdl;
 
 typedef struct
 {
@@ -61,9 +35,6 @@ typedef struct
 
     u32 entityCount;
     Entity entities[256];
-
-    u32 meshModelCount;
-    MeshMdl meshModels[256];
 
     M44 worldMatrix;
     M44 viewMatrix;

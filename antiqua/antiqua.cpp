@@ -141,11 +141,15 @@ internal void MoveEntity(GameState *gameState,
                           0.0f,
                           testEntity->posWorld.z);
 
-            Rect entityRegularAABB = gameState->meshModels[entity->meshModelIndex].regularAxisAlignedBoundingBox;
+            Rect entityRegularAABB;
+            entityRegularAABB.diameterW = gameState->tileSideLength;
+            entityRegularAABB.diameterH = gameState->tileSideLength;
             entityRegularAABB.diameterW *= entity->scaleFactor.x;
             entityRegularAABB.diameterH *= entity->scaleFactor.z;
 
-            Rect testEntityRegularAABB = gameState->meshModels[testEntity->meshModelIndex].regularAxisAlignedBoundingBox;
+            Rect testEntityRegularAABB;
+            testEntityRegularAABB.diameterW = gameState->tileSideLength;
+            testEntityRegularAABB.diameterH = gameState->tileSideLength;
             testEntityRegularAABB.diameterW *= testEntity->scaleFactor.x;
             testEntityRegularAABB.diameterH *= testEntity->scaleFactor.z;
 
@@ -384,12 +388,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #endif
 {
     /* TODO(dima):
-       1. DONE add new struct type: MDLMesh. It should include array of submeshes that the model consists of
-       2. DONE switch mesh loading code to use MDLMesh instead of RenderEntryMesh
-       3. DONE Add logic to a) move center of mesh to 0;0;0 and b) lift mesh up so that all Y-coords are >= 0
-       4. DONE Fix remaining compiler errors
-
-       5. DONE Fix collision detection
     */
 
     ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
@@ -475,15 +473,13 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             newEntity->flags = (EntityFlags)(EntityFlags_Moving | EntityFlags_PlayerControlled);
             newEntity->posWorld = v3(0.0f, 0.0f, 0.0f);
             newEntity->scaleFactor = v3(1.0f, 1.0f, 1.0f);
-            newEntity->meshModelIndex = 0;
             gameState->entityCount++;
         }
         {
             Entity *newEntity = (Entity *)(gameState->entities + gameState->entityCount);
             newEntity->flags = (EntityFlags)(EntityFlags_Static);
             newEntity->posWorld = v3(5.0f, 0.0f, 5.0f);
-            newEntity->scaleFactor = v3(20.0f, 1.0f, 1.0f);
-            newEntity->meshModelIndex = 0;
+            newEntity->scaleFactor = v3(20.0f, 1.0f, 2.0f);
             gameState->entityCount++;
         }
         {
@@ -491,193 +487,10 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             newEntity->flags = (EntityFlags)(EntityFlags_Moving | EntityFlags_Enemy);
             newEntity->posWorld = v3(6.5f, 0.0f, 7.5f);
             newEntity->scaleFactor = v3(1.0f, 2.0f, 1.0f);
-            newEntity->meshModelIndex = 0;
             gameState->entityCount++;
         }
 
         gameState->cameraFollowingEntityIndex = 0;
-
-        MeshMdl *meshModel = (MeshMdl *) (gameState->meshModels + gameState->meshModelCount);
-        gameState->meshModelCount++;
-
-        debug_ReadFileResult mdlFile = {};
-#define FILENAME "data" DIR_SEPARATOR "test_cube.mdl"
-        memory->debug_platformReadEntireFile(thread, &mdlFile, FILENAME);
-#undef FILENAME
-        ASSERT(mdlFile.contentsSize);
-#define MAX_LINE_LENGTH 256
-        s8* line = PUSH_ARRAY(&scratchArena, MAX_LINE_LENGTH, s8);
-        s8 *tmp = PUSH_ARRAY(&scratchArena, MAX_LINE_LENGTH, s8);
-        s8 *l, *fl, *tmpPtr, *linePtr;
-        debug_ReadFileResult binFile = {};
-        b32 binFileRead = false,
-            minCornerRead = false,
-            maxCornerRead = false,
-            meshCountRead = false;
-        V3 minCorner, maxCorner;
-        u32 meshIndex = 0;
-        for (l = line, fl = (s8 *) mdlFile.contents;
-             fl - ((s8 *) mdlFile.contents) <= mdlFile.contentsSize;
-             fl++)
-        {
-            ASSERT(l - line <= MAX_LINE_LENGTH);
-
-            if (*fl == '\n')
-            {
-                if (*line == '#')
-                {
-                    goto continue_loop;
-                }
-
-                if (!binFileRead)
-                {
-                    memory->debug_platformReadEntireFile(thread, &binFile, "data/test_cube.bin");
-                    ASSERT(binFile.contentsSize);
-
-                    meshModel->data = (u8 *)binFile.contents;
-                    meshModel->dataSize = binFile.contentsSize;
-
-                    binFileRead = true;
-                }
-                else if (!meshCountRead)
-                {
-                    linePtr = line;
-                    tmpPtr = tmp;
-                    while (*linePtr != ' ')
-                    {
-                        *tmpPtr++ = *linePtr++;
-                    }
-                    u32 meshCount = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
-                    meshModel->meshCount = meshCount;
-                    meshModel->meshMtd = PUSH_ARRAY(&mdlArena, meshCount, MeshMetadata);
-
-                    meshCountRead = true;
-                }
-                else if (!minCornerRead)
-                {
-                    linePtr = line;
-                    tmpPtr = tmp;
-                    while (*linePtr != ' ')
-                    {
-                        *tmpPtr++ = *linePtr++;
-                    }
-                    *tmpPtr = '\0';
-                    minCorner.x = asciiToR32(tmp);
-
-                    linePtr++;
-                    tmpPtr = tmp;
-                    while (*linePtr != ' ')
-                    {
-                        *tmpPtr++ = *linePtr++;
-                    }
-                    *tmpPtr = '\0';
-                    minCorner.y = asciiToR32(tmp);
-
-                    linePtr++;
-                    tmpPtr = tmp;
-                    while (*linePtr != ' ')
-                    {
-                        *tmpPtr++ = *linePtr++;
-                    }
-                    *tmpPtr = '\0';
-                    minCorner.z = asciiToR32(tmp);
-
-                    minCornerRead = true;
-                }
-                else if (!maxCornerRead)
-                {
-                    linePtr = line;
-                    tmpPtr = tmp;
-                    while (*linePtr != ' ')
-                    {
-                        *tmpPtr++ = *linePtr++;
-                    }
-                    *tmpPtr = '\0';
-                    maxCorner.x = asciiToR32(tmp);
-
-                    linePtr++;
-                    tmpPtr = tmp;
-                    while (*linePtr != ' ')
-                    {
-                        *tmpPtr++ = *linePtr++;
-                    }
-                    *tmpPtr = '\0';
-                    maxCorner.y = asciiToR32(tmp);
-
-                    linePtr++;
-                    tmpPtr = tmp;
-                    while (*linePtr != ' ')
-                    {
-                        *tmpPtr++ = *linePtr++;
-                    }
-                    *tmpPtr = '\0';
-                    maxCorner.z = asciiToR32(tmp);
-
-                    maxCornerRead = true;
-
-                    meshModel->meshCenterAndMinY[0] = (minCorner.x + maxCorner.x) / 2;
-                    meshModel->meshCenterAndMinY[1] = (minCorner.y + maxCorner.y) / 2;
-                    meshModel->meshCenterAndMinY[2] = (minCorner.z + maxCorner.z) / 2;
-                    meshModel->meshCenterAndMinY[3] = minCorner.y;
-
-                    meshModel->regularAxisAlignedBoundingBox.diameterW = maxCorner.x - minCorner.x;
-                    meshModel->regularAxisAlignedBoundingBox.diameterH = maxCorner.z - minCorner.z;
-                }
-                else
-                {
-                    MeshMetadata *meshMtd = meshModel->meshMtd + meshIndex;
-
-                    linePtr = line;
-                    tmpPtr = tmp;
-                    while (*linePtr != ' ')
-                    {
-                        *tmpPtr++ = *linePtr++;
-                    }
-                    meshMtd->indicesByteOffset = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
-
-                    linePtr++;
-                    tmpPtr = tmp;
-                    while (*linePtr != ' ')
-                    {
-                        *tmpPtr++ = *linePtr++;
-                    }
-                    meshMtd->indicesByteLength = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
-
-                    linePtr++;
-                    tmpPtr = tmp;
-                    while (*linePtr != ' ')
-                    {
-                        *tmpPtr++ = *linePtr++;
-                    }
-                    meshMtd->indicesCount = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
-
-                    linePtr++;
-                    tmpPtr = tmp;
-                    while (*linePtr != ' ')
-                    {
-                        *tmpPtr++ = *linePtr++;
-                    }
-                    meshMtd->posByteOffset = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
-
-                    linePtr++;
-                    tmpPtr = tmp;
-                    while (*linePtr != ' ')
-                    {
-                        *tmpPtr++ = *linePtr++;
-                    }
-                    meshMtd->posByteLength = asciiToU32OverflowUnsafe(tmp, tmpPtr - tmp);
-
-                    meshIndex++;
-                }
-                
-continue_loop:
-                l = line;
-            }
-            else
-            {
-                *l++ = *fl;
-            }
-        }
 
         memory->isInitialized = true;
     }
@@ -773,16 +586,11 @@ continue_loop:
         {
             Entity *entity = gameState->entities + entityIndex;
 
-            ASSERT(entity->meshModelIndex < gameState->meshModelCount);
-            MeshMdl *entityMeshMdl = gameState->meshModels + entity->meshModelIndex;
-
-#if 1
-            pushRenderEntryMesh(&renderGroupArena,
+            pushRenderEntryRect(&renderGroupArena,
                                 &renderGroup,
                                 entity->posWorld,
-                                entity->scaleFactor,
-                                entityMeshMdl);
-#endif
+                                entity->scaleFactor.x * gameState->tileSideLength,
+                                entity->scaleFactor.z * gameState->tileSideLength);
         }
     }
     else
@@ -896,16 +704,11 @@ continue_loop:
                 INVALID_CODE_PATH;
             }
 
-            ASSERT(entity->meshModelIndex < gameState->meshModelCount);
-            MeshMdl *entityMeshMdl = gameState->meshModels + entity->meshModelIndex;
-
-#if 1
-            pushRenderEntryMesh(&renderGroupArena,
+            pushRenderEntryRect(&renderGroupArena,
                                 &renderGroup,
                                 entity->posWorld,
-                                entity->scaleFactor,
-                                entityMeshMdl);
-#endif
+                                entity->scaleFactor.x * gameState->tileSideLength,
+                                entity->scaleFactor.z * gameState->tileSideLength);
         }
 
         // NOTE(dima): set up camera to look at entity it follows

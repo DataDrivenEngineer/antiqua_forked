@@ -9,8 +9,8 @@ typedef enum
     RenderGroupEntryType_RenderEntryClear,
     RenderGroupEntryType_RenderEntryPoint,
     RenderGroupEntryType_RenderEntryLine,
-    RenderGroupEntryType_RenderEntryMesh,
-    RenderGroupEntryType_RenderEntryTile
+    RenderGroupEntryType_RenderEntryTile,
+    RenderGroupEntryType_RenderEntryRect
 } RenderGroupEntryType;
 
 typedef struct RenderGroupEntryHeader
@@ -38,23 +38,6 @@ typedef struct
     V3 end;
 } RenderEntryLine;
 
-typedef struct RenderEntryMesh
-{
-    M44 modelMatrix;
-
-    u32 indicesByteOffset;
-    u32 indicesByteLength;
-    u32 indicesCount;
-    u32 posByteOffset;
-    u32 posByteLength;
-
-#define MESH_CENTER_AND_MIN_Y_SIZE 4
-    r32 meshCenterAndMinY[MESH_CENTER_AND_MIN_Y_SIZE];
-
-    u8 *data;
-    u32 dataSize;
-} RenderEntryMesh;
-
 typedef struct
 {
     u32 tileCountPerSide;
@@ -62,6 +45,14 @@ typedef struct
     V3 color;
     V3 originTileCenterPositionWorld;
 } RenderEntryTile;
+
+typedef struct
+{
+    r32 sideLengthW;
+    r32 sideLengthH;
+    V3 rectCenterPositionWorld;
+    V3 color;
+} RenderEntryRect;
 
 typedef struct RenderGroup
 {
