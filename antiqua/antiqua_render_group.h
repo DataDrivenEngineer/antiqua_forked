@@ -10,7 +10,8 @@ typedef enum
     RenderGroupEntryType_RenderEntryPoint,
     RenderGroupEntryType_RenderEntryLine,
     RenderGroupEntryType_RenderEntryTile,
-    RenderGroupEntryType_RenderEntryRect
+    RenderGroupEntryType_RenderEntryRect,
+    RenderGroupEntryType_RenderEntryTextureDebug,
 } RenderGroupEntryType;
 
 typedef struct RenderGroupEntryHeader
@@ -53,6 +54,10 @@ typedef struct
     V3 rectCenterPositionWorld;
     V3 color;
 } RenderEntryRect;
+
+typedef struct
+{
+} RenderEntryTextureDebug;
 
 typedef struct RenderGroup
 {

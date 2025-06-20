@@ -5,24 +5,17 @@
 
 typedef struct State
 {
-  u64 totalMemorySize;
-  void *gameMemoryBlock;
+    u64 totalMemorySize;
+    void *gameMemoryBlock;
 
-  s32 recordingHandle;
-  s32 inputRecordingIndex;
-  s32 playBackHandle;
-  s32 inputPlayingIndex;
+    HWND window;
 
-  b32 toggleFullscreen;
+    u32 windowWidth;
+    u32 windowHeight;
+    b32 windowedMode;
+    b32 windowVisible;
+
 } State;
-
-typedef struct InitRendererData
-{
-    HWND Window;
-    u32 WindowWidth;
-    u32 WindowHeight;
-    GameMemory *Memory;
-} InitRendererData;
 
 internal void FatalError(const char* message)
 {

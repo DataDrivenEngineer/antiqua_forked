@@ -122,3 +122,21 @@ void pushRenderEntryRect(MemoryArena *arena,
     renderGroup->prevHeader = entryHeader;
     entryHeader->next = 0;
 }
+
+void pushRenderEntryTextureDebug(MemoryArena *arena,
+                                 RenderGroup *renderGroup)
+{
+    ASSERT(renderGroup->pushBufferElementCount > 0);
+
+    RenderGroupEntryHeader *entryHeader = PUSH_STRUCT(arena, RenderGroupEntryHeader);
+    entryHeader->type = RenderGroupEntryType_RenderEntryTextureDebug;
+    renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
+    RenderEntryTextureDebug *entry = PUSH_STRUCT(arena, RenderEntryTextureDebug);
+
+    renderGroup->pushBufferSize += sizeof(RenderEntryTextureDebug);
+    renderGroup->pushBufferElementCount++;
+
+    renderGroup->prevHeader->next = entryHeader;
+    renderGroup->prevHeader = entryHeader;
+    entryHeader->next = 0;
+}

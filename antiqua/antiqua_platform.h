@@ -225,9 +225,9 @@ struct RenderGroup;
 // NOTE(dima): data depends on the platform!
 #define INIT_RENDERER(name) void name(void *data)
 typedef INIT_RENDERER(InitRenderer);
-#define RENDER_ON_GPU(name) void name(ThreadContext *thread, struct RenderGroup *renderGroup, s32 width, s32 height)
+#define RENDER_ON_GPU(name) void name(ThreadContext *thread, MemoryArena *arena, struct RenderGroup *renderGroup, s32 width, s32 height)
 typedef RENDER_ON_GPU(RenderOnGPU);
-#define RESIZE_WINDOW(name) void name(void *data)
+#define RESIZE_WINDOW(name) void name(u32 width, u32 height, b32 minimized)
 
 typedef struct
 {

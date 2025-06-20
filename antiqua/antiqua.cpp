@@ -3,7 +3,15 @@
 #include "antiqua_intrinsics.h"
 #include "antiqua_render_group.h"
 
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 #include "antiqua_render_group.cpp"
+
+#define TEXTURE_DEBUG_MODE 1
 
 static void CastRayToClickPositionOnTilemap(GameState *gameState,
                                             r32 drawableWidthWithoutScaleFactor,
@@ -379,6 +387,22 @@ static void UpdateEnemy(GameState *gameState,
 static void UpdateStaticEntity(GameState *gameState,
                                Entity *entity)
 {
+}
+
+internal void MakeNothingsTest(GameMemory *Memory)
+{
+    debug_ReadFileResult TTFFile;
+#define FILENAME "C:/Windows/Fonts/arial.ttf"
+    Memory->debug_platformReadEntireFile(NULL, &TTFFile, FILENAME);
+#undef FILENAME
+    ASSERT(TTFFile.contentsSize != 0);
+
+    stbtt_fontinfo Font;
+    stbtt_InitFont(&Font, (u8 *)TTFFile.contents, stbtt_GetFontOffsetForIndex((u8 *)TTFFile.contents, 0));
+    s32 Width, Height, XOffset, YOffset;
+    u8 *MonoBitmap = stbtt_GetCodepointBitmap(&Font, 0, stbtt_ScaleForPixelHeight(&Font, 128.0f), 'n', &Width, &Height, &XOffset, &YOffset);
+
+    stbtt_FreeBitmap(MonoBitmap, NULL);
 }
 
 #if !XCODE_BUILD && !COMPILER_MSVC

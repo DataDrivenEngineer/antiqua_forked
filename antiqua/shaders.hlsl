@@ -56,6 +56,11 @@ struct VS_OUTPUT_TILE
     float3 color        : COLOR;
 };
 
+struct VS_OUTPUT_TEXTURE_DEBUG
+{
+    
+};
+
 //--------------------------------------------------------------------------------------
 // Vertex Shader
 //--------------------------------------------------------------------------------------
@@ -188,6 +193,19 @@ VS_OUTPUT_RECT vsRect(uint vertexID : SV_VertexID)
     return output;
 }
 
+float4 vsTextureDebug(uint vertexID : SV_VertexID) : SV_POSITION
+{
+#define Z 0.1f
+    float4 outPositions[4];
+    outPositions[2] = float4(-0.5f, -0.5f, Z, 0.5f);
+    outPositions[0] = float4(-0.5f, 0.5f, Z, 0.5f);
+    outPositions[1] = float4(0.5f, 0.5f, Z, 0.5f);
+    outPositions[3] = float4(0.5f, -0.5f, Z, 0.5f);
+#undef Z
+
+    return outPositions[vertexID];
+}
+
 //--------------------------------------------------------------------------------------
 // Pixel Shader
 //--------------------------------------------------------------------------------------
@@ -209,4 +227,9 @@ float4 psTile(VS_OUTPUT_TILE input) : SV_TARGET
 float4 psRect(VS_OUTPUT_RECT input) : SV_TARGET
 {
     return float4(input.color, 1.0f);
+}
+
+float4 psTextureDebug() : SV_TARGET
+{
+    return float4(0.0f, 1.0f, 0.0f, 1.0f);
 }

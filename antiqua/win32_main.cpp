@@ -3,12 +3,17 @@
 #include "win32_antiqua.h"
 #include "antiqua_platform.h"
 
-#define DEBUG_CONSOLE_ENABLED 1
-#define DISPLAY_FRAME_TIME 1
+#define DEBUG_CONSOLE_ENABLED 0
+#define DISPLAY_FRAME_TIME 0
 
-internal b32 GlobalRunning;
+#define _CRTDBG_MAP_ALLOC
+#include <crtdbg.h>
 
-internal State win32State = {};
+internal HWND Window = NULL;
+internal RECT WindowRect;
+
+internal b32 GlobalRunning = false;
+internal b32 FullscreenMode = false;
 
 DEBUG_PLATFORM_FREE_FILE_MEMORY(DEBUGPlatformFreeFileMemory)
 {
@@ -101,6 +106,81 @@ DEBUG_PLATFORM_WRITE_ENTIRE_FILE(DEBUGPlatformWriteEntireFile)
     return(Result);
 }
 
+void ToggleFullscreenWindow()
+{
+    ASSERT(swapChain);
+
+    FPRINTF3(stderr, "ToggleFullscreenWindow -> WindowRect left: %d\n", WindowRect.left);
+    FPRINTF3(stderr, "ToggleFullscreenWindow -> WindowRect top: %d\n", WindowRect.top);
+    FPRINTF3(stderr, "ToggleFullscreenWindow -> WindowRect right - left: %d\n", WindowRect.right - WindowRect.left);
+    FPRINTF3(stderr, "ToggleFullscreenWindow -> WindowRect bottom - top: %d\n", WindowRect.bottom - WindowRect.top);
+
+
+    if (FullscreenMode)
+    {
+        // Restore the window's attributes and size.
+        SetWindowLong(Window, GWL_STYLE, WS_OVERLAPPEDWINDOW);
+        
+        SetWindowPos(
+            Window,
+            HWND_NOTOPMOST,
+            WindowRect.left,
+            WindowRect.top,
+            WindowRect.right - WindowRect.left,
+            WindowRect.bottom - WindowRect.top,
+            SWP_FRAMECHANGED | SWP_NOACTIVATE);
+
+        ShowWindow(Window, SW_NORMAL);
+    }
+    else
+    {
+        // Save the old window rect so we can restore it when exiting fullscreen mode.
+        GetWindowRect(Window, &WindowRect);
+
+        // Make the window borderless so that the client area can fill the screen.
+        SetWindowLong(Window, GWL_STYLE, WS_OVERLAPPEDWINDOW & ~(WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU | WS_THICKFRAME));
+
+        RECT FullscreenWindowRect;
+        // Get the settings of the display on which the app's window is currently displayed
+        ComPtr<IDXGIOutput> Output;
+
+        HRESULT Hr = swapChain->GetContainingOutput(&Output);
+        if (!SUCCEEDED(Hr))
+        {
+            // Get the settings of the primary display
+            DEVMODE devMode = {};
+            devMode.dmSize = sizeof(DEVMODE);
+            EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &devMode);
+
+            FullscreenWindowRect = {
+                devMode.dmPosition.x,
+                devMode.dmPosition.y,
+                devMode.dmPosition.x + static_cast<LONG>(devMode.dmPelsWidth),
+                devMode.dmPosition.y + static_cast<LONG>(devMode.dmPelsHeight)
+            };
+        }
+        else
+        {
+            DXGI_OUTPUT_DESC Desc;
+            ThrowIfFailed(Output->GetDesc(&Desc));
+            FullscreenWindowRect = Desc.DesktopCoordinates;
+        }
+
+        SetWindowPos(
+            Window,
+            HWND_TOPMOST,
+            FullscreenWindowRect.left,
+            FullscreenWindowRect.top,
+            FullscreenWindowRect.right,
+            FullscreenWindowRect.bottom,
+            SWP_FRAMECHANGED | SWP_NOACTIVATE);
+
+
+        ShowWindow(Window, SW_MAXIMIZE);
+    }
+
+    FullscreenMode = !FullscreenMode;
+}
 
 internal void Win32ProcessKeyboardMessage(GameButtonState *NewState, b32 IsDown)
 {
@@ -187,14 +267,14 @@ internal void Win32ProcessPendingMessages(GameControllerInput *NewInput)
                     else if(VKCode == VK_SPACE)
                     {
                     }
-
-#if 0
-                    b32 LeftAltKeyIsDown = raw->data.keyboard.MakeCode & 0x0038;
-                    if((VKCode == VK_F3) && LeftAltKeyIsDown)
+                    else if ((IsDown && VKCode == VK_RETURN))
                     {
-                        GlobalRunning = false;
+                        b32 LeftAltKeyIsDown = raw->data.keyboard.MakeCode & 0x0038;
+                        if (LeftAltKeyIsDown && TearingSupportEnabled)
+                        {
+                            ToggleFullscreenWindow();
+                        }
                     }
-#endif
                 }
 
                 delete[] lpb;
@@ -213,9 +293,26 @@ internal LRESULT CALLBACK WindowProc(HWND Wnd, UINT Msg, WPARAM WParam, LPARAM L
 {
     switch (Msg)
     {
-        case WM_EXITSIZEMOVE:
+        case WM_CREATE:
         {
-            ResizeWindow(&Wnd);
+        } break;
+
+        case WM_SIZE:
+        {
+            RECT ClientRect = {};
+            GetClientRect(Wnd, &ClientRect);
+
+            ResizeWindow(ClientRect.right - ClientRect.left,
+                         ClientRect.bottom - ClientRect.top,
+                         WParam == SIZE_MINIMIZED);
+        } break;
+        case WM_SYSCHAR:
+        {
+            // NOTE(Dima): Do not play beep sound on ALT + Enter
+            if ((WParam == VK_RETURN) && (LParam & (1 << 29)))
+            {
+                return 0;
+            }
         } break;
 
         case WM_DESTROY:
@@ -230,6 +327,9 @@ internal LRESULT CALLBACK WindowProc(HWND Wnd, UINT Msg, WPARAM WParam, LPARAM L
 
 s32 WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine, s32 CmdShow)
 {
+    // Enable run-time memory check for debug builds.
+    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+
     WNDCLASSEXW WndCls = {};
     WndCls.style         = CS_HREDRAW | CS_VREDRAW;
     WndCls.cbSize        = sizeof(WndCls);
@@ -256,7 +356,7 @@ s32 WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine, s3
 	s32 Width  = R.right - R.left;
 	s32 Height = R.bottom - R.top;
 
-	HWND Window = CreateWindowExW(WS_EX_APPWINDOW | WS_EX_NOREDIRECTIONBITMAP,
+	Window = CreateWindowExW(WS_EX_APPWINDOW | WS_EX_NOREDIRECTIONBITMAP,
                                  WndCls.lpszClassName,
                                  L"Antiqua",
                                  WS_OVERLAPPEDWINDOW,
@@ -275,14 +375,14 @@ s32 WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine, s3
 		return -1;
 	}
 
-	ShowWindow(Window, SW_SHOW);
-
     GameMemory gameMemory = {};
     gameMemory.permanentStorageSize = GB(1);
     gameMemory.transientStorageSize = GB(1);
     gameMemory.debug_platformFreeFileMemory = DEBUGPlatformFreeFileMemory;
     gameMemory.debug_platformReadEntireFile = DEBUGPlatformReadEntireFile;
     gameMemory.debug_platformWriteEntireFile = DEBUGPlatformWriteEntireFile;
+
+    State win32_State = {};
 
 #if ANTIQUA_INTERNAL
     LPVOID baseAddress = (LPVOID)GB(2*1024);
@@ -292,24 +392,27 @@ s32 WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine, s3
     // TODO(casey): Handle various memory footprints (USING SYSTEM METRICS)
     // TODO(casey): Use MEM_LARGE_PAGES and call adjust token
     // privileges when not on Windows XP?
-    win32State.totalMemorySize = gameMemory.permanentStorageSize + gameMemory.transientStorageSize;
-    win32State.gameMemoryBlock = VirtualAlloc(baseAddress,
-                                              (size_t)win32State.totalMemorySize,
+    win32_State.totalMemorySize = gameMemory.permanentStorageSize + gameMemory.transientStorageSize;
+    win32_State.gameMemoryBlock = VirtualAlloc(baseAddress,
+                                              (size_t)win32_State.totalMemorySize,
                                               MEM_RESERVE|MEM_COMMIT,
                                               PAGE_READWRITE);
-    gameMemory.permanentStorage = win32State.gameMemoryBlock;
+    gameMemory.permanentStorage = win32_State.gameMemoryBlock;
     gameMemory.transientStorage = (((u8 *)gameMemory.permanentStorage) +
                                    gameMemory.permanentStorageSize);
     gameMemory.renderOnGPU = renderOnGPU;
 
-    InitRendererData Data;
-    Data.Window = Window;
-    Data.WindowWidth = Width;
-    Data.WindowHeight = Height;
-    Data.Memory = &gameMemory;
-    initRenderer(&Data);
+    win32_State.window = Window;
+    win32_State.windowWidth = Width;
+    win32_State.windowHeight = Height;
+    win32_State.windowedMode = true;
+    win32_State.windowVisible = true;
 
-    LARGE_INTEGER Freq, C1, C2, C3;
+    initRenderer(&win32_State);
+
+	ShowWindow(Window, SW_SHOW);
+
+    LARGE_INTEGER Freq, C1, C2;
     QueryPerformanceFrequency(&Freq);
     QueryPerformanceCounter(&C1);
 
@@ -376,16 +479,6 @@ s32 WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine, s3
         updateGameAndRender(&thread, DeltaTimeSec, &NewInput, &soundState, &gameMemory, (r32)Width, (r32)Height);
 
         OldInput = NewInput;
-
-        QueryPerformanceCounter(&C3);
-        r32 TimeItTookToGenFrame = (r32)((r64)(C3.QuadPart - C2.QuadPart) / Freq.QuadPart);
-        // NOTE(dima): if vsync is disabled, force 60 fps
-        // TODO(dima): do not hardcode frametime, resolve it dynamically
-        r32 frameTimeEpsilon = 0.001f;
-        if (TimeItTookToGenFrame < 0.016f)
-        {
-            Sleep((u32)(1000*(0.016f - TimeItTookToGenFrame - frameTimeEpsilon)));
-        }
     }
 
     ExitProcess(0);
