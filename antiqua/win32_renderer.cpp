@@ -7,7 +7,7 @@
 #include "antiqua_render_group.h"
 
 #define CULLING_ENABLED 1
-#define WIREFRAME_MODE_ENABLED 0
+#define WIREFRAME_MODE_ENABLED 1
 
 #define RECT_PIPELINE_STATE_IDX 0
 #define LINE_PIPELINE_STATE_IDX 1
@@ -47,22 +47,46 @@ internal D3D12_RECT scissorRect;
 b32 TearingSupportEnabled;
 
 // Pipeline objects.
-ComPtr<IDXGISwapChain3> swapChain = NULL;
+internal ComPtr<ID3D12Device> device = NULL;
 
-internal ComPtr<ID3D12Device> device;
-internal ComPtr<ID3D12Resource> renderTargets[SWAP_CHAIN_BUFFER_COUNT];
-internal ComPtr<ID3D12CommandAllocator> commandAllocators[SWAP_CHAIN_BUFFER_COUNT];
-internal ComPtr<ID3D12CommandQueue> commandQueue;
-internal ComPtr<ID3D12DescriptorHeap> rtvHeap;
-internal ComPtr<ID3D12PipelineState> pipelineState;
-internal ComPtr<ID3D12GraphicsCommandList> commandList;
+ComPtr<IDXGISwapChain3> swapChain = NULL;
+internal ComPtr<ID3D12Resource> renderTargets[SWAP_CHAIN_BUFFER_COUNT] = { NULL, NULL };
+
+internal ComPtr<ID3D12Resource> depthStencilBuffer = NULL;
+
+internal ComPtr<ID3D12RootSignature> rootSignature = NULL;
+
+internal ComPtr<ID3D12PipelineState> pipelineState[PIPELINE_STATE_COUNT];
+
+internal ComPtr<ID3D12CommandQueue> commandQueue = NULL;
+internal ComPtr<ID3D12CommandAllocator> commandAllocators[SWAP_CHAIN_BUFFER_COUNT] = { NULL, NULL };
+internal ComPtr<ID3D12GraphicsCommandList> commandList = NULL;
+
+internal ComPtr<ID3D12DescriptorHeap> rtvHeap = NULL;
+internal ComPtr<ID3D12DescriptorHeap> dsvHeap = NULL;
+internal ComPtr<ID3D12DescriptorHeap> cbvSrvUavHeap = NULL;
+
 internal u32 rtvDescriptorSize;
+internal u32 dsvDescriptorSize;
+internal u32 cbvSrvUavDescriptorSize;
+internal u32 cbvSrvUavDescriptorHeapTotalSizeForCurrentFrame;
+
+internal ComPtr<ID3D12Resource> renderGroupPerPassCB = NULL;
+internal ComPtr<ID3D12Resource> renderGroupPerObjectCB = NULL;
+
+internal D3D12_RASTERIZER_DESC rasterizerDesc = {};
+internal D3D12_BLEND_DESC blendDesc = {};
 
 // Synchronization objects.
 internal u32 frameIndex;
 internal HANDLE fenceEvent;
 internal ComPtr<ID3D12Fence> fence;
 internal u64 fenceValues[SWAP_CHAIN_BUFFER_COUNT];
+
+// NOTE(dima): application-specific fields
+internal u32 renderGroupVBCurrentSize = 0;
+internal u32 currentCbvSrvUavDescriptorIdx = 0;
+internal u32 currentPerObjectCBOffset = 0;
 
 internal void GetHardwareAdapter(
     IDXGIFactory1* pFactory,
@@ -129,35 +153,122 @@ internal void GetHardwareAdapter(
     *ppAdapter = adapter.Detach();
 }
 
-internal inline D3D12_CPU_DESCRIPTOR_HANDLE
-GetCPUDescriptorHandle(ID3D12DescriptorHeap *Heap, u32 DescriptorSize, u32 DescriptorIdx)
+internal inline D3D12_GPU_DESCRIPTOR_HANDLE
+GetGPUDescriptorHandle(ID3D12DescriptorHeap *heap,
+                       u32 descriptorSize,
+                       u32 descriptorIdx,
+                       u32 frameIdx,
+                       u32 descriptorHeapTotalSizeForCurrentFrame)
 {
-    D3D12_CPU_DESCRIPTOR_HANDLE StartHndl = Heap->GetCPUDescriptorHandleForHeapStart();
-    D3D12_CPU_DESCRIPTOR_HANDLE CurrHndl;
-    CurrHndl.ptr = StartHndl.ptr + DescriptorIdx*DescriptorSize;
+    D3D12_GPU_DESCRIPTOR_HANDLE startHndl = heap->GetGPUDescriptorHandleForHeapStart();
+    D3D12_GPU_DESCRIPTOR_HANDLE currHndl;
+    currHndl.ptr = startHndl.ptr + frameIdx*descriptorHeapTotalSizeForCurrentFrame + descriptorIdx*descriptorSize;
 
-    return CurrHndl;
+    return currHndl;
+}
+
+internal inline D3D12_CPU_DESCRIPTOR_HANDLE
+GetCPUDescriptorHandle(ID3D12DescriptorHeap *heap,
+                       u32 descriptorSize,
+                       u32 descriptorIdx)
+{
+    D3D12_CPU_DESCRIPTOR_HANDLE startHndl = heap->GetCPUDescriptorHandleForHeapStart();
+    D3D12_CPU_DESCRIPTOR_HANDLE currHndl;
+    currHndl.ptr = startHndl.ptr + descriptorIdx*descriptorSize;
+
+    return currHndl;
+}
+
+internal inline D3D12_CPU_DESCRIPTOR_HANDLE
+GetCPUDescriptorHandle(ID3D12DescriptorHeap *heap,
+                       u32 descriptorSize,
+                       u32 descriptorIdx,
+                       u32 frameIdx,
+                       u32 descriptorHeapTotalSizeForCurrentFrame)
+{
+    D3D12_CPU_DESCRIPTOR_HANDLE startHndl = heap->GetCPUDescriptorHandleForHeapStart();
+    D3D12_CPU_DESCRIPTOR_HANDLE currHndl;
+    currHndl.ptr = startHndl.ptr + frameIdx*descriptorHeapTotalSizeForCurrentFrame + descriptorIdx*descriptorSize;
+
+    return currHndl;
+}
+
+internal inline void
+CreateConstantBuffer(u32 size, ID3D12Resource **buffer)
+{
+        D3D12_RESOURCE_DESC	desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Alignment = 0;
+        desc.Width = size;
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_UNKNOWN;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        D3D12_HEAP_PROPERTIES heapProperties = {};
+        heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProperties.CreationNodeMask = 1;
+        heapProperties.VisibleNodeMask = 1;
+
+        ThrowIfFailed(device->CreateCommittedResource(&heapProperties,
+                                                      D3D12_HEAP_FLAG_NONE,
+                                                      &desc,
+                                                      D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                      NULL,
+                                                      IID_PPV_ARGS(buffer)));
+}
+
+internal inline void
+CreateConstantBufferView(ID3D12Resource *buffer,
+                         ID3D12DescriptorHeap *heap,
+                         u32 descriptorSize,
+                         u32 descriptorIdx,
+                         u32 currentCBOffset,
+                         u32 sizeOfDataRoundedToNearest256,
+                         u32 frameIdx,
+                         u32 descriptorHeapTotalSizeForCurrentFrame)
+{
+    D3D12_GPU_VIRTUAL_ADDRESS cbAddress = buffer->GetGPUVirtualAddress() + currentCBOffset;
+    D3D12_CPU_DESCRIPTOR_HANDLE currHndl = GetCPUDescriptorHandle(heap,
+                                                                  descriptorSize,
+                                                                  descriptorIdx,
+                                                                  frameIdx,
+                                                                  descriptorHeapTotalSizeForCurrentFrame);
+
+    D3D12_CONSTANT_BUFFER_VIEW_DESC desc;
+    desc.BufferLocation = cbAddress;
+    desc.SizeInBytes = sizeOfDataRoundedToNearest256;
+
+    device->CreateConstantBufferView(&desc, currHndl);
 }
 
 internal inline D3D12_RESOURCE_BARRIER
-GetResourceTransitionBarrier(ID3D12Resource *Resource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After)
+GetResourceTransitionBarrier(ID3D12Resource *resource,
+                             D3D12_RESOURCE_STATES before,
+                             D3D12_RESOURCE_STATES after)
 {
-    D3D12_RESOURCE_TRANSITION_BARRIER TransitionBarrier = {};
-    TransitionBarrier.pResource = Resource;
-    TransitionBarrier.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    TransitionBarrier.StateBefore = Before;
-    TransitionBarrier.StateAfter = After;
+    D3D12_RESOURCE_TRANSITION_BARRIER transitionBarrier = {};
+    transitionBarrier.pResource = resource;
+    transitionBarrier.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    transitionBarrier.StateBefore = before;
+    transitionBarrier.StateAfter = after;
 
-    D3D12_RESOURCE_BARRIER Barrier = {};
-    Barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    Barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    Barrier.Transition = TransitionBarrier;
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition = transitionBarrier;
 
-    return Barrier;
+    return barrier;
 }
 
 // Wait for pending GPU work to complete.
-internal void WaitForGpu()
+internal inline void WaitForGpu()
 {
     // Schedule a Signal command in the queue.
     HRESULT HR = commandQueue->Signal(fence.Get(), fenceValues[frameIndex]);
@@ -171,6 +282,56 @@ internal void WaitForGpu()
     fenceValues[frameIndex]++;
 }
 
+internal inline void CreateDepthStencilBuffer(s32 windowWidth, s32 windowHeight)
+{
+    depthStencilBuffer.Reset();
+
+    D3D12_RESOURCE_DESC	depthStencilDesc = {};
+    depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    depthStencilDesc.Alignment = 0;
+    depthStencilDesc.Width = windowWidth;
+    depthStencilDesc.Height = windowHeight;
+    depthStencilDesc.DepthOrArraySize = 1;
+    depthStencilDesc.MipLevels = 1;
+    depthStencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    depthStencilDesc.SampleDesc.Count = 1;
+    depthStencilDesc.SampleDesc.Quality = 0;
+    depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+    D3D12_CLEAR_VALUE clear = {};
+    clear.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    clear.DepthStencil.Depth = 1.0f;
+    clear.DepthStencil.Stencil = 0;
+
+    D3D12_HEAP_PROPERTIES heapProperties = {};
+    heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProperties.CreationNodeMask = 1;
+    heapProperties.VisibleNodeMask = 1;
+
+    ThrowIfFailed(device->CreateCommittedResource(&heapProperties,
+                                                  D3D12_HEAP_FLAG_NONE,
+                                                  &depthStencilDesc,
+                                                  D3D12_RESOURCE_STATE_COMMON,
+                                                  &clear,
+                                                  IID_PPV_ARGS(depthStencilBuffer.ReleaseAndGetAddressOf())));
+
+    D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+    dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	dsvDesc.Texture2D.MipSlice = 0;
+
+    device->CreateDepthStencilView(depthStencilBuffer.Get(),
+                                   &dsvDesc,
+                                   dsvHeap->GetCPUDescriptorHandleForHeapStart());
+
+    D3D12_RESOURCE_BARRIER barrier = GetResourceTransitionBarrier(depthStencilBuffer.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    commandList->ResourceBarrier(1, &barrier);
+}
+
 RESIZE_WINDOW(ResizeWindow)
 {
     // Determine if the swap buffers and other resources need to be resized or not.
@@ -178,6 +339,8 @@ RESIZE_WINDOW(ResizeWindow)
     {
         // Flush all current GPU commands.
         WaitForGpu();
+
+        ThrowIfFailed(commandList->Reset(commandAllocators[frameIndex].Get(), NULL));
 
         // Release the resources holding references to the swap chain (requirement of
         // IDXGISwapChain::ResizeBuffers) and reset the frame fence values to the
@@ -235,7 +398,17 @@ RESIZE_WINDOW(ResizeWindow)
 
             // This is where you would create/resize intermediate render targets, depth stencils, or other resources
             // dependent on the window size.
+
+            CreateDepthStencilBuffer(width, height);
         }
+
+        ThrowIfFailed(commandList->Close());
+#define COMMAND_LIST_COUNT 1
+        ID3D12CommandList *ppCommandLists[] = { commandList.Get() };
+        commandQueue->ExecuteCommandLists(COMMAND_LIST_COUNT, ppCommandLists);
+#undef COMMAND_LIST_COUNT
+
+        WaitForGpu();
     }
 
     win32State->windowVisible = !minimized;
@@ -247,6 +420,10 @@ INIT_RENDERER(initRenderer)
     {
         win32State = (State *)data;
     }
+
+    ASSERT(win32State);
+
+    GameMemory *gameMemory = (GameMemory *)win32State->gameMemory;
 
     u32 dxgiFactoryFlags = 0;
 
@@ -339,7 +516,7 @@ INIT_RENDERER(initRenderer)
     ThrowIfFailed(swapChainLocalVar.As(&swapChain));
     frameIndex = swapChain->GetCurrentBackBufferIndex();
 
-    // Create descriptor heaps.
+    // Create RTV descriptor heap
     {
         // Describe and create a render target view (RTV) descriptor heap.
         D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
@@ -349,6 +526,36 @@ INIT_RENDERER(initRenderer)
         ThrowIfFailed(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap)));
 
         rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    }
+
+    // Create DSV descriptor heap
+    {
+        D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
+        dsvHeapDesc.NumDescriptors = 1;
+        dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+        dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        dsvHeapDesc.NodeMask = 0;
+
+        ThrowIfFailed(device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(dsvHeap.ReleaseAndGetAddressOf())));
+
+        dsvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+    }
+
+    // NOTE(dima): create CBV/SRV/UAV Descriptor Heap
+    {
+        // NOTE(dima): descriptor per renderable object + 1 for per pass descriptor + 1 for SRV descriptor
+        // TODO(dima): do not hardcode max renderable object count!
+        u32 maxDescriptorCount = SWAP_CHAIN_BUFFER_COUNT*(256 + 1 + 1);
+
+        D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+        desc.NumDescriptors = maxDescriptorCount;
+        desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        desc.NodeMask = 0;
+
+        ThrowIfFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(cbvSrvUavHeap.ReleaseAndGetAddressOf())));
+
+        cbvSrvUavDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
     // Create frame resources.
@@ -391,6 +598,173 @@ INIT_RENDERER(initRenderer)
         // complete before continuing.
         WaitForGpu();
     }
+
+
+    // NOTE(dima): create root signature
+    {
+        D3D12_DESCRIPTOR_RANGE perPassRange = {};
+        perPassRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        perPassRange.NumDescriptors = 1;
+        perPassRange.BaseShaderRegister = 0;
+        perPassRange.RegisterSpace = 0;
+        perPassRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+        D3D12_DESCRIPTOR_RANGE perObjectRange = {};
+        perObjectRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        perObjectRange.NumDescriptors = 1;
+        perObjectRange.BaseShaderRegister = 1;
+        perObjectRange.RegisterSpace = 0;
+        perObjectRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+        D3D12_ROOT_DESCRIPTOR_TABLE perPassRootDescriptorTable = {};
+        perPassRootDescriptorTable.NumDescriptorRanges = 1;
+        perPassRootDescriptorTable.pDescriptorRanges = &perPassRange;
+
+        D3D12_ROOT_DESCRIPTOR_TABLE perObjectRootDescriptorTable = {};
+        perObjectRootDescriptorTable.NumDescriptorRanges = 1;
+        perObjectRootDescriptorTable.pDescriptorRanges = &perObjectRange;
+
+        D3D12_ROOT_DESCRIPTOR tileRootDescriptor;
+        tileRootDescriptor.ShaderRegister = 2;
+        tileRootDescriptor.RegisterSpace = 0;
+
+        D3D12_ROOT_PARAMETER slotRootParameters[3];
+        slotRootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        slotRootParameters[0].DescriptorTable = perPassRootDescriptorTable;
+        slotRootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+        slotRootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        slotRootParameters[1].DescriptorTable = perObjectRootDescriptorTable;
+        slotRootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+        slotRootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+        slotRootParameters[2].Descriptor = tileRootDescriptor;
+        slotRootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+        D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+        rootSignatureDesc.NumParameters = 3;
+        rootSignatureDesc.pParameters = slotRootParameters;
+        rootSignatureDesc.NumStaticSamplers = 0;
+        rootSignatureDesc.pStaticSamplers = NULL;
+        rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+        ComPtr<ID3DBlob> serializedRootSignature;
+        ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc,
+                                                  D3D_ROOT_SIGNATURE_VERSION_1,
+                                                  serializedRootSignature.ReleaseAndGetAddressOf(),
+                                                  NULL));
+
+        ThrowIfFailed(device->CreateRootSignature(0,
+                                                  serializedRootSignature->GetBufferPointer(),
+                                                  serializedRootSignature->GetBufferSize(),
+                                                  IID_PPV_ARGS(rootSignature.ReleaseAndGetAddressOf())));
+    }
+
+    {
+#if WIREFRAME_MODE_ENABLED
+        rasterizerDesc.FillMode = D3D12_FILL_MODE_WIREFRAME;
+#else
+        rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
+#endif
+#if CULLING_ENABLED
+        rasterizerDesc.FrontCounterClockwise = false;
+        rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+#else
+        rasterizerDesc.FrontCounterClockwise = false;
+        rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+#endif
+        rasterizerDesc.DepthClipEnable = true;
+        rasterizerDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+        rasterizerDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+        rasterizerDesc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+        rasterizerDesc.MultisampleEnable = FALSE;
+        rasterizerDesc.AntialiasedLineEnable = FALSE;
+        rasterizerDesc.ForcedSampleCount = 0;
+        rasterizerDesc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+    }
+
+    {
+        blendDesc.AlphaToCoverageEnable = false;
+        blendDesc.IndependentBlendEnable = false;
+        blendDesc.RenderTarget[0].BlendEnable = false;
+        blendDesc.RenderTarget[0].LogicOpEnable = false;
+        blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+        blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
+        blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+        blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+        blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+        blendDesc.RenderTarget[0].LogicOp = D3D12_LOGIC_OP_NOOP;
+        blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    }
+
+    // NOTE(dima): create per-pass CB
+    CreateConstantBuffer(MAX_RENDER_GROUP_PER_PASS_CB_SIZE,
+                         renderGroupPerPassCB.ReleaseAndGetAddressOf());
+
+    // NOTE(dima): create per-object CB
+    CreateConstantBuffer(MAX_RENDER_GROUP_PER_OBJECT_CB_SIZE,
+                         renderGroupPerObjectCB.ReleaseAndGetAddressOf());
+
+    // NOTE(dima): create PSO for tiles
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+
+        desc.pRootSignature = rootSignature.Get();
+
+        {
+            debug_ReadFileResult vsFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_vshader_tile.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &vsFile, FILENAME);
+#undef FILENAME
+            ASSERT(vsFile.contentsSize);
+
+            desc.VS = { vsFile.contents, vsFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &vsFile);
+        }
+
+        {
+            debug_ReadFileResult psFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_pshader_tile.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &psFile, FILENAME);
+#undef FILENAME
+            ASSERT(psFile.contentsSize);
+
+            desc.PS = { psFile.contents, psFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &psFile);
+        }
+
+        desc.RasterizerState = rasterizerDesc;
+        desc.BlendState = blendDesc;
+
+        {
+            D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+
+            D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
+            depthStencilDesc.DepthEnable = true;  
+            depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+            depthStencilDesc.StencilEnable = false;
+            depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+            depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+            depthStencilDesc.FrontFace = defaultStencilOp;
+            depthStencilDesc.BackFace = defaultStencilOp;
+
+            desc.DepthStencilState = depthStencilDesc;
+        }
+
+        desc.SampleMask = UINT_MAX;
+        desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        desc.NumRenderTargets = 1;
+        desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[TILE_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+    }
 }
 
 RENDER_ON_GPU(renderOnGPU)
@@ -399,6 +773,9 @@ RENDER_ON_GPU(renderOnGPU)
     {
         return;
     }
+
+    // NOTE(dima): descriptor per renderable object + 1 for per pass descriptor + 1 for SRV descriptor
+    cbvSrvUavDescriptorHeapTotalSizeForCurrentFrame = cbvSrvUavDescriptorSize*(renderGroup->pushBufferElementCount + 1 + 1);
 
     // Populate command list
     {
@@ -410,19 +787,152 @@ RENDER_ON_GPU(renderOnGPU)
         // However, when ExecuteCommandList() is called on a particular command 
         // list, that command list can then be reset at any time and must be before 
         // re-recording.
-        ThrowIfFailed(commandList->Reset(commandAllocators[frameIndex].Get(), pipelineState.Get()));
+        ThrowIfFailed(commandList->Reset(commandAllocators[frameIndex].Get(), NULL));
 
         // Indicate that the back buffer will be used as a render target.
         D3D12_RESOURCE_BARRIER Barrier = GetResourceTransitionBarrier(renderTargets[frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
         commandList->ResourceBarrier(1, &Barrier);
 
+        commandList->RSSetViewports(1, &viewport);
+        commandList->RSSetScissorRects(1, &scissorRect);
+
+        renderGroupVBCurrentSize = 0;
+        currentCbvSrvUavDescriptorIdx = 0;
+        currentPerObjectCBOffset = 0;
+
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetCPUDescriptorHandle(rtvHeap.Get(),
                                                                        rtvDescriptorSize,
                                                                        frameIndex);
 
-        // Record commands.
-        r32 clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-        commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, NULL);
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+        commandList->ClearDepthStencilView(dsvHandle,
+                                           D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL,
+                                           1.0f,
+                                           0,
+                                           0,
+                                           NULL);
+
+        commandList->OMSetRenderTargets(1, &rtvHandle, true, &dsvHandle);
+
+#define CBV_SRV_UAV_HEAP_COUNT 1
+        ID3D12DescriptorHeap** cbvSrvUavHeaps = PUSH_ARRAY(arena, CBV_SRV_UAV_HEAP_COUNT, ID3D12DescriptorHeap *);
+        cbvSrvUavHeaps[0] = cbvSrvUavHeap.Get();
+        commandList->SetDescriptorHeaps(CBV_SRV_UAV_HEAP_COUNT, cbvSrvUavHeaps);
+#undef CBV_SRV_UAV_HEAP_COUNT
+
+        commandList->SetGraphicsRootSignature(rootSignature.Get());
+
+        D3D12_GPU_DESCRIPTOR_HANDLE perPassCBVGPUHndl = GetGPUDescriptorHandle(cbvSrvUavHeap.Get(),
+                                                                               cbvSrvUavDescriptorSize,
+                                                                               0,
+                                                                               frameIndex,
+                                                                               cbvSrvUavDescriptorHeapTotalSizeForCurrentFrame);
+
+        commandList->SetGraphicsRootDescriptorTable(0, perPassCBVGPUHndl);
+
+        // NOTE(dima): populate per-pass CB
+        {
+            u8 *mappedData;
+            ThrowIfFailed(renderGroupPerPassCB->Map(0, NULL, (void **)&mappedData));
+
+            u32 dataLength = sizeof(renderGroup->uniforms);
+            memcpy(mappedData, renderGroup->uniforms, dataLength);
+            memcpy(mappedData + dataLength, &viewport.Width, sizeof(viewport.Width));
+            memcpy(mappedData + dataLength + sizeof(viewport.Width), &viewport.Height, sizeof(viewport.Height));
+
+            renderGroupPerPassCB->Unmap(0, NULL);
+
+            u32 sizeOfData = RoundToNearestMultipleOf256(sizeof(renderGroup->uniforms) + sizeof(viewport.Width) + sizeof(viewport.Height));
+            CreateConstantBufferView(renderGroupPerPassCB.Get(),
+                                     cbvSrvUavHeap.Get(),
+                                     cbvSrvUavDescriptorSize,
+                                     currentCbvSrvUavDescriptorIdx,
+                                     0,
+                                     sizeOfData,
+                                     frameIndex,
+                                     cbvSrvUavDescriptorHeapTotalSizeForCurrentFrame);
+            ++currentCbvSrvUavDescriptorIdx;
+        }
+
+        // NOTE(dima): draw render items
+        RenderGroupEntryHeader *entryHeader = (RenderGroupEntryHeader *)renderGroup->pushBufferBase;
+        while (entryHeader)
+        {
+            ASSERT(renderGroupVBCurrentSize < MAX_RENDER_GROUP_VB_SIZE);
+            ASSERT(currentPerObjectCBOffset < MAX_RENDER_GROUP_PER_OBJECT_CB_SIZE);
+
+            switch (entryHeader->type)
+            {
+                case RenderGroupEntryType_RenderEntryClear:
+                {
+                    RenderEntryClear *entry = (RenderEntryClear *)(entryHeader + 1);
+
+                    commandList->ClearRenderTargetView(rtvHandle, (r32 *)&entry->color, 0, NULL);
+
+                    break;
+                }
+#if 1
+                case RenderGroupEntryType_RenderEntryTile:
+                {
+                    commandList->SetPipelineState(pipelineState[TILE_PIPELINE_STATE_IDX].Get());
+
+                    RenderEntryTile *entry = (RenderEntryTile *)(entryHeader + 1);
+
+                    D3D12_GPU_VIRTUAL_ADDRESS cbAddress = renderGroupPerObjectCB->GetGPUVirtualAddress() 
+                                                          + currentPerObjectCBOffset;
+                    commandList->SetGraphicsRootConstantBufferView(2, cbAddress);
+
+                    {
+                        u32 lengthOfTileCountPerSide = sizeof(entry->tileCountPerSide);
+                        u32 lengthOfTileSideLength = sizeof(entry->tileSideLength);
+                        u32 lengthOfTileColor = sizeof(entry->color);
+                        u32 lengthOfOriginTileCenterPositionWorld = sizeof(entry->originTileCenterPositionWorld);
+                        u32 totalSize = RoundToNearestMultipleOf256(lengthOfTileCountPerSide
+                                                                    + lengthOfTileSideLength
+                                                                    + lengthOfTileColor
+                                                                    + lengthOfOriginTileCenterPositionWorld);
+                        u8 *mappedData;
+                        ThrowIfFailed(renderGroupPerObjectCB->Map(0, NULL, (void **)&mappedData));
+
+                        mappedData += currentPerObjectCBOffset;
+                        memcpy(mappedData, &entry->color, lengthOfTileColor);
+                        mappedData += lengthOfTileColor
+                                      // NOTE(dima): padding to respect HLSL constant buffer's memory alignment rules
+                                      + sizeof(r32);
+                        memcpy(mappedData, &entry->originTileCenterPositionWorld, lengthOfOriginTileCenterPositionWorld);
+                        mappedData += lengthOfOriginTileCenterPositionWorld;
+                        memcpy(mappedData, &entry->tileCountPerSide, lengthOfTileCountPerSide);
+                        mappedData += lengthOfTileCountPerSide;
+                        memcpy(mappedData, &entry->tileSideLength, lengthOfTileSideLength);
+
+                        renderGroupPerObjectCB->Unmap(0, NULL);
+
+                        // NOTE(dima): create CBV for the data we just copied
+                        CreateConstantBufferView(renderGroupPerObjectCB.Get(),
+                                                 cbvSrvUavHeap.Get(),
+                                                 cbvSrvUavDescriptorSize,
+                                                 currentCbvSrvUavDescriptorIdx,
+                                                 currentPerObjectCBOffset,
+                                                 totalSize,
+                                                 frameIndex,
+                                                 cbvSrvUavDescriptorHeapTotalSizeForCurrentFrame);
+                        ++currentCbvSrvUavDescriptorIdx;
+
+                        currentPerObjectCBOffset += totalSize;
+                    }
+
+                    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+                    commandList->DrawInstanced(4, entry->tileCountPerSide * entry->tileCountPerSide, 0, 0);
+
+                } break;
+#endif
+                default:
+                    break;
+            }
+
+            entryHeader = entryHeader->next;
+        }
 
         // Indicate that the back buffer will now be used to present.
         Barrier = GetResourceTransitionBarrier(renderTargets[frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
@@ -432,11 +942,11 @@ RENDER_ON_GPU(renderOnGPU)
     }
 
     // Execute the command list.
-#define COUNT_OF_COMMAND_LISTS 1
-    ID3D12CommandList** ppCommandLists = PUSH_ARRAY(arena, COUNT_OF_COMMAND_LISTS, ID3D12CommandList *);
+#define COMMAND_LIST_COUNT 1
+    ID3D12CommandList** ppCommandLists = PUSH_ARRAY(arena, COMMAND_LIST_COUNT, ID3D12CommandList *);
     ppCommandLists[0] = commandList.Get();
-    commandQueue->ExecuteCommandLists(COUNT_OF_COMMAND_LISTS, ppCommandLists);
-#undef COUNT_OF_COMMAND_LISTS
+    commandQueue->ExecuteCommandLists(COMMAND_LIST_COUNT, ppCommandLists);
+#undef COMMAND_LIST_COUNT
 
     // When using sync interval 0, it is recommended to always pass the tearing
     // flag when it is supported, even when presenting in windowed mode.

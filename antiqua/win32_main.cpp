@@ -392,15 +392,17 @@ s32 WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine, s3
     // TODO(casey): Handle various memory footprints (USING SYSTEM METRICS)
     // TODO(casey): Use MEM_LARGE_PAGES and call adjust token
     // privileges when not on Windows XP?
-    win32_State.totalMemorySize = gameMemory.permanentStorageSize + gameMemory.transientStorageSize;
-    win32_State.gameMemoryBlock = VirtualAlloc(baseAddress,
-                                              (size_t)win32_State.totalMemorySize,
-                                              MEM_RESERVE|MEM_COMMIT,
-                                              PAGE_READWRITE);
-    gameMemory.permanentStorage = win32_State.gameMemoryBlock;
+    u64 totalMemorySize = gameMemory.permanentStorageSize + gameMemory.transientStorageSize;
+    void *gameMemoryBlock = VirtualAlloc(baseAddress,
+                                         (size_t)totalMemorySize,
+                                         MEM_RESERVE|MEM_COMMIT,
+                                         PAGE_READWRITE);
+    gameMemory.permanentStorage = gameMemoryBlock;
     gameMemory.transientStorage = (((u8 *)gameMemory.permanentStorage) +
                                    gameMemory.permanentStorageSize);
     gameMemory.renderOnGPU = renderOnGPU;
+
+    win32_State.gameMemory = &gameMemory;
 
     win32_State.window = Window;
     win32_State.windowWidth = Width;

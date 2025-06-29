@@ -5,8 +5,7 @@
 
 typedef struct State
 {
-    u64 totalMemorySize;
-    void *gameMemoryBlock;
+    GameMemory *gameMemory;
 
     HWND window;
 

@@ -869,7 +869,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     renderGroup.uniforms[0] = gameState->viewMatrix;
     renderGroup.uniforms[1] = gameState->projectionMatrix;
 
-    memory->renderOnGPU(0, &renderGroup, (s32)drawableWidthWithoutScaleFactor, (s32)drawableHeightWithoutScaleFactor);
+    memory->renderOnGPU(0, &renderGroupArena, &renderGroup, (s32)drawableWidthWithoutScaleFactor, (s32)drawableHeightWithoutScaleFactor);
 
     // TODO(dima): on macos make everything run on the same thread. Get rid of these locks!!!
 #if COMPILER_LLVM
