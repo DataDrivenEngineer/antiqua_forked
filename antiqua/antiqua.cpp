@@ -858,6 +858,11 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                              v3(1.0f, 1.0f, 0.0f));
     }
 
+#if TEXTURE_DEBUG_MODE
+    pushRenderEntryTextureDebug(&renderGroupArena,
+                                &renderGroup);
+#endif
+
 #if 0
     pushRenderEntryPoint(&renderGroupArena,
                          &renderGroup,

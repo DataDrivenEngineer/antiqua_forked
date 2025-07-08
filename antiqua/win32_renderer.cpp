@@ -7,7 +7,7 @@
 #include "antiqua_render_group.h"
 
 #define CULLING_ENABLED 1
-#define WIREFRAME_MODE_ENABLED 1
+#define WIREFRAME_MODE_ENABLED 0
 
 #define RECT_PIPELINE_STATE_IDX 0
 #define LINE_PIPELINE_STATE_IDX 1
@@ -73,6 +73,8 @@ internal u32 cbvSrvUavDescriptorHeapTotalSizeForCurrentFrame;
 
 internal ComPtr<ID3D12Resource> renderGroupPerPassCB = NULL;
 internal ComPtr<ID3D12Resource> renderGroupPerObjectCB = NULL;
+
+internal ComPtr<ID3D12Resource> renderGroupVb;
 
 internal D3D12_RASTERIZER_DESC rasterizerDesc = {};
 internal D3D12_BLEND_DESC blendDesc = {};
@@ -194,34 +196,34 @@ GetCPUDescriptorHandle(ID3D12DescriptorHeap *heap,
 }
 
 internal inline void
-CreateConstantBuffer(u32 size, ID3D12Resource **buffer)
+CreateBuffer(u32 size, ID3D12Resource **buffer)
 {
-        D3D12_RESOURCE_DESC	desc = {};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Alignment = 0;
-        desc.Width = size;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.Format = DXGI_FORMAT_UNKNOWN;
-        desc.SampleDesc.Count = 1;
-        desc.SampleDesc.Quality = 0;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    D3D12_RESOURCE_DESC	desc = {};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Alignment = 0;
+    desc.Width = size;
+    desc.Height = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_UNKNOWN;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-        D3D12_HEAP_PROPERTIES heapProperties = {};
-        heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProperties.CreationNodeMask = 1;
-        heapProperties.VisibleNodeMask = 1;
+    D3D12_HEAP_PROPERTIES heapProperties = {};
+    heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+    heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProperties.CreationNodeMask = 1;
+    heapProperties.VisibleNodeMask = 1;
 
-        ThrowIfFailed(device->CreateCommittedResource(&heapProperties,
-                                                      D3D12_HEAP_FLAG_NONE,
-                                                      &desc,
-                                                      D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                      NULL,
-                                                      IID_PPV_ARGS(buffer)));
+    ThrowIfFailed(device->CreateCommittedResource(&heapProperties,
+                                                  D3D12_HEAP_FLAG_NONE,
+                                                  &desc,
+                                                  D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                  NULL,
+                                                  IID_PPV_ARGS(buffer)));
 }
 
 internal inline void
@@ -599,6 +601,9 @@ INIT_RENDERER(initRenderer)
         WaitForGpu();
     }
 
+    // NOTE(dima): create VB
+    CreateBuffer(MAX_RENDER_GROUP_VB_SIZE,
+                 renderGroupVb.ReleaseAndGetAddressOf());
 
     // NOTE(dima): create root signature
     {
@@ -699,12 +704,207 @@ INIT_RENDERER(initRenderer)
     }
 
     // NOTE(dima): create per-pass CB
-    CreateConstantBuffer(MAX_RENDER_GROUP_PER_PASS_CB_SIZE,
-                         renderGroupPerPassCB.ReleaseAndGetAddressOf());
+    CreateBuffer(MAX_RENDER_GROUP_PER_PASS_CB_SIZE,
+                 renderGroupPerPassCB.ReleaseAndGetAddressOf());
 
     // NOTE(dima): create per-object CB
-    CreateConstantBuffer(MAX_RENDER_GROUP_PER_OBJECT_CB_SIZE,
-                         renderGroupPerObjectCB.ReleaseAndGetAddressOf());
+    CreateBuffer(MAX_RENDER_GROUP_PER_OBJECT_CB_SIZE,
+                 renderGroupPerObjectCB.ReleaseAndGetAddressOf());
+
+    // Create PSO for rects
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+
+        desc.pRootSignature = rootSignature.Get();
+
+        {
+            debug_ReadFileResult vsFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_vshader_rect.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &vsFile, FILENAME);
+#undef FILENAME
+            ASSERT(vsFile.contentsSize);
+
+            desc.VS = { vsFile.contents, vsFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &vsFile);
+        }
+
+        {
+            debug_ReadFileResult psFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_pshader_rect.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &psFile, FILENAME);
+#undef FILENAME
+            ASSERT(psFile.contentsSize);
+
+            desc.PS = { psFile.contents, psFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &psFile);
+        }
+
+        desc.RasterizerState = rasterizerDesc;
+        desc.BlendState = blendDesc;
+
+        {
+            D3D12_DEPTH_STENCILOP_DESC DefaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+
+            D3D12_DEPTH_STENCIL_DESC DepthStencilDesc = {};
+            DepthStencilDesc.DepthEnable = true;  
+            DepthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            DepthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+            DepthStencilDesc.StencilEnable = false;
+            DepthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+            DepthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+            DepthStencilDesc.FrontFace = DefaultStencilOp;
+            DepthStencilDesc.BackFace = DefaultStencilOp;
+
+            desc.DepthStencilState = DepthStencilDesc;
+        }
+
+        desc.SampleMask = UINT_MAX;
+        desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        desc.NumRenderTargets = 1;
+        desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[RECT_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+    }
+
+    // Create PSO for lines
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+
+        {
+            D3D12_INPUT_ELEMENT_DESC InputLayout[] = { { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+                                                       { "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 } };
+
+            desc.InputLayout = { InputLayout, ARRAY_COUNT(InputLayout) };
+        }
+
+        desc.pRootSignature = rootSignature.Get();
+
+        {
+            debug_ReadFileResult vsFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_vshader_line.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &vsFile, FILENAME);
+#undef FILENAME
+            ASSERT(vsFile.contentsSize);
+
+            desc.VS = { vsFile.contents, vsFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &vsFile);
+        }
+
+        {
+            debug_ReadFileResult psFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_pshader_line.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &psFile, FILENAME);
+#undef FILENAME
+            ASSERT(psFile.contentsSize);
+
+            desc.PS = { psFile.contents, psFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &psFile);
+        }
+
+        desc.RasterizerState = rasterizerDesc;
+        desc.BlendState = blendDesc;
+
+        {
+            D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+
+            D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
+            depthStencilDesc.DepthEnable = true;
+            depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+            depthStencilDesc.StencilEnable = false;
+            depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+            depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+            depthStencilDesc.FrontFace = defaultStencilOp;
+            depthStencilDesc.BackFace = defaultStencilOp;
+
+            desc.DepthStencilState = depthStencilDesc;
+        }
+
+        desc.SampleMask = UINT_MAX;
+        desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+        desc.NumRenderTargets = 1;
+        desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[LINE_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+    }
+
+    // Create PSO for points
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+
+        {
+            D3D12_INPUT_ELEMENT_DESC InputLayout[] = { { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+                                                       { "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 } };
+
+            desc.InputLayout = { InputLayout, ARRAY_COUNT(InputLayout) };
+        }
+
+        desc.pRootSignature = rootSignature.Get();
+
+        {
+            debug_ReadFileResult vsFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_vshader_point.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &vsFile, FILENAME);
+#undef FILENAME
+            ASSERT(vsFile.contentsSize);
+
+            desc.VS = { vsFile.contents, vsFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &vsFile);
+        }
+
+        {
+            debug_ReadFileResult psFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_pshader_point.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &psFile, FILENAME);
+#undef FILENAME
+            ASSERT(psFile.contentsSize);
+
+            desc.PS = { psFile.contents, psFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &psFile);
+        }
+
+        desc.RasterizerState = rasterizerDesc;
+        desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+        desc.BlendState = blendDesc;
+
+        {
+            D3D12_DEPTH_STENCILOP_DESC DefaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+
+            D3D12_DEPTH_STENCIL_DESC DepthStencilDesc = {};
+            DepthStencilDesc.DepthEnable = true;
+            DepthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            DepthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+            DepthStencilDesc.StencilEnable = false;
+            DepthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+            DepthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+            DepthStencilDesc.FrontFace = DefaultStencilOp;
+            DepthStencilDesc.BackFace = DefaultStencilOp;
+
+            desc.DepthStencilState = DepthStencilDesc;
+        }
+
+        desc.SampleMask = UINT_MAX;
+        desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        desc.NumRenderTargets = 1;
+        desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[POINT_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+    }
 
     // NOTE(dima): create PSO for tiles
     {
@@ -764,6 +964,66 @@ INIT_RENDERER(initRenderer)
         desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
         ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[TILE_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+    }
+
+    // NOTE(dima): create PSO for debugging textures
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+
+        desc.pRootSignature = rootSignature.Get();
+
+        {
+            debug_ReadFileResult vsFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_vshader_texture_debug.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &vsFile, FILENAME);
+#undef FILENAME
+            ASSERT(vsFile.contentsSize);
+
+            desc.VS = { vsFile.contents, vsFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &vsFile);
+        }
+
+        {
+            debug_ReadFileResult psFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_pshader_texture_debug.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &psFile, FILENAME);
+#undef FILENAME
+            ASSERT(psFile.contentsSize);
+
+            desc.PS = { psFile.contents, psFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &psFile);
+        }
+
+        desc.RasterizerState = rasterizerDesc;
+        desc.BlendState = blendDesc;
+
+        {
+            D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+
+            D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
+            depthStencilDesc.DepthEnable = false;
+            depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+            depthStencilDesc.StencilEnable = false;
+            depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+            depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+            depthStencilDesc.FrontFace = defaultStencilOp;
+            depthStencilDesc.BackFace = defaultStencilOp;
+
+            desc.DepthStencilState = depthStencilDesc;
+        }
+
+        desc.SampleMask = UINT_MAX;
+        desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        desc.NumRenderTargets = 1;
+        desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[TEXTURE_DEBUG_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
     }
 }
 
@@ -871,7 +1131,97 @@ RENDER_ON_GPU(renderOnGPU)
 
                     break;
                 }
-#if 1
+
+                case RenderGroupEntryType_RenderEntryPoint:
+                {
+                    commandList->SetPipelineState(pipelineState[POINT_PIPELINE_STATE_IDX].Get());
+
+                    RenderEntryPoint *entry = (RenderEntryPoint *)(entryHeader + 1);
+
+                    u32 renderGroupVBStartOffset = renderGroupVBCurrentSize;
+                    {
+                        r32 vertices[4 * 3 * 2];
+                        V4 pointPosCamera = v4(entry->position.x,
+                                               entry->position.y,
+                                               entry->position.z,
+                                               1.0f);
+                        memcpy(vertices, (void*)&entry->position, sizeof(V3));
+                        memcpy(vertices + 3, (void*)&entry->color, sizeof(entry->color));
+                        memcpy(vertices + 6, (void*)&entry->position, sizeof(V3));
+                        memcpy(vertices + 9, (void*)&entry->color, sizeof(entry->color));
+                        memcpy(vertices + 12, (void*)&entry->position, sizeof(V3));
+                        memcpy(vertices + 15, (void*)&entry->color, sizeof(entry->color));
+                        memcpy(vertices + 18, (void*)&entry->position, sizeof(V3));
+                        memcpy(vertices + 21, (void*)&entry->color, sizeof(entry->color));
+
+                        u32 sizeOfData = sizeof(r32)*ARRAY_COUNT(vertices);
+                        renderGroupVBCurrentSize += sizeOfData;
+
+                        u8 *mappedData;
+                        ThrowIfFailed(renderGroupVb->Map(0, NULL, (void **)&mappedData));
+                        mappedData += renderGroupVBStartOffset;
+
+                        memcpy(mappedData, vertices, sizeOfData);
+
+                        renderGroupVb->Unmap(0, NULL);
+
+                        D3D12_VERTEX_BUFFER_VIEW view;
+                        view.BufferLocation = renderGroupVb->GetGPUVirtualAddress() + renderGroupVBStartOffset;
+                        view.SizeInBytes = renderGroupVBCurrentSize - renderGroupVBStartOffset;
+                        // TODO(dima): currently, will have to modify this every time InputLayout changes
+                        view.StrideInBytes = 2*sizeof(V3);
+
+                        commandList->IASetVertexBuffers(0, 1, &view);
+                    }
+
+                    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+                    commandList->DrawInstanced(4, 1, 0, 0);
+
+                    break;
+                }
+
+                case RenderGroupEntryType_RenderEntryLine:
+                {
+                    commandList->SetPipelineState(pipelineState[LINE_PIPELINE_STATE_IDX].Get());
+
+                    RenderEntryLine *entry = (RenderEntryLine *)(entryHeader + 1);
+
+                    u32 renderGroupVBStartOffset = renderGroupVBCurrentSize;
+                    {
+                        r32 vertices[2 * 3 * 2];
+                        memcpy(vertices, (void*)&entry->start, sizeof(entry->start));
+                        memcpy(vertices + 3, (void*)&entry->color, sizeof(entry->color));
+                        memcpy(vertices + 6, (void*)&entry->end, sizeof(entry->end));
+                        memcpy(vertices + 9, (void*)&entry->color, sizeof(entry->color));
+
+                        u32 sizeOfData = sizeof(r32)*ARRAY_COUNT(vertices);
+                        renderGroupVBCurrentSize += sizeOfData;
+
+                        u8 *mappedData;
+                        ThrowIfFailed(renderGroupVb->Map(0, NULL, (void **)&mappedData));
+                        mappedData += renderGroupVBStartOffset;
+
+                        memcpy(mappedData, vertices, sizeOfData);
+
+                        renderGroupVb->Unmap(0, NULL);
+
+                        D3D12_VERTEX_BUFFER_VIEW view;
+                        view.BufferLocation = renderGroupVb->GetGPUVirtualAddress() + renderGroupVBStartOffset;
+                        view.SizeInBytes = renderGroupVBCurrentSize - renderGroupVBStartOffset;
+                        // TODO(dima): currently, will have to modify this every time InputLayout changes
+                        view.StrideInBytes = 2*sizeof(V3);
+
+                        commandList->IASetVertexBuffers(0, 1, &view);
+                    }
+
+                    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+
+                    commandList->DrawInstanced(2, 1, 0, 0);
+
+                    break;
+                }
+
                 case RenderGroupEntryType_RenderEntryTile:
                 {
                     commandList->SetPipelineState(pipelineState[TILE_PIPELINE_STATE_IDX].Get());
@@ -926,7 +1276,82 @@ RENDER_ON_GPU(renderOnGPU)
                     commandList->DrawInstanced(4, entry->tileCountPerSide * entry->tileCountPerSide, 0, 0);
 
                 } break;
-#endif
+
+                case RenderGroupEntryType_RenderEntryRect:
+                {
+                    commandList->SetPipelineState(pipelineState[RECT_PIPELINE_STATE_IDX].Get());
+
+                    RenderEntryRect *entry = (RenderEntryRect *)(entryHeader + 1);
+
+                    D3D12_GPU_DESCRIPTOR_HANDLE perObjectCbvGpuHndl = GetGPUDescriptorHandle(cbvSrvUavHeap.Get(),
+                                                                                             cbvSrvUavDescriptorSize,
+                                                                                             currentCbvSrvUavDescriptorIdx,
+                                                                                             frameIndex,
+                                                                                             cbvSrvUavDescriptorHeapTotalSizeForCurrentFrame);
+                    commandList->SetGraphicsRootDescriptorTable(1, perObjectCbvGpuHndl);
+
+                    {
+                        u32 sideLengthWLength = sizeof(entry->sideLengthW);
+                        u32 sideLengthHLength = sizeof(entry->sideLengthH);
+                        u32 rectCenterPositionWorldLength = sizeof(entry->rectCenterPositionWorld);
+                        u32 colorLength = sizeof(entry->color);
+                        u32 totalSize = RoundToNearestMultipleOf256(sideLengthWLength
+                                                                    + sideLengthHLength
+                                                                    + rectCenterPositionWorldLength
+                                                                    + colorLength);
+
+                        u8 *mappedData;
+                        ThrowIfFailed(renderGroupPerObjectCB->Map(0, NULL, (void **)&mappedData));
+
+                        mappedData += currentPerObjectCBOffset;
+
+                        memcpy(mappedData, &entry->rectCenterPositionWorld, rectCenterPositionWorldLength);
+                        mappedData += rectCenterPositionWorldLength;
+
+                        memcpy(mappedData, &entry->sideLengthW, sideLengthWLength);
+                        mappedData += sideLengthWLength;
+
+                        memcpy(mappedData, &entry->color, colorLength);
+                        mappedData += colorLength;
+
+                        memcpy(mappedData, &entry->sideLengthH, sideLengthHLength);
+
+                        renderGroupPerObjectCB->Unmap(0, NULL);
+
+                        // NOTE(dima): create CBV for the data we just copied
+                        CreateConstantBufferView(renderGroupPerObjectCB.Get(),
+                                                 cbvSrvUavHeap.Get(),
+                                                 cbvSrvUavDescriptorSize,
+                                                 currentCbvSrvUavDescriptorIdx,
+                                                 currentPerObjectCBOffset,
+                                                 totalSize,
+                                                 frameIndex,
+                                                 cbvSrvUavDescriptorHeapTotalSizeForCurrentFrame);
+                        ++currentCbvSrvUavDescriptorIdx;
+
+                        currentPerObjectCBOffset += totalSize;
+                    }
+
+                    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+                    commandList->DrawInstanced(4, 1, 0, 0);
+
+                    break;
+                }
+
+                case RenderGroupEntryType_RenderEntryTextureDebug:
+                {
+                    commandList->SetPipelineState(pipelineState[TEXTURE_DEBUG_PIPELINE_STATE_IDX].Get());
+
+                    RenderEntryTextureDebug *entry = (RenderEntryTextureDebug *)(entryHeader + 1);
+
+                    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+                    commandList->DrawInstanced(4, 1, 0, 0);
+
+                    break;
+                }
+
                 default:
                     break;
             }
