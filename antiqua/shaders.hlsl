@@ -25,6 +25,9 @@ cbuffer cbPerTile : register(b2)
     float           tileSideLength;
 };
 
+Texture2D g_texture : register(t0);
+SamplerState g_sampler : register(s0);
+
 #define NORMALIZE(OldValue, OldMin, NewRange, OldRange, NewMin) ((((OldValue) - (OldMin)) * (NewRange)) / (OldRange)) + (NewMin) 
 
 #define POINT_SIZE_PX 10
@@ -58,7 +61,8 @@ struct VS_OUTPUT_TILE
 
 struct VS_OUTPUT_TEXTURE_DEBUG
 {
-    
+    float4 position : SV_POSITION;
+    float2 uv : TEXCOORD;
 };
 
 //--------------------------------------------------------------------------------------
@@ -193,17 +197,35 @@ VS_OUTPUT_RECT vsRect(uint vertexID : SV_VertexID)
     return output;
 }
 
-float4 vsTextureDebug(uint vertexID : SV_VertexID) : SV_POSITION
+VS_OUTPUT_TEXTURE_DEBUG vsTextureDebug(uint vertexID : SV_VertexID)
 {
+
+    VS_OUTPUT_TEXTURE_DEBUG output;
 #define Z 0.1f
     float4 outPositions[4];
-    outPositions[2] = float4(-0.5f, -0.5f, Z, 0.5f);
-    outPositions[0] = float4(-0.5f, 0.5f, Z, 0.5f);
-    outPositions[1] = float4(0.5f, 0.5f, Z, 0.5f);
-    outPositions[3] = float4(0.5f, -0.5f, Z, 0.5f);
+#if 0
+    outPositions[2] = float4(-0.5f, -0.5f, Z, 1.0f);
+    outPositions[0] = float4(-0.5f, 0.5f, Z, 1.0f);
+    outPositions[1] = float4(0.5f, 0.5f, Z, 1.0f);
+    outPositions[3] = float4(0.5f, -0.5f, Z, 1.0f);
+#else
+    outPositions[2] = float4(-1.0f, -1.0f, Z, 1.0f);
+    outPositions[0] = float4(-1.0f, 1.0f, Z, 1.0f);
+    outPositions[1] = float4(1.0f, 1.0f, Z, 1.0f);
+    outPositions[3] = float4(1.0f, -1.0f, Z, 1.0f);
+#endif
 #undef Z
 
-    return outPositions[vertexID];
+    float2 uvs[4];
+    uvs[2] = float2(0.0f, 1.0f);
+    uvs[0] = float2(0.0f, 0.0f);
+    uvs[1] = float2(1.0f, 0.0f);
+    uvs[3] = float2(1.0f, 1.0f);
+
+    output.position = outPositions[vertexID];
+    output.uv = uvs[vertexID];
+
+    return output;
 }
 
 //--------------------------------------------------------------------------------------
@@ -229,7 +251,8 @@ float4 psRect(VS_OUTPUT_RECT input) : SV_TARGET
     return float4(input.color, 1.0f);
 }
 
-float4 psTextureDebug() : SV_TARGET
+float4 psTextureDebug(VS_OUTPUT_TEXTURE_DEBUG input) : SV_TARGET
 {
-    return float4(0.0f, 1.0f, 0.0f, 1.0f);
+    float4 color = float4(g_texture.Sample(g_sampler, input.uv).rgb, 1.0f);
+    return color;
 }

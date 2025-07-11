@@ -3,11 +3,13 @@
 #include "antiqua_intrinsics.h"
 #include "antiqua_render_group.h"
 
+#if 0
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+#endif
 
 #include "antiqua_render_group.cpp"
 
@@ -389,6 +391,7 @@ static void UpdateStaticEntity(GameState *gameState,
 {
 }
 
+#if 0
 internal void MakeNothingsTest(GameMemory *Memory)
 {
     debug_ReadFileResult TTFFile;
@@ -404,6 +407,7 @@ internal void MakeNothingsTest(GameMemory *Memory)
 
     stbtt_FreeBitmap(MonoBitmap, NULL);
 }
+#endif
 
 #if !XCODE_BUILD && !COMPILER_MSVC
 EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
