@@ -4,7 +4,7 @@
 #include "types.h"
 #include "antiqua_math.h"
 
-typedef enum
+typedef enum RenderGroupEntryType
 {
     RenderGroupEntryType_RenderEntryClear,
     RenderGroupEntryType_RenderEntryPoint,
@@ -12,6 +12,8 @@ typedef enum
     RenderGroupEntryType_RenderEntryTile,
     RenderGroupEntryType_RenderEntryRect,
     RenderGroupEntryType_RenderEntryTextureDebug,
+
+    RenderGroupEntryType_Count,
 } RenderGroupEntryType;
 
 typedef struct RenderGroupEntryHeader
@@ -20,18 +22,18 @@ typedef struct RenderGroupEntryHeader
     RenderGroupEntryHeader *next;
 } RenderGroupEntryHeader;
 
-typedef struct
+typedef struct RenderEntryClear
 {
     V4 color;
 } RenderEntryClear;
 
-typedef struct
+typedef struct RenderEntryPoint
 {
     V3 position;
     V3 color;
 } RenderEntryPoint;
 
-typedef struct
+typedef struct RenderEntryLine
 {
     /* NOTE(dima): index 0 - start, index 1 - end */
     V3 color;
@@ -39,7 +41,7 @@ typedef struct
     V3 end;
 } RenderEntryLine;
 
-typedef struct
+typedef struct RenderEntryTile
 {
     u32 tileCountPerSide;
     r32 tileSideLength;
@@ -47,7 +49,7 @@ typedef struct
     V3 originTileCenterPositionWorld;
 } RenderEntryTile;
 
-typedef struct
+typedef struct RenderEntryRect
 {
     r32 sideLengthW;
     r32 sideLengthH;
@@ -55,8 +57,10 @@ typedef struct
     V3 color;
 } RenderEntryRect;
 
-typedef struct
+typedef struct RenderEntryTextureDebug
 {
+    AssetHeader *textureHeader;
+    b32 needsGpuReupload;
 } RenderEntryTextureDebug;
 
 typedef struct RenderGroup

@@ -203,7 +203,7 @@ VS_OUTPUT_TEXTURE_DEBUG vsTextureDebug(uint vertexID : SV_VertexID)
     VS_OUTPUT_TEXTURE_DEBUG output;
 #define Z 0.1f
     float4 outPositions[4];
-#if 0
+#if 1
     outPositions[2] = float4(-0.5f, -0.5f, Z, 1.0f);
     outPositions[0] = float4(-0.5f, 0.5f, Z, 1.0f);
     outPositions[1] = float4(0.5f, 0.5f, Z, 1.0f);

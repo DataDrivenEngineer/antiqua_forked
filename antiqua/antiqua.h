@@ -18,7 +18,7 @@ enum EntityFlags
     EntityFlags_Enemy = 1 << 11,
 };
 
-typedef struct
+typedef struct Entity
 {
     EntityFlags flags;
 
@@ -27,9 +27,25 @@ typedef struct
     V3 scaleFactor;
 } Entity;
 
-typedef struct
+typedef struct AssetHeader
+{
+    struct AssetHeader *next;
+    u32 width;
+    u32 height;
+    u32 pixelSizeBytes;
+} AssetHeader;
+
+typedef struct Font
+{
+    u32 glyphCount;
+    AssetHeader *textureHeader;
+} Font;
+
+typedef struct GameState
 {
     MemoryArena worldArena;
+
+    Font font;
 
     u32 cameraFollowingEntityIndex;
 
@@ -37,7 +53,6 @@ typedef struct
     Entity entities[256];
 
     M44 worldMatrix;
-    M44 viewMatrix;
     M44 projectionMatrix;
 
     r32 nearPlane;
@@ -88,6 +103,8 @@ typedef struct
     V3 collisionPointDebug;
     V3 lineNormalVector;
 #endif
+
+    M44 viewMatrix;
 } GameState;
 
 #define _ANTIQUA_H_

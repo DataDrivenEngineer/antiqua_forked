@@ -6,9 +6,6 @@
 #include "antiqua.h"
 #include "antiqua_render_group.h"
 
-#define STB_TRUETYPE_IMPLEMENTATION
-#include "stb_truetype.h"
-
 #define CULLING_ENABLED 1
 #define WIREFRAME_MODE_ENABLED 0
 
@@ -92,8 +89,8 @@ internal u32 renderGroupVBCurrentSize = 0;
 internal u32 currentCbvSrvUavDescriptorIdx = 0;
 internal u32 currentPerObjectCBOffset = 0;
 
-internal ComPtr<ID3D12Resource> texture[SWAP_CHAIN_BUFFER_COUNT];
-internal ComPtr<ID3D12Resource> textureUploadHeap[SWAP_CHAIN_BUFFER_COUNT];
+internal AntiquaTexture texture[SWAP_CHAIN_BUFFER_COUNT] = {{}, {}};
+internal ComPtr<ID3D12Resource> textureUploadHeap[SWAP_CHAIN_BUFFER_COUNT] = {NULL, NULL};
 
 internal void GetHardwareAdapter(
     IDXGIFactory1* pFactory,
@@ -1392,8 +1389,12 @@ RENDER_ON_GPU(renderOnGPU)
                     break;
                 }
 
+#if 1
                 case RenderGroupEntryType_RenderEntryTextureDebug:
                 {
+                    RenderEntryTextureDebug *entry = (RenderEntryTextureDebug *)(entryHeader + 1);
+                    AssetHeader *textureHeader = entry->textureHeader;
+
                     commandList->SetPipelineState(pipelineState[TEXTURE_DEBUG_PIPELINE_STATE_IDX].Get());
 
                     D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHndl = GetGPUDescriptorHandle(cbvSrvUavHeap[frameIndex].Get(),
@@ -1402,111 +1403,108 @@ RENDER_ON_GPU(renderOnGPU)
                                                                                     
                     commandList->SetGraphicsRootDescriptorTable(3, srvGpuHndl);
 
-#if 1
-                    debug_ReadFileResult TTFFile;
-#define FILENAME "C:/Windows/Fonts/arial.ttf"
-                    gameMemory->debug_platformReadEntireFile(NULL, &TTFFile, FILENAME);
-#undef FILENAME
-                    ASSERT(TTFFile.contentsSize != 0);
+                    DXGI_FORMAT textureFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 
-                    stbtt_fontinfo Font;
-                    stbtt_InitFont(&Font, (u8 *)TTFFile.contents, stbtt_GetFontOffsetForIndex((u8 *)TTFFile.contents, 0));
-
-                    gameMemory->debug_platformFreeFileMemory(NULL, &TTFFile);
-
-                    s32 Width, Height, XOffset, YOffset;
-                    u8 *MonoBitmap = stbtt_GetCodepointBitmap(&Font, 0, stbtt_ScaleForPixelHeight(&Font, 128.0f), 'n', &Width, &Height, &XOffset, &YOffset);
-
-                    u32 textureDataSize = Width * Height;
-                    u8 *rgbaBitmap = PUSH_ARRAY(arena, 4*textureDataSize, u8);
-                    u8 *srcBitmap = MonoBitmap;
-                    u8 *dstRow = rgbaBitmap;
-                    u32 pitch = 4*Width;
-                    for (s32 y = 0; y < Height; y++)
+                    if (!texture[frameIndex].initialized)
                     {
-                        u32 *dst = (u32 *)dstRow;
-                        for (s32 x = 0; x < Width; x++)
-                        {
-                            u8 alpha = *srcBitmap++;
-                            *dst++ = ((alpha << 24) |
-                                      (alpha << 16) |
-                                      (alpha <<  8) |
-                                      (alpha <<  0));
-                        }
+                        D3D12_RESOURCE_DESC TextureDesc = GetResourceDescriptor(D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+                                                                                0,
+                                                                                textureHeader->pixelSizeBytes*textureHeader->width,
+                                                                                textureHeader->height,
+                                                                                1,
+                                                                                1,
+                                                                                textureFormat,
+                                                                                1,
+                                                                                0,
+                                                                                D3D12_TEXTURE_LAYOUT_UNKNOWN,
+                                                                                D3D12_RESOURCE_FLAG_NONE);
 
-                        dstRow += pitch;
+                        D3D12_HEAP_PROPERTIES textureHeapProperties = GetHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
+                        ThrowIfFailed(device->CreateCommittedResource(&textureHeapProperties,
+                                                                      D3D12_HEAP_FLAG_NONE,
+                                                                      &TextureDesc,
+                                                                      D3D12_RESOURCE_STATE_COPY_DEST,
+                                                                      NULL,
+                                                                      IID_PPV_ARGS(texture[frameIndex].gpuTexture.ReleaseAndGetAddressOf())));
+
+                        texture[frameIndex].gpuTexture->SetName(L"Texture");
+
+                        texture[frameIndex].state = D3D12_RESOURCE_STATE_COPY_DEST;
+                        texture[frameIndex].needsGpuReupload = true;
+                        texture[frameIndex].initialized = true;
                     }
 
-                    stbtt_FreeBitmap(MonoBitmap, NULL);
+                    u32 textureDataSize = textureHeader->width*textureHeader->height*textureHeader->pixelSizeBytes;
 
-                    textureDataSize *= 4;
+                    if (!textureUploadHeap[frameIndex])
+                    {
+                        // Create the GPU upload buffer.
+                        D3D12_HEAP_PROPERTIES bufferResourceHeapProperties = GetHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
 
-                    D3D12_RESOURCE_DESC TextureDesc = GetResourceDescriptor(D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-                                                                            0,
-                                                                            4*Width,
-                                                                            Height,
-                                                                            1,
-                                                                            1,
-                                                                            DXGI_FORMAT_R8G8B8A8_UNORM,
-                                                                            1,
-                                                                            0,
-                                                                            D3D12_TEXTURE_LAYOUT_UNKNOWN,
-                                                                            D3D12_RESOURCE_FLAG_NONE);
+                        D3D12_RESOURCE_DESC bufferResourceDesc = GetBufferResourceDescriptor(textureDataSize);
+                        ThrowIfFailed(device->CreateCommittedResource(&bufferResourceHeapProperties,
+                                                                      D3D12_HEAP_FLAG_NONE,
+                                                                      &bufferResourceDesc,
+                                                                      D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                                      NULL,
+                                                                      IID_PPV_ARGS(textureUploadHeap[frameIndex].ReleaseAndGetAddressOf())));
 
-                    D3D12_HEAP_PROPERTIES textureHeapProperties = GetHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
-                    ThrowIfFailed(device->CreateCommittedResource(&textureHeapProperties,
-                                                                  D3D12_HEAP_FLAG_NONE,
-                                                                  &TextureDesc,
-                                                                  D3D12_RESOURCE_STATE_COPY_DEST,
-                                                                  NULL,
-                                                                  IID_PPV_ARGS(texture[frameIndex].ReleaseAndGetAddressOf())));
+                        textureUploadHeap[frameIndex]->SetName(L"textureUploadHeap");
+                    }
 
-                    texture[frameIndex]->SetName(L"Texture");
+                    if (entry->needsGpuReupload)
+                    {
+                        for (u32 frameIdx = 0; frameIdx < SWAP_CHAIN_BUFFER_COUNT; ++frameIdx)
+                        {
+                            texture[frameIdx].needsGpuReupload = true;
+                        }
+                    }
 
-                    // Create the GPU upload buffer.
-                    D3D12_HEAP_PROPERTIES bufferResourceHeapProperties = GetHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
-                    D3D12_RESOURCE_DESC bufferResourceDesc = GetBufferResourceDescriptor(textureDataSize);
-                    ThrowIfFailed(device->CreateCommittedResource(&bufferResourceHeapProperties,
-                                                                  D3D12_HEAP_FLAG_NONE,
-                                                                  &bufferResourceDesc,
-                                                                  D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                                  NULL,
-                                                                  IID_PPV_ARGS(textureUploadHeap[frameIndex].ReleaseAndGetAddressOf())));
+                    if (texture[frameIndex].needsGpuReupload)
+                    {
+                        D3D12_RESOURCE_BARRIER textureBarrier;
+                        if (texture[frameIndex].state == D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+                        {
+                            textureBarrier = GetResourceTransitionBarrier(texture[frameIndex].gpuTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+                            commandList->ResourceBarrier(1, &textureBarrier);
+                        }
 
-                    textureUploadHeap[frameIndex]->SetName(L"textureUploadHeap");
+                        u8 *mappedData;
+                        ThrowIfFailed(textureUploadHeap[frameIndex]->Map(0, NULL, (void **)&mappedData));
 
-                    u8 *mappedData;
-                    ThrowIfFailed(textureUploadHeap[frameIndex]->Map(0, NULL, (void **)&mappedData));
+                        u8 *rgbaBitmap = ((u8 *)textureHeader) + sizeof(AssetHeader);
+                        memcpy(mappedData, rgbaBitmap, textureDataSize);
 
-                    memcpy(mappedData, rgbaBitmap, textureDataSize);
+                        textureUploadHeap[frameIndex]->Unmap(0, NULL);
 
-                    textureUploadHeap[frameIndex]->Unmap(0, NULL);
+                        D3D12_SUBRESOURCE_FOOTPRINT srcFootprint = {};
+                        srcFootprint.Format = textureFormat;
+                        srcFootprint.Width = textureHeader->width;
+                        srcFootprint.Height = textureHeader->height;
+                        srcFootprint.Depth = 1;
+                        srcFootprint.RowPitch = textureHeader->pixelSizeBytes*textureHeader->width;
 
-                    D3D12_SUBRESOURCE_FOOTPRINT srcFootprint = {};
-                    srcFootprint.Format = TextureDesc.Format;
-                    srcFootprint.Width = Width;
-                    srcFootprint.Height = Height;
-                    srcFootprint.Depth = 1;
-                    srcFootprint.RowPitch = 4*Width;
+                        D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcPlacedFootprint = {};
+                        srcPlacedFootprint.Offset = 0;
+                        srcPlacedFootprint.Footprint = srcFootprint;
 
-                    D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcPlacedFootprint = {};
-                    srcPlacedFootprint.Offset = 0;
-                    srcPlacedFootprint.Footprint = srcFootprint;
+                        D3D12_TEXTURE_COPY_LOCATION src = {};
+                        src.pResource = textureUploadHeap[frameIndex].Get();
+                        src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                        src.PlacedFootprint = srcPlacedFootprint;
 
-                    D3D12_TEXTURE_COPY_LOCATION src = {};
-                    src.pResource = textureUploadHeap[frameIndex].Get();
-                    src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                    src.PlacedFootprint = srcPlacedFootprint;
+                        D3D12_TEXTURE_COPY_LOCATION dst = {};
+                        dst.pResource = texture[frameIndex].gpuTexture.Get();
+                        dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                        dst.SubresourceIndex = 0;
 
-                    D3D12_TEXTURE_COPY_LOCATION dst = {};
-                    dst.pResource = texture[frameIndex].Get();
-                    dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-                    dst.SubresourceIndex = 0;
+                        commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, NULL);
 
-                    commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, NULL);
+                        textureBarrier = GetResourceTransitionBarrier(texture[frameIndex].gpuTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                        commandList->ResourceBarrier(1, &textureBarrier);
 
-                    D3D12_RESOURCE_BARRIER textureBarrier = GetResourceTransitionBarrier(texture[frameIndex].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-                    commandList->ResourceBarrier(1, &textureBarrier);
+                        texture[frameIndex].needsGpuReupload = false;
+                    }
 
                     D3D12_TEX2D_SRV TexSRV =  {};
                     TexSRV.MostDetailedMip = 0;
@@ -1514,18 +1512,17 @@ RENDER_ON_GPU(renderOnGPU)
                     TexSRV.ResourceMinLODClamp = 0.0f;
 
                     D3D12_SHADER_RESOURCE_VIEW_DESC Desc = {};
-                    Desc.Format = TextureDesc.Format;
+                    Desc.Format = textureFormat;
                     Desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
                     Desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
                     Desc.Texture2D = TexSRV;
 
                     D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHndl = GetCPUDescriptorHandle(cbvSrvUavHeap[frameIndex].Get(), cbvSrvUavDescriptorSize, currentCbvSrvUavDescriptorIdx);
 
-                    device->CreateShaderResourceView(texture[frameIndex].Get(),
+                    device->CreateShaderResourceView(texture[frameIndex].gpuTexture.Get(),
                                                      &Desc,
                                                      srvCpuHndl);
 
-#endif
 
                     ++currentCbvSrvUavDescriptorIdx;
 
@@ -1535,6 +1532,7 @@ RENDER_ON_GPU(renderOnGPU)
 
                     break;
                 }
+#endif
 
                 default:
                     break;

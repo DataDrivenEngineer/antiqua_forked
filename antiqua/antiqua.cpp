@@ -3,13 +3,8 @@
 #include "antiqua_intrinsics.h"
 #include "antiqua_render_group.h"
 
-#if 0
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
-#endif
 
 #include "antiqua_render_group.cpp"
 
@@ -409,6 +404,82 @@ internal void MakeNothingsTest(GameMemory *Memory)
 }
 #endif
 
+internal void
+LoadFont(GameState *gameState, GameMemory *memory)
+{
+    debug_ReadFileResult ttfFile;
+#define FILENAME "C:/Windows/Fonts/arial.ttf"
+    memory->debug_platformReadEntireFile(NULL, &ttfFile, FILENAME);
+#undef FILENAME
+    ASSERT(ttfFile.contentsSize != 0);
+
+    stbtt_fontinfo font;
+    stbtt_InitFont(&font, (u8 *)ttfFile.contents, stbtt_GetFontOffsetForIndex((u8 *)ttfFile.contents, 0));
+
+    memory->debug_platformFreeFileMemory(NULL, &ttfFile);
+
+    gameState->font.glyphCount = 128;
+    gameState->font.textureHeader = NULL;
+    AssetHeader *currHeader = gameState->font.textureHeader;
+
+    MemoryArena fontArena;
+    initializeArenaFromPermanentStorage(memory, &fontArena, MB(5));
+
+#define PIXEL_SIZE_BYTES 4
+
+    for (u32 glyphASCIICode = 33;
+#if 0
+         glyphASCIICode < gameState->font.glyphCount;
+#else
+         glyphASCIICode < 34;
+#endif
+         ++glyphASCIICode)
+    {
+        s32 width, height, xOffset, yOffset;
+        u8 *monoBitmap = stbtt_GetCodepointBitmap(&font, 0, stbtt_ScaleForPixelHeight(&font, 128.0f), glyphASCIICode, &width, &height, &xOffset, &yOffset);
+
+        if (currHeader)
+        {
+            currHeader->next = PUSH_STRUCT(&fontArena, AssetHeader);
+            currHeader = currHeader->next;
+        }
+        else
+        {
+            gameState->font.textureHeader = PUSH_STRUCT(&fontArena, AssetHeader);
+            currHeader = gameState->font.textureHeader;
+        }
+
+        currHeader->next = NULL;
+        currHeader->width = width;
+        currHeader->height = height;
+        currHeader->pixelSizeBytes = PIXEL_SIZE_BYTES;
+
+        u8 *rgbaBitmap = PUSH_ARRAY(&fontArena,
+                                    currHeader->width*currHeader->height*currHeader->pixelSizeBytes,
+                                    u8);
+        u8 *srcBitmap = monoBitmap;
+        u8 *dstRow = rgbaBitmap;
+        u32 pitch = 4*width;
+        for (s32 y = 0; y < height; y++)
+        {
+            u32 *dst = (u32 *)dstRow;
+            for (s32 x = 0; x < width; x++)
+            {
+                u8 alpha = *srcBitmap++;
+                *dst++ = ((alpha << 24) |
+                          (alpha << 16) |
+                          (alpha <<  8) |
+                          (alpha <<  0));
+            }
+
+            dstRow += pitch;
+        }
+
+        stbtt_FreeBitmap(monoBitmap, NULL);
+    }
+#undef PIXEL_SIZE_BYTES
+}
+
 #if !XCODE_BUILD && !COMPILER_MSVC
 EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #else
@@ -421,31 +492,32 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     ASSERT(sizeof(GameState) <= memory->permanentStorageSize);
     GameState *gameState = (GameState *) memory->permanentStorage;
 
-    MemoryArena mdlArena;
-    u64 mdlArenaSize = MB(256);
-    ASSERT(mdlArenaSize <= memory->permanentStorageSize - sizeof(gameState));
-    initializeArena(&mdlArena,
-                    mdlArenaSize,
-                    (u8 *) memory->permanentStorage + sizeof(GameState));
+    // NOTE(dima): Reset any state here
+    // TODO: should we refactor into separate beginRender() function?
+    {
+        memory->usedTransientStorage = 0;
+    }
 
     MemoryArena renderGroupArena;
     u32 renderGroupArenaSize = KB(256);
-    ASSERT(renderGroupArenaSize <= memory->transientStorageSize);
-    initializeArena(&renderGroupArena,
-                    renderGroupArenaSize,
-                    (u8 *) memory->transientStorage);
+    initializeArenaFromTransientStorage(memory,
+                                        &renderGroupArena,
+                                        renderGroupArenaSize);
 
     MemoryArena scratchArena;
     u32 scratchArenaSize = KB(256);
-    ASSERT(scratchArenaSize <= memory->transientStorageSize - renderGroupArenaSize);
-    initializeArena(&scratchArena,
-                    scratchArenaSize,
-                    (u8 *) memory->transientStorage + renderGroupArenaSize);
+    initializeArenaFromTransientStorage(memory,
+                                        &scratchArena,
+                                        scratchArenaSize);
 
     ASSERT(&gcInput->terminator - &gcInput->buttons[0] == ARRAY_COUNT(gcInput->buttons));
     if (!memory->isInitialized)
     {
         // do initialization here as needed
+
+        memory->usedPermanentStorage += sizeof(GameState);
+
+        LoadFont(gameState, memory);
 
         gameState->nearPlane = 1.0f;
         gameState->farPlane = 100.0f;
@@ -864,7 +936,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
 #if TEXTURE_DEBUG_MODE
     pushRenderEntryTextureDebug(&renderGroupArena,
-                                &renderGroup);
+                                &renderGroup,
+                                gameState->font.textureHeader);
 #endif
 
 #if 0

@@ -124,7 +124,8 @@ void pushRenderEntryRect(MemoryArena *arena,
 }
 
 void pushRenderEntryTextureDebug(MemoryArena *arena,
-                                 RenderGroup *renderGroup)
+                                 RenderGroup *renderGroup,
+                                 AssetHeader *textureHeader)
 {
     ASSERT(renderGroup->pushBufferElementCount > 0);
 
@@ -132,6 +133,8 @@ void pushRenderEntryTextureDebug(MemoryArena *arena,
     entryHeader->type = RenderGroupEntryType_RenderEntryTextureDebug;
     renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
     RenderEntryTextureDebug *entry = PUSH_STRUCT(arena, RenderEntryTextureDebug);
+    entry->needsGpuReupload = true;
+    entry->textureHeader = textureHeader;
 
     renderGroup->pushBufferSize += sizeof(RenderEntryTextureDebug);
     renderGroup->pushBufferElementCount++;

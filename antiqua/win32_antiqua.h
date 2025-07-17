@@ -1,7 +1,10 @@
 #ifndef _WIN32_ANTIQUA_H_
 #include <windows.h>
+#include <wrl.h>
 
 #include "antiqua_platform.h"
+
+using Microsoft::WRL::ComPtr;
 
 typedef struct State
 {
@@ -15,6 +18,14 @@ typedef struct State
     b32 windowVisible;
 
 } State;
+
+typedef struct AntiquaTexture
+{
+    ComPtr<ID3D12Resource> gpuTexture;
+    b32 initialized;
+    b32 needsGpuReupload;
+    D3D12_RESOURCE_STATES state;
+} AntiquaTexture;
 
 internal void FatalError(const char* message)
 {
