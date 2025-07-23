@@ -1503,6 +1503,7 @@ RENDER_ON_GPU(renderOnGPU)
 
                         textureBarrier = GetResourceTransitionBarrier(texture[frameIndex].gpuTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
                         commandList->ResourceBarrier(1, &textureBarrier);
+                        texture[frameIndex].state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
                         texture[frameIndex].needsGpuReupload = false;
                     }
