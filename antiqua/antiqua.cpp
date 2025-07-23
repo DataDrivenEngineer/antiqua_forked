@@ -427,13 +427,8 @@ LoadFont(GameState *gameState, GameMemory *memory)
     gameState->font.textureHeader = PUSH_STRUCT(&fontArena, AssetHeader);
     AssetHeader *bitmapHeader = gameState->font.textureHeader;
     bitmapHeader->pixelSizeBytes = 4;
-#if 0
-    bitmapHeader->width = 512;
-    bitmapHeader->height = bitmapHeader->pixelSizeBytes*bitmapHeader->width;
-#else
     bitmapHeader->width = 1024;
     bitmapHeader->height = 1024;
-#endif
 
     MemoryArena monoBitmapArena;
     u32 sizeOfMonoBitmapArena = MB(5);
