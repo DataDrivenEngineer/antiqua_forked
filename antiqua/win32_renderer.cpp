@@ -1409,7 +1409,7 @@ RENDER_ON_GPU(renderOnGPU)
                     {
                         D3D12_RESOURCE_DESC TextureDesc = GetResourceDescriptor(D3D12_RESOURCE_DIMENSION_TEXTURE2D,
                                                                                 0,
-                                                                                textureHeader->pixelSizeBytes*textureHeader->width,
+                                                                                textureHeader->width,
                                                                                 textureHeader->height,
                                                                                 1,
                                                                                 1,
@@ -1436,6 +1436,7 @@ RENDER_ON_GPU(renderOnGPU)
 
                     u32 textureDataSize = textureHeader->width*textureHeader->height*textureHeader->pixelSizeBytes;
 
+                    // TODO: upload heap should be large enough to fit any texture!
                     if (!textureUploadHeap[frameIndex])
                     {
                         // Create the GPU upload buffer.

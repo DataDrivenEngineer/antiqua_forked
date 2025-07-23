@@ -415,54 +415,70 @@ LoadFont(GameState *gameState, GameMemory *memory)
 
     stbtt_fontinfo font;
     stbtt_InitFont(&font, (u8 *)ttfFile.contents, stbtt_GetFontOffsetForIndex((u8 *)ttfFile.contents, 0));
+    r32 fontScale = stbtt_ScaleForPixelHeight(&font, 128.0f);
 
     memory->debug_platformFreeFileMemory(NULL, &ttfFile);
-
-    gameState->font.glyphCount = 128;
-    gameState->font.textureHeader = NULL;
-    AssetHeader *currHeader = gameState->font.textureHeader;
 
     MemoryArena fontArena;
     initializeArenaFromPermanentStorage(memory, &fontArena, MB(5));
 
-#define PIXEL_SIZE_BYTES 4
-
-    for (u32 glyphASCIICode = 33;
+    gameState->font.firstGlyph = 33;
+    gameState->font.lastGlyph = 127;
+    gameState->font.textureHeader = PUSH_STRUCT(&fontArena, AssetHeader);
+    AssetHeader *bitmapHeader = gameState->font.textureHeader;
+    bitmapHeader->pixelSizeBytes = 4;
 #if 0
-         glyphASCIICode < gameState->font.glyphCount;
+    bitmapHeader->width = 512;
+    bitmapHeader->height = bitmapHeader->pixelSizeBytes*bitmapHeader->width;
 #else
-         glyphASCIICode < 34;
+    bitmapHeader->width = 1024;
+    bitmapHeader->height = 1024;
 #endif
+
+    MemoryArena monoBitmapArena;
+    u32 sizeOfMonoBitmapArena = MB(5);
+    initializeArenaFromTransientStorage(memory, &monoBitmapArena, sizeOfMonoBitmapArena);
+
+#define ATLAS_WIDTH (s32)bitmapHeader->width
+#define ATLAS_HEIGHT (s32)bitmapHeader->height
+#define ATLAS_PITCH (s32)bitmapHeader->pixelSizeBytes*ATLAS_WIDTH
+    u8 *fontAtlas = PUSH_ARRAY(&fontArena, ATLAS_PITCH*ATLAS_HEIGHT, u8);
+
+    s32 offsetToNextAtlasRow = 0, currentAtlasRow = 0, currentAtlasColumn = 0;
+
+    for (u32 glyphASCIICode = gameState->font.firstGlyph;
+         glyphASCIICode < gameState->font.lastGlyph;
          ++glyphASCIICode)
     {
-        s32 width, height, xOffset, yOffset;
-        u8 *monoBitmap = stbtt_GetCodepointBitmap(&font, 0, stbtt_ScaleForPixelHeight(&font, 128.0f), glyphASCIICode, &width, &height, &xOffset, &yOffset);
+        s32 ix0, ix1, iy0, iy1;
+        stbtt_GetCodepointBitmapBox(&font, glyphASCIICode, fontScale, fontScale, &ix0, &iy0, &ix1, &iy1);
+        s32 width = ix1 - ix0;
+        s32 height = iy1 - iy0;
 
-        if (currHeader)
-        {
-            currHeader->next = PUSH_STRUCT(&fontArena, AssetHeader);
-            currHeader = currHeader->next;
-        }
-        else
-        {
-            gameState->font.textureHeader = PUSH_STRUCT(&fontArena, AssetHeader);
-            currHeader = gameState->font.textureHeader;
-        }
+        u8 *monoBitmap = PUSH_ARRAY(&monoBitmapArena, width*height, u8);
 
-        currHeader->next = NULL;
-        currHeader->width = width;
-        currHeader->height = height;
-        currHeader->pixelSizeBytes = PIXEL_SIZE_BYTES;
+        stbtt_MakeCodepointBitmap(&font, monoBitmap, width, height, width, fontScale, fontScale, glyphASCIICode);
 
-        u8 *rgbaBitmap = PUSH_ARRAY(&fontArena,
-                                    currHeader->width*currHeader->height*currHeader->pixelSizeBytes,
-                                    u8);
         u8 *srcBitmap = monoBitmap;
-        u8 *dstRow = rgbaBitmap;
-        u32 pitch = 4*width;
+
+        if (ATLAS_PITCH - currentAtlasColumn < (s32)bitmapHeader->pixelSizeBytes*width)
+        {
+            currentAtlasRow += offsetToNextAtlasRow;
+            currentAtlasColumn = 0;
+
+            offsetToNextAtlasRow = 0;
+        }
+
+        ASSERT(ATLAS_PITCH - currentAtlasColumn >= (s32)bitmapHeader->pixelSizeBytes*width);
+        ASSERT(ATLAS_HEIGHT - currentAtlasRow >= height);
+
+        offsetToNextAtlasRow = height > offsetToNextAtlasRow ? height : offsetToNextAtlasRow;
+
+        u8 *dstAtlas = fontAtlas + ATLAS_PITCH*currentAtlasRow + currentAtlasColumn;
+
         for (s32 y = 0; y < height; y++)
         {
-            u32 *dst = (u32 *)dstRow;
+            u32 *dst = (u32 *)dstAtlas;
             for (s32 x = 0; x < width; x++)
             {
                 u8 alpha = *srcBitmap++;
@@ -472,12 +488,17 @@ LoadFont(GameState *gameState, GameMemory *memory)
                           (alpha <<  0));
             }
 
-            dstRow += pitch;
+            dstAtlas += ATLAS_PITCH;
         }
 
-        stbtt_FreeBitmap(monoBitmap, NULL);
+        currentAtlasColumn += bitmapHeader->pixelSizeBytes*width;
+
     }
-#undef PIXEL_SIZE_BYTES
+#undef ATLAS_PITCH
+#undef ATLAS_WIDTH
+#undef ATLAS_HEIGHT
+
+    deallocateArenaFromTransientStorage(memory, sizeOfMonoBitmapArena);
 }
 
 #if !XCODE_BUILD && !COMPILER_MSVC

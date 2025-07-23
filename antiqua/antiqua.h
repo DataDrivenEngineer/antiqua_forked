@@ -37,7 +37,8 @@ typedef struct AssetHeader
 
 typedef struct Font
 {
-    u32 glyphCount;
+    u32 firstGlyph;
+    u32 lastGlyph;
     AssetHeader *textureHeader;
 } Font;
 

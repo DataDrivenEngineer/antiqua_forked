@@ -277,6 +277,11 @@ inline void initializeArenaFromTransientStorage(GameMemory *globalMemory, Memory
     initializeArena(arena, size, (u8 *)globalMemory->transientStorage, globalMemory->usedTransientStorage);
 }
 
+inline void deallocateArenaFromTransientStorage(GameMemory *globalMemory, u32 arenaSize)
+{
+    globalMemory->usedTransientStorage -= arenaSize;
+}
+
 #define PUSH_STRUCT(arena, Type) (Type *) pushSize_(arena, sizeof(Type))
 #define PUSH_ARRAY(arena, count, Type) (Type *) pushSize_(arena, (count) * sizeof(Type))
 #define PUSH_SIZE(arena, size, Type) (Type *) pushSize_(arena, (size))
