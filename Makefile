@@ -26,6 +26,8 @@ TILE_VSHADER_NAME=d3d11_vshader_tile
 TILE_PSHADER_NAME=d3d11_pshader_tile
 TEXTURE_DEBUG_VSHADER_NAME=d3d11_vshader_texture_debug
 TEXTURE_DEBUG_PSHADER_NAME=d3d11_pshader_texture_debug
+TEXT_VSHADER_NAME=d3d11_vshader_text
+TEXT_PSHADER_NAME=d3d11_pshader_text
 
 build: clean
 	pushd $(BUILD_DIR)
@@ -39,6 +41,8 @@ build: clean
 	fxc.exe /nologo /T ps_5_0 /E psTile /Od /WX /Zpc /Zi /Ges /Fo $(BUILD_DIR)\$(TILE_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(TILE_PSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(TILE_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
 	fxc.exe /nologo /T vs_5_0 /E vsTextureDebug /Od /WX /Zpc /Zi /Ges /Fo $(BUILD_DIR)\$(TEXTURE_DEBUG_VSHADER_NAME).cso /Fd $(BUILD_DIR)\$(TEXTURE_DEBUG_VSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(TEXTURE_DEBUG_VSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
 	fxc.exe /nologo /T ps_5_0 /E psTextureDebug /Od /WX /Zpc /Zi /Ges /Fo $(BUILD_DIR)\$(TEXTURE_DEBUG_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(TEXTURE_DEBUG_PSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(TEXTURE_DEBUG_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
+	fxc.exe /nologo /T vs_5_0 /E vsText /Od /WX /Zpc /Zi /Ges /Fo $(BUILD_DIR)\$(TEXT_VSHADER_NAME).cso /Fd $(BUILD_DIR)\$(TEXT_VSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(TEXT_VSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
+	fxc.exe /nologo /T ps_5_0 /E psText /Od /WX /Zpc /Zi /Ges /Fo $(BUILD_DIR)\$(TEXT_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(TEXT_PSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(TEXT_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
 	cl $(COMMON_COMPILER_FLAGS) $(INCLUDE) win32.cpp -Fmwin32_main.map -Fo:win32_main /link $(LIB_PATH) /NODEFAULTLIB:LIBCMT -incremental:no -opt:ref user32.lib d3d11.lib dxgi.lib dxguid.lib d3d12.lib -PDB:win32_main.pdb
 	if not exist "$(BUILD_DIR)" mkdir $(BUILD_DIR)
 	if exist "*.dll" move *.dll $(BUILD_DIR) >NUL

@@ -35,11 +35,22 @@ typedef struct AssetHeader
     u32 pixelSizeBytes;
 } AssetHeader;
 
+typedef struct GlyphMetadata
+{
+    u32 atlasRowOffset;
+    u32 atlasColumnOffset;
+    u32 glyphWidth;
+    u32 glyphHeight;
+} GlyphMetadata;
+
 typedef struct Font
 {
-    u32 firstGlyph;
-    u32 lastGlyph;
-    AssetHeader *textureHeader;
+    GlyphMetadata *glyphMetadata;
+    AssetHeader *atlasHeader;
+    u8 firstGlyphCode;
+    u8 lastGlyphCode;
+    u32 glyphCount;
+    b32 needsGpuReupload;
 } Font;
 
 typedef struct GameState

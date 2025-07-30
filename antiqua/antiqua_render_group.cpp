@@ -125,7 +125,8 @@ void pushRenderEntryRect(MemoryArena *arena,
 
 void pushRenderEntryTextureDebug(MemoryArena *arena,
                                  RenderGroup *renderGroup,
-                                 AssetHeader *textureHeader)
+                                 AssetHeader *textureHeader,
+                                 b32 needsGpuReupload)
 {
     ASSERT(renderGroup->pushBufferElementCount > 0);
 
@@ -133,8 +134,35 @@ void pushRenderEntryTextureDebug(MemoryArena *arena,
     entryHeader->type = RenderGroupEntryType_RenderEntryTextureDebug;
     renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
     RenderEntryTextureDebug *entry = PUSH_STRUCT(arena, RenderEntryTextureDebug);
-    entry->needsGpuReupload = true;
+    entry->needsGpuReupload = needsGpuReupload;
     entry->textureHeader = textureHeader;
+
+    renderGroup->pushBufferSize += sizeof(RenderEntryTextureDebug);
+    renderGroup->pushBufferElementCount++;
+
+    renderGroup->prevHeader->next = entryHeader;
+    renderGroup->prevHeader = entryHeader;
+    entryHeader->next = 0;
+}
+
+void pushRenderEntryText(MemoryArena *arena,
+                         RenderGroup *renderGroup,
+                         s8 *text,
+                         AssetHeader *atlasHeader,
+                         GlyphMetadata *glyphMetadata,
+                         s8 firstGlyphCode,
+                         b32 needsGpuReupload)
+{
+    ASSERT(renderGroup->pushBufferElementCount > 0);
+
+    RenderGroupEntryHeader *entryHeader = PUSH_STRUCT(arena, RenderGroupEntryHeader);
+    entryHeader->type = RenderGroupEntryType_RenderEntryText;
+    renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
+    RenderEntryText *entry = PUSH_STRUCT(arena, RenderEntryText);
+    entry->atlasHeader = atlasHeader;
+    entry->glyphMetadata = glyphMetadata;
+    entry->text = text;
+    entry->firstGlyphCode = firstGlyphCode;
 
     renderGroup->pushBufferSize += sizeof(RenderEntryTextureDebug);
     renderGroup->pushBufferElementCount++;

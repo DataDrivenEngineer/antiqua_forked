@@ -7,6 +7,9 @@ cbuffer cbPerPass : register(b0)
     float4x4        projectionMatrix;
     float           windowWidth;
     float           windowHeight;
+
+    uint            atlasWidth;
+	uint            atlasHeight;
 };
 
 cbuffer cbPerObject : register(b1)
@@ -25,7 +28,10 @@ cbuffer cbPerTile : register(b2)
     float           tileSideLength;
 };
 
-Texture2D g_texture : register(t0);
+// Debug texture
+Texture2D g_texture    : register(t0);
+// Font atlas
+Texture2D fontAtlas    : register(t1);
 SamplerState g_sampler : register(s0);
 
 #define NORMALIZE(OldValue, OldMin, NewRange, OldRange, NewMin) ((((OldValue) - (OldMin)) * (NewRange)) / (OldRange)) + (NewMin) 
@@ -35,10 +41,17 @@ SamplerState g_sampler : register(s0);
 //--------------------------------------------------------------------------------------
 // Input / Output structures
 //--------------------------------------------------------------------------------------
-struct VS_INPUT
-{
+struct VS_INPUT {
     float3 position     : POSITION;
     float3 color        : COLOR;
+};
+
+struct VS_INPUT_TEXT {
+    uint offsetX           : OFFSET_X;
+    uint atlasRowOffset    : ATLAS_ROW_OFFSET;
+    uint atlasColumnOffset : ATLAS_COLUMN_OFFSET;
+    uint glyphWidth        : GLYPH_WIDTH;
+    uint glyphHeight       : GLYPH_HEIGHT;
 };
 
 struct VS_OUTPUT
@@ -59,7 +72,7 @@ struct VS_OUTPUT_TILE
     float3 color        : COLOR;
 };
 
-struct VS_OUTPUT_TEXTURE_DEBUG
+struct VS_OUTPUT_TEXTURE
 {
     float4 position : SV_POSITION;
     float2 uv : TEXCOORD;
@@ -96,6 +109,43 @@ VS_OUTPUT vsPoint(VS_INPUT input, uint vertexID : SV_VertexID)
 
     output.position = float4(positions[vertexID], 0.1f, 1.0f);
     output.color = input.color;
+    
+    return output;
+}
+
+VS_OUTPUT_TEXTURE vsText(VS_INPUT_TEXT input, uint vertexID : SV_VertexID)
+{
+    float baselineX = 500.0f;
+    float baselineY = 500.0f;
+
+    float2 topLeft     = float2(baselineX + (float)input.offsetX, baselineY);
+    float2 topRight    = float2(baselineX + (float)input.offsetX + (float)input.glyphWidth, baselineY);
+    float2 bottomLeft  = float2(baselineX + (float)input.offsetX, baselineY - (float)input.glyphHeight);
+    float2 bottomRight = float2(baselineX + (float)input.offsetX + (float)input.glyphWidth, baselineY - (float)input.glyphHeight);
+
+    float2 positions[4] = {
+                              float2(NORMALIZE(topLeft.x, 0, 2, windowWidth, -1), NORMALIZE(topLeft.y, 0, 2, windowHeight, -1)),
+                              float2(NORMALIZE(topRight.x, 0, 2, windowWidth, -1), NORMALIZE(topRight.y, 0, 2, windowHeight, -1)),
+                              float2(NORMALIZE(bottomLeft.x, 0, 2, windowWidth, -1), NORMALIZE(bottomLeft.y, 0, 2, windowHeight, -1)),
+                              float2(NORMALIZE(bottomRight.x, 0, 2, windowWidth, -1), NORMALIZE(bottomRight.y, 0, 2, windowHeight, -1))
+                          };
+
+    float atlasRowOffsetF    = (float)input.atlasRowOffset;
+    float atlasColumnOffsetF = (float)(input.atlasColumnOffset / 4);
+    float glyphWidthF        = (float)input.glyphWidth;
+    float glyphHeightF       = (float)input.glyphHeight;
+    float atlasWidthF        = (float)atlasWidth;
+    float atlasHeightF       = (float)atlasHeight;
+
+    float2 uvs[4];
+    uvs[2] = float2(atlasColumnOffsetF / atlasWidthF, (atlasRowOffsetF + glyphHeightF) / atlasHeightF);
+    uvs[0] = float2(atlasColumnOffsetF / atlasWidthF, atlasRowOffsetF / atlasHeightF);
+    uvs[1] = float2((atlasColumnOffsetF + glyphWidthF) / atlasWidthF, atlasRowOffsetF / atlasHeightF);
+    uvs[3] = float2((atlasColumnOffsetF + glyphWidthF) / atlasWidthF, (atlasRowOffsetF + glyphHeightF) / atlasHeightF);
+
+    VS_OUTPUT_TEXTURE output;
+    output.position = float4(positions[vertexID], 0.1f, 1.0f);
+    output.uv       = uvs[vertexID];
     
     return output;
 }
@@ -197,10 +247,10 @@ VS_OUTPUT_RECT vsRect(uint vertexID : SV_VertexID)
     return output;
 }
 
-VS_OUTPUT_TEXTURE_DEBUG vsTextureDebug(uint vertexID : SV_VertexID)
+VS_OUTPUT_TEXTURE vsTextureDebug(uint vertexID : SV_VertexID)
 {
 
-    VS_OUTPUT_TEXTURE_DEBUG output;
+    VS_OUTPUT_TEXTURE output;
 #define Z 0.1f
     float4 outPositions[4];
 #if 0
@@ -251,8 +301,18 @@ float4 psRect(VS_OUTPUT_RECT input) : SV_TARGET
     return float4(input.color, 1.0f);
 }
 
-float4 psTextureDebug(VS_OUTPUT_TEXTURE_DEBUG input) : SV_TARGET
+float4 psTextureDebug(VS_OUTPUT_TEXTURE input) : SV_TARGET
 {
     float4 color = float4(g_texture.Sample(g_sampler, input.uv).rgb, 1.0f);
     return color;
+}
+
+float4 psText(VS_OUTPUT_TEXTURE input) : SV_TARGET
+{
+#if 1
+    float4 color = float4(g_texture.Sample(g_sampler, input.uv).rgb, 1.0f);
+    return color;
+#else
+    return float4(0.0f, 1.0f, 0.0f, 1.0f);
+#endif
 }

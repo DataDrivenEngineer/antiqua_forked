@@ -294,4 +294,6 @@ void * pushSize_(MemoryArena *arena, u32 size)
   return result;
 }
 
+#include "antiqua_common_functions.h"
+
 #endif

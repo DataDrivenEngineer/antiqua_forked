@@ -6,9 +6,12 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 #include "antiqua_render_group.cpp"
 
-#define TEXTURE_DEBUG_MODE 1
+#define TEXTURE_DEBUG_MODE 0
 
 static void CastRayToClickPositionOnTilemap(GameState *gameState,
                                             r32 drawableWidthWithoutScaleFactor,
@@ -422,27 +425,31 @@ LoadFont(GameState *gameState, GameMemory *memory)
     MemoryArena fontArena;
     initializeArenaFromPermanentStorage(memory, &fontArena, MB(5));
 
-    gameState->font.firstGlyph = 33;
-    gameState->font.lastGlyph = 127;
-    gameState->font.textureHeader = PUSH_STRUCT(&fontArena, AssetHeader);
-    AssetHeader *bitmapHeader = gameState->font.textureHeader;
-    bitmapHeader->pixelSizeBytes = 4;
-    bitmapHeader->width = 1024;
-    bitmapHeader->height = 1024;
+    gameState->font.firstGlyphCode = 32;
+    gameState->font.lastGlyphCode = 127;
+    gameState->font.glyphCount = gameState->font.lastGlyphCode - gameState->font.firstGlyphCode;
+    gameState->font.atlasHeader = PUSH_STRUCT(&fontArena, AssetHeader);
+    gameState->font.needsGpuReupload = true;
+    AssetHeader *atlasHeader = gameState->font.atlasHeader;
+    atlasHeader->pixelSizeBytes = 4;
+    atlasHeader->width = 1024;
+    atlasHeader->height = 1024;
 
     MemoryArena monoBitmapArena;
     u32 sizeOfMonoBitmapArena = MB(5);
     initializeArenaFromTransientStorage(memory, &monoBitmapArena, sizeOfMonoBitmapArena);
 
-#define ATLAS_WIDTH (s32)bitmapHeader->width
-#define ATLAS_HEIGHT (s32)bitmapHeader->height
-#define ATLAS_PITCH (s32)bitmapHeader->pixelSizeBytes*ATLAS_WIDTH
+#define ATLAS_WIDTH (s32)atlasHeader->width
+#define ATLAS_HEIGHT (s32)atlasHeader->height
+#define ATLAS_PITCH (s32)atlasHeader->pixelSizeBytes*ATLAS_WIDTH
     u8 *fontAtlas = PUSH_ARRAY(&fontArena, ATLAS_PITCH*ATLAS_HEIGHT, u8);
+
+    gameState->font.glyphMetadata = PUSH_ARRAY(&fontArena, gameState->font.glyphCount, GlyphMetadata);
 
     s32 offsetToNextAtlasRow = 0, currentAtlasRow = 0, currentAtlasColumn = 0;
 
-    for (u32 glyphASCIICode = gameState->font.firstGlyph;
-         glyphASCIICode < gameState->font.lastGlyph;
+    for (u32 glyphASCIICode = gameState->font.firstGlyphCode;
+         glyphASCIICode < gameState->font.lastGlyphCode;
          ++glyphASCIICode)
     {
         s32 ix0, ix1, iy0, iy1;
@@ -456,7 +463,7 @@ LoadFont(GameState *gameState, GameMemory *memory)
 
         u8 *srcBitmap = monoBitmap;
 
-        if (ATLAS_PITCH - currentAtlasColumn < (s32)bitmapHeader->pixelSizeBytes*width)
+        if (ATLAS_PITCH - currentAtlasColumn < (s32)atlasHeader->pixelSizeBytes*width)
         {
             currentAtlasRow += offsetToNextAtlasRow;
             currentAtlasColumn = 0;
@@ -464,7 +471,7 @@ LoadFont(GameState *gameState, GameMemory *memory)
             offsetToNextAtlasRow = 0;
         }
 
-        ASSERT(ATLAS_PITCH - currentAtlasColumn >= (s32)bitmapHeader->pixelSizeBytes*width);
+        ASSERT(ATLAS_PITCH - currentAtlasColumn >= (s32)atlasHeader->pixelSizeBytes*width);
         ASSERT(ATLAS_HEIGHT - currentAtlasRow >= height);
 
         offsetToNextAtlasRow = height > offsetToNextAtlasRow ? height : offsetToNextAtlasRow;
@@ -486,14 +493,22 @@ LoadFont(GameState *gameState, GameMemory *memory)
             dstAtlas += ATLAS_PITCH;
         }
 
-        currentAtlasColumn += bitmapHeader->pixelSizeBytes*width;
+        GlyphMetadata *currentGlyphMetadata = gameState->font.glyphMetadata + (glyphASCIICode - gameState->font.firstGlyphCode);
 
+        currentGlyphMetadata->atlasRowOffset    = currentAtlasRow;
+        currentGlyphMetadata->atlasColumnOffset = currentAtlasColumn;
+        currentGlyphMetadata->glyphWidth        = width;
+        currentGlyphMetadata->glyphHeight       = height;
+
+        currentAtlasColumn += atlasHeader->pixelSizeBytes*width;
     }
 #undef ATLAS_PITCH
 #undef ATLAS_WIDTH
 #undef ATLAS_HEIGHT
 
     deallocateArenaFromTransientStorage(memory, sizeOfMonoBitmapArena);
+
+    stbi_write_bmp("tmp\\fontAtlas.bmp", 1024, 1024, 4, fontAtlas);
 }
 
 #if !XCODE_BUILD && !COMPILER_MSVC
@@ -619,6 +634,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     RenderGroup renderGroup = {0};
     renderGroup.maxPushBufferSize = renderGroupArenaSize;
     renderGroup.pushBufferBase = renderGroupArena.base;
+    renderGroup.atlasHeader = gameState->font.atlasHeader;
 
     pushRenderEntryClear(&renderGroupArena,
                          &renderGroup,
@@ -953,7 +969,19 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #if TEXTURE_DEBUG_MODE
     pushRenderEntryTextureDebug(&renderGroupArena,
                                 &renderGroup,
-                                gameState->font.textureHeader);
+                                gameState->font.atlasHeader,
+                                gameState->font.needsGpuReupload);
+    gameState->font.needsGpuReupload = false;
+#else
+    s8 text[] = "HeljoWorld!";
+    pushRenderEntryText(&renderGroupArena,
+                        &renderGroup,
+                        text,
+                        gameState->font.atlasHeader,
+                        gameState->font.glyphMetadata,
+                        gameState->font.firstGlyphCode,
+                        false);
+
 #endif
 
 #if 0

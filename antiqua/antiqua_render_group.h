@@ -12,6 +12,7 @@ typedef enum RenderGroupEntryType
     RenderGroupEntryType_RenderEntryTile,
     RenderGroupEntryType_RenderEntryRect,
     RenderGroupEntryType_RenderEntryTextureDebug,
+    RenderGroupEntryType_RenderEntryText,
 
     RenderGroupEntryType_Count,
 } RenderGroupEntryType;
@@ -63,14 +64,24 @@ typedef struct RenderEntryTextureDebug
     b32 needsGpuReupload;
 } RenderEntryTextureDebug;
 
+typedef struct RenderEntryText
+{
+    GlyphMetadata *glyphMetadata;
+    AssetHeader *atlasHeader;
+    s8 *text;
+    b32 needsGpuReupload;
+    u8 firstGlyphCode;
+} RenderEntryText;
+
 typedef struct RenderGroup
 {
+    M44 uniforms[2];
+    u8 *pushBufferBase;
+    RenderGroupEntryHeader *prevHeader;
+    AssetHeader *atlasHeader;
     u32 maxPushBufferSize;
     u32 pushBufferSize;
-    u8 *pushBufferBase;
     u32 pushBufferElementCount;
-    RenderGroupEntryHeader *prevHeader;
-    M44 uniforms[2];
 } RenderGroup;
 
 #endif

@@ -14,14 +14,19 @@
 #define POINT_PIPELINE_STATE_IDX 2
 #define TILE_PIPELINE_STATE_IDX 3
 #define TEXTURE_DEBUG_PIPELINE_STATE_IDX 4
+#define TEXT_PIPELINE_STATE_IDX 5
 
-#define PIPELINE_STATE_COUNT 5
+#define PIPELINE_STATE_COUNT 6
 
 #define SWAP_CHAIN_BUFFER_COUNT 2
 
 #define MAX_RENDER_GROUP_VB_SIZE KB(256)
 #define MAX_RENDER_GROUP_PER_OBJECT_CB_SIZE KB(512)
 #define MAX_RENDER_GROUP_PER_PASS_CB_SIZE KB(1)
+
+// NOTE(dima): descriptor per renderable object + 1 for per pass descriptor + 1 for SRV descriptor
+// TODO(dima): do not hardcode max renderable object count!
+#define MAX_CBV_SRV_UAV_DESCRIPTOR_COUNT SWAP_CHAIN_BUFFER_COUNT*(256 + 1 + 1)
 
 #define ThrowIfFailed(hr) ASSERT(SUCCEEDED((hr)))
 
@@ -73,7 +78,7 @@ internal u32 cbvSrvUavDescriptorSize;
 internal ComPtr<ID3D12Resource> renderGroupPerPassCB = NULL;
 internal ComPtr<ID3D12Resource> renderGroupPerObjectCB = NULL;
 
-internal ComPtr<ID3D12Resource> renderGroupVb;
+internal ComPtr<ID3D12Resource> renderGroupVb[SWAP_CHAIN_BUFFER_COUNT] = {NULL, NULL};
 
 internal D3D12_RASTERIZER_DESC rasterizerDesc = {};
 internal D3D12_BLEND_DESC blendDesc = {};
@@ -89,8 +94,11 @@ internal u32 renderGroupVBCurrentSize = 0;
 internal u32 currentCbvSrvUavDescriptorIdx = 0;
 internal u32 currentPerObjectCBOffset = 0;
 
-internal AntiquaTexture texture[SWAP_CHAIN_BUFFER_COUNT] = {{}, {}};
-internal ComPtr<ID3D12Resource> textureUploadHeap[SWAP_CHAIN_BUFFER_COUNT] = {NULL, NULL};
+// TEXTURES BEGIN
+AntiquaTextureUploadHeap textureUploadHeap = {};
+
+internal AntiquaTexture textureAtlas = {};
+// TEXTURES END
 
 internal void GetHardwareAdapter(
     IDXGIFactory1* pFactory,
@@ -325,6 +333,28 @@ internal inline void WaitForGpu()
 
     // Increment the fence value for the current frame.
     fenceValues[frameIndex]++;
+}
+
+internal inline void createTextureUploadHeap(AntiquaTextureUploadHeap *heap)
+{
+    if (!heap->initialized)
+    {
+        // Create the GPU upload buffer.
+        D3D12_HEAP_PROPERTIES bufferResourceHeapProperties = GetHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
+
+#define TEXTURE_UPLOAD_HEAP_SIZE 4*2048*2048 // 4x 2048x2048 textures
+        D3D12_RESOURCE_DESC bufferResourceDesc = GetBufferResourceDescriptor(TEXTURE_UPLOAD_HEAP_SIZE);
+        ThrowIfFailed(device->CreateCommittedResource(&bufferResourceHeapProperties,
+                                                      D3D12_HEAP_FLAG_NONE,
+                                                      &bufferResourceDesc,
+                                                      D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                      NULL,
+                                                      IID_PPV_ARGS(heap->gpuUploadHeap.ReleaseAndGetAddressOf())));
+
+        heap->gpuUploadHeap->SetName(L"textureUploadHeap");
+
+        heap->initialized = true;
+    }
 }
 
 internal inline void CreateDepthStencilBuffer(s32 windowWidth, s32 windowHeight)
@@ -583,12 +613,8 @@ INIT_RENDERER(initRenderer)
 
     // NOTE(dima): create CBV/SRV/UAV Descriptor Heap
     {
-        // NOTE(dima): descriptor per renderable object + 1 for per pass descriptor + 1 for SRV descriptor
-        // TODO(dima): do not hardcode max renderable object count!
-        u32 maxDescriptorCount = SWAP_CHAIN_BUFFER_COUNT*(256 + 1 + 1);
-
         D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-        desc.NumDescriptors = maxDescriptorCount;
+        desc.NumDescriptors = MAX_CBV_SRV_UAV_DESCRIPTOR_COUNT;
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         desc.NodeMask = 0;
@@ -643,8 +669,11 @@ INIT_RENDERER(initRenderer)
     }
 
     // NOTE(dima): create VB
-    CreateBuffer(MAX_RENDER_GROUP_VB_SIZE,
-                 renderGroupVb.ReleaseAndGetAddressOf());
+    for (u32 frameIdx = 0; frameIdx < SWAP_CHAIN_BUFFER_COUNT; ++frameIdx)
+    {
+        CreateBuffer(MAX_RENDER_GROUP_VB_SIZE,
+                     renderGroupVb[frameIdx].ReleaseAndGetAddressOf());
+    }
 
     // NOTE(dima): create root signature
     {
@@ -1081,6 +1110,81 @@ INIT_RENDERER(initRenderer)
 
         ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[TEXTURE_DEBUG_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
     }
+
+    // NOTE(dima): create PSO for text
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+
+        {
+            D3D12_INPUT_ELEMENT_DESC InputLayout[] = {
+                { "OFFSET_X",            0, DXGI_FORMAT_R32_UINT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+                { "ATLAS_ROW_OFFSET",    0, DXGI_FORMAT_R32_UINT, 0, 4, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+                { "ATLAS_COLUMN_OFFSET", 0, DXGI_FORMAT_R32_UINT, 0, 8, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+                { "GLYPH_WIDTH",         0, DXGI_FORMAT_R32_UINT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+                { "GLYPH_HEIGHT",        0, DXGI_FORMAT_R32_UINT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 }
+            }; 
+
+            desc.InputLayout = { InputLayout, ARRAY_COUNT(InputLayout) };
+        }
+
+        desc.pRootSignature = rootSignature.Get();
+
+        {
+            debug_ReadFileResult vsFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_vshader_text.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &vsFile, FILENAME);
+#undef FILENAME
+            ASSERT(vsFile.contentsSize);
+
+            desc.VS = { vsFile.contents, vsFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &vsFile);
+        }
+
+        {
+            debug_ReadFileResult psFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_pshader_text.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &psFile, FILENAME);
+#undef FILENAME
+            ASSERT(psFile.contentsSize);
+
+            desc.PS = { psFile.contents, psFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &psFile);
+        }
+
+        desc.RasterizerState = rasterizerDesc;
+        desc.BlendState = blendDesc;
+
+        {
+            D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+
+            D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
+            depthStencilDesc.DepthEnable = false;
+            depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+            depthStencilDesc.StencilEnable = false;
+            depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+            depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+            depthStencilDesc.FrontFace = defaultStencilOp;
+            depthStencilDesc.BackFace = defaultStencilOp;
+
+            desc.DepthStencilState = depthStencilDesc;
+        }
+
+        desc.SampleMask = UINT_MAX;
+        desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        desc.NumRenderTargets = 1;
+        desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[TEXT_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+    }
+
+    // Create texture upload heap
+    createTextureUploadHeap(&textureUploadHeap);
 }
 
 RENDER_ON_GPU(renderOnGPU)
@@ -1140,19 +1244,23 @@ RENDER_ON_GPU(renderOnGPU)
         D3D12_GPU_DESCRIPTOR_HANDLE perPassCBVGPUHndl = GetGPUDescriptorHandle(cbvSrvUavHeap[frameIndex].Get(),
                                                                                cbvSrvUavDescriptorSize,
                                                                                0);
-                                                                               
 
         commandList->SetGraphicsRootDescriptorTable(0, perPassCBVGPUHndl);
 
         // NOTE(dima): populate per-pass CB
         {
+            ASSERT(currentCbvSrvUavDescriptorIdx < MAX_CBV_SRV_UAV_DESCRIPTOR_COUNT);
+
             u8 *mappedData;
             ThrowIfFailed(renderGroupPerPassCB->Map(0, NULL, (void **)&mappedData));
 
+            u32 offset = 0;
             u32 dataLength = sizeof(renderGroup->uniforms);
-            memcpy(mappedData, renderGroup->uniforms, dataLength);
-            memcpy(mappedData + dataLength, &viewport.Width, sizeof(viewport.Width));
-            memcpy(mappedData + dataLength + sizeof(viewport.Width), &viewport.Height, sizeof(viewport.Height));
+            memCopyAndUpdateOffset(mappedData + offset, renderGroup->uniforms, dataLength, &offset);
+            memCopyAndUpdateOffset(mappedData + offset, &viewport.Width, sizeof(viewport.Width), &offset);
+            memCopyAndUpdateOffset(mappedData + offset, &viewport.Height, sizeof(viewport.Height), &offset);
+            memCopyAndUpdateOffset(mappedData + offset, &renderGroup->atlasHeader->width, sizeof(renderGroup->atlasHeader->width), &offset);
+            memCopyAndUpdateOffset(mappedData + offset, &renderGroup->atlasHeader->height, sizeof(renderGroup->atlasHeader->height), &offset);
 
             renderGroupPerPassCB->Unmap(0, NULL);
 
@@ -1167,12 +1275,15 @@ RENDER_ON_GPU(renderOnGPU)
             ++currentCbvSrvUavDescriptorIdx;
         }
 
+        textureUploadHeap.framesPassedSinceWritingToBeginningOfHeap++;
+
         // NOTE(dima): draw render items
         RenderGroupEntryHeader *entryHeader = (RenderGroupEntryHeader *)renderGroup->pushBufferBase;
         while (entryHeader)
         {
             ASSERT(renderGroupVBCurrentSize < MAX_RENDER_GROUP_VB_SIZE);
             ASSERT(currentPerObjectCBOffset < MAX_RENDER_GROUP_PER_OBJECT_CB_SIZE);
+            ASSERT(currentCbvSrvUavDescriptorIdx < MAX_CBV_SRV_UAV_DESCRIPTOR_COUNT);
 
             switch (entryHeader->type)
             {
@@ -1211,15 +1322,15 @@ RENDER_ON_GPU(renderOnGPU)
                         renderGroupVBCurrentSize += sizeOfData;
 
                         u8 *mappedData;
-                        ThrowIfFailed(renderGroupVb->Map(0, NULL, (void **)&mappedData));
+                        ThrowIfFailed(renderGroupVb[frameIndex]->Map(0, NULL, (void **)&mappedData));
                         mappedData += renderGroupVBStartOffset;
 
                         memcpy(mappedData, vertices, sizeOfData);
 
-                        renderGroupVb->Unmap(0, NULL);
+                        renderGroupVb[frameIndex]->Unmap(0, NULL);
 
                         D3D12_VERTEX_BUFFER_VIEW view;
-                        view.BufferLocation = renderGroupVb->GetGPUVirtualAddress() + renderGroupVBStartOffset;
+                        view.BufferLocation = renderGroupVb[frameIndex]->GetGPUVirtualAddress() + renderGroupVBStartOffset;
                         view.SizeInBytes = renderGroupVBCurrentSize - renderGroupVBStartOffset;
                         // TODO(dima): currently, will have to modify this every time InputLayout changes
                         view.StrideInBytes = 2*sizeof(V3);
@@ -1252,15 +1363,15 @@ RENDER_ON_GPU(renderOnGPU)
                         renderGroupVBCurrentSize += sizeOfData;
 
                         u8 *mappedData;
-                        ThrowIfFailed(renderGroupVb->Map(0, NULL, (void **)&mappedData));
+                        ThrowIfFailed(renderGroupVb[frameIndex]->Map(0, NULL, (void **)&mappedData));
                         mappedData += renderGroupVBStartOffset;
 
                         memcpy(mappedData, vertices, sizeOfData);
 
-                        renderGroupVb->Unmap(0, NULL);
+                        renderGroupVb[frameIndex]->Unmap(0, NULL);
 
                         D3D12_VERTEX_BUFFER_VIEW view;
-                        view.BufferLocation = renderGroupVb->GetGPUVirtualAddress() + renderGroupVBStartOffset;
+                        view.BufferLocation = renderGroupVb[frameIndex]->GetGPUVirtualAddress() + renderGroupVBStartOffset;
                         view.SizeInBytes = renderGroupVBCurrentSize - renderGroupVBStartOffset;
                         // TODO(dima): currently, will have to modify this every time InputLayout changes
                         view.StrideInBytes = 2*sizeof(V3);
@@ -1389,7 +1500,6 @@ RENDER_ON_GPU(renderOnGPU)
                     break;
                 }
 
-#if 1
                 case RenderGroupEntryType_RenderEntryTextureDebug:
                 {
                     RenderEntryTextureDebug *entry = (RenderEntryTextureDebug *)(entryHeader + 1);
@@ -1405,7 +1515,7 @@ RENDER_ON_GPU(renderOnGPU)
 
                     DXGI_FORMAT textureFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 
-                    if (!texture[frameIndex].initialized)
+                    if (!textureAtlas.initialized)
                     {
                         D3D12_RESOURCE_DESC TextureDesc = GetResourceDescriptor(D3D12_RESOURCE_DIMENSION_TEXTURE2D,
                                                                                 0,
@@ -1425,58 +1535,46 @@ RENDER_ON_GPU(renderOnGPU)
                                                                       &TextureDesc,
                                                                       D3D12_RESOURCE_STATE_COPY_DEST,
                                                                       NULL,
-                                                                      IID_PPV_ARGS(texture[frameIndex].gpuTexture.ReleaseAndGetAddressOf())));
+                                                                      IID_PPV_ARGS(textureAtlas.gpuTexture.ReleaseAndGetAddressOf())));
 
-                        texture[frameIndex].gpuTexture->SetName(L"Texture");
+                        textureAtlas.gpuTexture->SetName(L"Texture");
 
-                        texture[frameIndex].state = D3D12_RESOURCE_STATE_COPY_DEST;
-                        texture[frameIndex].needsGpuReupload = true;
-                        texture[frameIndex].initialized = true;
+                        textureAtlas.state = D3D12_RESOURCE_STATE_COPY_DEST;
+                        textureAtlas.needsGpuReupload = true;
+                        textureAtlas.initialized = true;
                     }
 
                     u32 textureDataSize = textureHeader->width*textureHeader->height*textureHeader->pixelSizeBytes;
 
-                    // TODO: upload heap should be large enough to fit any texture!
-                    if (!textureUploadHeap[frameIndex])
-                    {
-                        // Create the GPU upload buffer.
-                        D3D12_HEAP_PROPERTIES bufferResourceHeapProperties = GetHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
-
-                        D3D12_RESOURCE_DESC bufferResourceDesc = GetBufferResourceDescriptor(textureDataSize);
-                        ThrowIfFailed(device->CreateCommittedResource(&bufferResourceHeapProperties,
-                                                                      D3D12_HEAP_FLAG_NONE,
-                                                                      &bufferResourceDesc,
-                                                                      D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                                      NULL,
-                                                                      IID_PPV_ARGS(textureUploadHeap[frameIndex].ReleaseAndGetAddressOf())));
-
-                        textureUploadHeap[frameIndex]->SetName(L"textureUploadHeap");
-                    }
-
                     if (entry->needsGpuReupload)
                     {
-                        for (u32 frameIdx = 0; frameIdx < SWAP_CHAIN_BUFFER_COUNT; ++frameIdx)
-                        {
-                            texture[frameIdx].needsGpuReupload = true;
-                        }
+                        textureAtlas.needsGpuReupload = true;
                     }
 
-                    if (texture[frameIndex].needsGpuReupload)
+                    if (textureAtlas.needsGpuReupload)
                     {
                         D3D12_RESOURCE_BARRIER textureBarrier;
-                        if (texture[frameIndex].state == D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+                        if (textureAtlas.state == D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
                         {
-                            textureBarrier = GetResourceTransitionBarrier(texture[frameIndex].gpuTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+                            textureBarrier = GetResourceTransitionBarrier(textureAtlas.gpuTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
                             commandList->ResourceBarrier(1, &textureBarrier);
                         }
 
+                        if (TEXTURE_UPLOAD_HEAP_SIZE - textureUploadHeap.currentTextureUploadHeapOffset < textureDataSize)
+                        {
+                            ASSERT(textureUploadHeap.framesPassedSinceWritingToBeginningOfHeap > 1);
+                            textureUploadHeap.framesPassedSinceWritingToBeginningOfHeap = 0;
+                            textureUploadHeap.currentTextureUploadHeapOffset = 0;
+                        }
+
                         u8 *mappedData;
-                        ThrowIfFailed(textureUploadHeap[frameIndex]->Map(0, NULL, (void **)&mappedData));
+                        ThrowIfFailed(textureUploadHeap.gpuUploadHeap->Map(0, NULL, (void **)&mappedData));
+                        mappedData += textureUploadHeap.currentTextureUploadHeapOffset;
 
                         u8 *rgbaBitmap = ((u8 *)textureHeader) + sizeof(AssetHeader);
                         memcpy(mappedData, rgbaBitmap, textureDataSize);
 
-                        textureUploadHeap[frameIndex]->Unmap(0, NULL);
+                        textureUploadHeap.gpuUploadHeap->Unmap(0, NULL);
 
                         D3D12_SUBRESOURCE_FOOTPRINT srcFootprint = {};
                         srcFootprint.Format = textureFormat;
@@ -1486,26 +1584,28 @@ RENDER_ON_GPU(renderOnGPU)
                         srcFootprint.RowPitch = textureHeader->pixelSizeBytes*textureHeader->width;
 
                         D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcPlacedFootprint = {};
-                        srcPlacedFootprint.Offset = 0;
+                        srcPlacedFootprint.Offset = textureUploadHeap.currentTextureUploadHeapOffset;
                         srcPlacedFootprint.Footprint = srcFootprint;
 
                         D3D12_TEXTURE_COPY_LOCATION src = {};
-                        src.pResource = textureUploadHeap[frameIndex].Get();
+                        src.pResource = textureUploadHeap.gpuUploadHeap.Get();
                         src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
                         src.PlacedFootprint = srcPlacedFootprint;
 
                         D3D12_TEXTURE_COPY_LOCATION dst = {};
-                        dst.pResource = texture[frameIndex].gpuTexture.Get();
+                        dst.pResource = textureAtlas.gpuTexture.Get();
                         dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
                         dst.SubresourceIndex = 0;
 
                         commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, NULL);
 
-                        textureBarrier = GetResourceTransitionBarrier(texture[frameIndex].gpuTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-                        commandList->ResourceBarrier(1, &textureBarrier);
-                        texture[frameIndex].state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+                        textureUploadHeap.currentTextureUploadHeapOffset += textureDataSize;
 
-                        texture[frameIndex].needsGpuReupload = false;
+                        textureBarrier = GetResourceTransitionBarrier(textureAtlas.gpuTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                        commandList->ResourceBarrier(1, &textureBarrier);
+                        textureAtlas.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+                        textureAtlas.needsGpuReupload = false;
                     }
 
                     D3D12_TEX2D_SRV TexSRV =  {};
@@ -1521,7 +1621,7 @@ RENDER_ON_GPU(renderOnGPU)
 
                     D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHndl = GetCPUDescriptorHandle(cbvSrvUavHeap[frameIndex].Get(), cbvSrvUavDescriptorSize, currentCbvSrvUavDescriptorIdx);
 
-                    device->CreateShaderResourceView(texture[frameIndex].gpuTexture.Get(),
+                    device->CreateShaderResourceView(textureAtlas.gpuTexture.Get(),
                                                      &Desc,
                                                      srvCpuHndl);
 
@@ -1534,7 +1634,185 @@ RENDER_ON_GPU(renderOnGPU)
 
                     break;
                 }
-#endif
+
+                case RenderGroupEntryType_RenderEntryText:
+                {
+                    RenderEntryText *entry = (RenderEntryText *)(entryHeader + 1);
+                    AssetHeader *textureHeader = renderGroup->atlasHeader;
+
+                    commandList->SetPipelineState(pipelineState[TEXT_PIPELINE_STATE_IDX].Get());
+
+                    D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHndl = GetGPUDescriptorHandle(cbvSrvUavHeap[frameIndex].Get(),
+                                                                                    cbvSrvUavDescriptorSize,
+                                                                                    currentCbvSrvUavDescriptorIdx);
+                                                                                    
+                    commandList->SetGraphicsRootDescriptorTable(3, srvGpuHndl);
+
+                    // Load per-instance data into vertex buffer
+                    u32 bufferLocationOffset = renderGroupVBCurrentSize;
+                    u32 offsetX = 0;
+                    s8 *ch = entry->text;
+                    while (s8 c = *ch++)
+                    {
+                        ASSERT(entry->firstGlyphCode >= 32 && entry->firstGlyphCode < 127);
+
+                        GlyphMetadata *currentCharMetadata = entry->glyphMetadata + (c - entry->firstGlyphCode);
+
+                        u32 atlasRowOffset    = currentCharMetadata->atlasRowOffset;
+                        u32 atlasColumnOffset = currentCharMetadata->atlasColumnOffset;
+                        u32 glyphWidth        = currentCharMetadata->glyphWidth;
+                        u32 glyphHeight       = currentCharMetadata->glyphHeight;
+
+                        u32 renderGroupVBStartOffset = renderGroupVBCurrentSize;
+
+                        u8 *mappedData;
+                        ThrowIfFailed(renderGroupVb[frameIndex]->Map(0, NULL, (void **)&mappedData));
+                        mappedData += renderGroupVBStartOffset;
+
+                        u32 offset = 0;
+                        memCopyAndUpdateOffset(mappedData + offset, &offsetX, sizeof(offsetX), &offset);
+                        memCopyAndUpdateOffset(mappedData + offset, &atlasRowOffset, sizeof(atlasRowOffset), &offset);
+                        memCopyAndUpdateOffset(mappedData + offset, &atlasColumnOffset, sizeof(atlasColumnOffset), &offset);
+                        memCopyAndUpdateOffset(mappedData + offset, &glyphWidth, sizeof(glyphWidth), &offset);
+                        memCopyAndUpdateOffset(mappedData + offset, &glyphHeight, sizeof(glyphHeight), &offset);
+
+                        renderGroupVb[frameIndex]->Unmap(0, NULL);
+
+                        renderGroupVBCurrentSize += offset;
+
+                        offsetX += glyphWidth;
+                    }
+
+                    D3D12_VERTEX_BUFFER_VIEW view;
+                    view.BufferLocation = renderGroupVb[frameIndex]->GetGPUVirtualAddress() + bufferLocationOffset;
+                    view.SizeInBytes = renderGroupVBCurrentSize - bufferLocationOffset;
+                    // TODO(dima): currently, will have to modify this every time InputLayout changes
+                    view.StrideInBytes = 20;
+
+                    commandList->IASetVertexBuffers(0, 1, &view);
+
+                    DXGI_FORMAT textureFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+                    if (!textureAtlas.initialized)
+                    {
+                        D3D12_RESOURCE_DESC TextureDesc = GetResourceDescriptor(D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+                                                                                0,
+                                                                                textureHeader->width,
+                                                                                textureHeader->height,
+                                                                                1,
+                                                                                1,
+                                                                                textureFormat,
+                                                                                1,
+                                                                                0,
+                                                                                D3D12_TEXTURE_LAYOUT_UNKNOWN,
+                                                                                D3D12_RESOURCE_FLAG_NONE);
+
+                        D3D12_HEAP_PROPERTIES textureHeapProperties = GetHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
+                        ThrowIfFailed(device->CreateCommittedResource(&textureHeapProperties,
+                                                                      D3D12_HEAP_FLAG_NONE,
+                                                                      &TextureDesc,
+                                                                      D3D12_RESOURCE_STATE_COPY_DEST,
+                                                                      NULL,
+                                                                      IID_PPV_ARGS(textureAtlas.gpuTexture.ReleaseAndGetAddressOf())));
+
+                        textureAtlas.gpuTexture->SetName(L"Texture Atlas");
+
+                        textureAtlas.state = D3D12_RESOURCE_STATE_COPY_DEST;
+                        textureAtlas.needsGpuReupload = true;
+                        textureAtlas.initialized = true;
+                    }
+
+                    u32 textureDataSize = textureHeader->width*textureHeader->height*textureHeader->pixelSizeBytes;
+
+                    if (entry->needsGpuReupload)
+                    {
+                        textureAtlas.needsGpuReupload = true;
+                    }
+
+                    if (textureAtlas.needsGpuReupload)
+                    {
+                        D3D12_RESOURCE_BARRIER textureBarrier;
+                        if (textureAtlas.state == D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+                        {
+                            textureBarrier = GetResourceTransitionBarrier(textureAtlas.gpuTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+                            commandList->ResourceBarrier(1, &textureBarrier);
+                        }
+
+                        if (TEXTURE_UPLOAD_HEAP_SIZE - textureUploadHeap.currentTextureUploadHeapOffset < textureDataSize)
+                        {
+                            ASSERT(textureUploadHeap.framesPassedSinceWritingToBeginningOfHeap > 1);
+                            textureUploadHeap.framesPassedSinceWritingToBeginningOfHeap = 0;
+                            textureUploadHeap.currentTextureUploadHeapOffset = 0;
+                        }
+
+                        u8 *mappedData;
+                        ThrowIfFailed(textureUploadHeap.gpuUploadHeap->Map(0, NULL, (void **)&mappedData));
+                        mappedData += textureUploadHeap.currentTextureUploadHeapOffset;
+
+                        u8 *rgbaBitmap = ((u8 *)textureHeader) + sizeof(AssetHeader);
+                        memcpy(mappedData, rgbaBitmap, textureDataSize);
+
+                        textureUploadHeap.gpuUploadHeap->Unmap(0, NULL);
+
+                        D3D12_SUBRESOURCE_FOOTPRINT srcFootprint = {};
+                        srcFootprint.Format = textureFormat;
+                        srcFootprint.Width = textureHeader->width;
+                        srcFootprint.Height = textureHeader->height;
+                        srcFootprint.Depth = 1;
+                        srcFootprint.RowPitch = textureHeader->pixelSizeBytes*textureHeader->width;
+
+                        D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcPlacedFootprint = {};
+                        srcPlacedFootprint.Offset = textureUploadHeap.currentTextureUploadHeapOffset;
+                        srcPlacedFootprint.Footprint = srcFootprint;
+
+                        D3D12_TEXTURE_COPY_LOCATION src = {};
+                        src.pResource = textureUploadHeap.gpuUploadHeap.Get();
+                        src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                        src.PlacedFootprint = srcPlacedFootprint;
+
+                        D3D12_TEXTURE_COPY_LOCATION dst = {};
+                        dst.pResource = textureAtlas.gpuTexture.Get();
+                        dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                        dst.SubresourceIndex = 0;
+
+                        commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, NULL);
+
+                        textureUploadHeap.currentTextureUploadHeapOffset += textureDataSize;
+
+                        textureBarrier = GetResourceTransitionBarrier(textureAtlas.gpuTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                        commandList->ResourceBarrier(1, &textureBarrier);
+                        textureAtlas.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+                        textureAtlas.needsGpuReupload = false;
+                    }
+
+                    D3D12_TEX2D_SRV TexSRV =  {};
+                    TexSRV.MostDetailedMip = 0;
+                    TexSRV.MipLevels = 1;
+                    TexSRV.ResourceMinLODClamp = 0.0f;
+
+                    D3D12_SHADER_RESOURCE_VIEW_DESC Desc = {};
+                    Desc.Format = textureFormat;
+                    Desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                    Desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                    Desc.Texture2D = TexSRV;
+
+                    D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHndl = GetCPUDescriptorHandle(cbvSrvUavHeap[frameIndex].Get(), cbvSrvUavDescriptorSize, currentCbvSrvUavDescriptorIdx);
+
+                    device->CreateShaderResourceView(textureAtlas.gpuTexture.Get(),
+                                                     &Desc,
+                                                     srvCpuHndl);
+
+
+                    ++currentCbvSrvUavDescriptorIdx;
+
+                    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+                    u32 glyphToRenderCount = stringLength(entry->text);
+                    commandList->DrawInstanced(4, glyphToRenderCount, 0, 0);
+
+                    break;
+                }
 
                 default:
                     break;

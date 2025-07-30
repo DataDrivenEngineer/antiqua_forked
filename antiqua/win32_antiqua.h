@@ -27,6 +27,14 @@ typedef struct AntiquaTexture
     D3D12_RESOURCE_STATES state;
 } AntiquaTexture;
 
+typedef struct AntiquaTextureUploadHeap
+{
+    ComPtr<ID3D12Resource> gpuUploadHeap;
+    b32 initialized;
+    u32 currentTextureUploadHeapOffset;
+    u32 framesPassedSinceWritingToBeginningOfHeap;
+} AntiquaTextureUploadHeap;
+
 internal void FatalError(const char* message)
 {
     MessageBoxA(NULL, message, "Error", MB_ICONEXCLAMATION);
