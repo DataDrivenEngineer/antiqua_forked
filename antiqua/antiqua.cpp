@@ -384,6 +384,12 @@ static void UpdateStaticEntity(GameState *gameState,
 {
 }
 
+/* TODO:
+   - Do not allow making window smaller than certain width / height to prevent crashes when window width or height are zero
+
+   - add support for spaces in text
+   - look into applying antialiasing for text
+*/
 #if !XCODE_BUILD && !COMPILER_MSVC
 EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
 #else
@@ -850,7 +856,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     pushRenderEntryText(&renderGroupArena,
                         &renderGroup,
                         text,
-                        v2(5.0f, 980.0f),
+                        v2(5.0f, 100.0f),
                         v3(0.0f, 1.0f, 0.0f),
                         gameState->font.atlasHeader,
                         gameState->font.glyphMetadata,
@@ -870,7 +876,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     renderGroup.uniforms[0] = gameState->viewMatrix;
     renderGroup.uniforms[1] = gameState->projectionMatrix;
 
-    memory->renderOnGPU(0, &renderGroupArena, &renderGroup, (s32)drawableWidthWithoutScaleFactor, (s32)drawableHeightWithoutScaleFactor);
+    memory->renderOnGPU(0, &renderGroupArena, &renderGroup, drawableWidthWithoutScaleFactor, drawableHeightWithoutScaleFactor);
 
     // TODO(dima): on macos make everything run on the same thread. Get rid of these locks!!!
 #if COMPILER_LLVM

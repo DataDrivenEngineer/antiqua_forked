@@ -322,7 +322,6 @@ GetResourceTransitionBarrier(ID3D12Resource *resource,
 internal inline void WaitForGpu()
 {
     // Schedule a Signal command in the queue.
-    HRESULT HR = commandQueue->Signal(fence.Get(), fenceValues[frameIndex]);
     ThrowIfFailed(commandQueue->Signal(fence.Get(), fenceValues[frameIndex]));
 
     // Wait until the fence has been processed.
@@ -1115,7 +1114,7 @@ INIT_RENDERER(initRenderer)
 
         {
             D3D12_INPUT_ELEMENT_DESC InputLayout[] = {
-{ "OFFSET_X",            0, DXGI_FORMAT_R32_UINT,        0, 0,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "OFFSET_X",            0, DXGI_FORMAT_R32_FLOAT,       0, 0,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 { "OFFSET_Y",            0, DXGI_FORMAT_R32_SINT,        0, 4,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 { "ATLAS_ROW_OFFSET",    0, DXGI_FORMAT_R32_UINT,        0, 8,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 { "ATLAS_COLUMN_OFFSET", 0, DXGI_FORMAT_R32_UINT,        0, 12, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
@@ -1651,13 +1650,15 @@ RENDER_ON_GPU(renderOnGPU)
 
                     // Load per-instance data into vertex buffer
                     u32 bufferLocationOffset = renderGroupVBCurrentSize;
-                    u32 offsetX = 0;
+                    r32 offsetX = 0;
                     s8 *ch = entry->text;
                     while (s8 c = *ch++)
                     {
                         ASSERT(entry->firstGlyphCode >= 32 && entry->firstGlyphCode < 127);
 
                         GlyphMetadata *currentCharMetadata = entry->glyphMetadata + (c - entry->firstGlyphCode);
+
+                        offsetX += currentCharMetadata->leftSideBearing;
 
                         u32 atlasRowOffset      = currentCharMetadata->atlasRowOffset;
                         u32 atlasColumnOffset   = currentCharMetadata->atlasColumnOffset;
@@ -1687,7 +1688,7 @@ RENDER_ON_GPU(renderOnGPU)
 
                         renderGroupVBCurrentSize += offset;
 
-                        offsetX += glyphWidth;
+                        offsetX += currentCharMetadata->advanceWidth;
                     }
 
                     D3D12_VERTEX_BUFFER_VIEW view;

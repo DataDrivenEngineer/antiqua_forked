@@ -45,7 +45,7 @@ struct VS_INPUT {
 };
 
 struct VS_INPUT_TEXT {
-    uint   offsetX             : OFFSET_X;
+    float  offsetX             : OFFSET_X;
     int    offsetY             : OFFSET_Y;
     uint   atlasRowOffset      : ATLAS_ROW_OFFSET;
     uint   atlasColumnOffset   : ATLAS_COLUMN_OFFSET;
@@ -124,14 +124,14 @@ VS_OUTPUT vsPoint(VS_INPUT input, uint vertexID : SV_VertexID)
 VS_OUTPUT_TEXT vsText(VS_INPUT_TEXT input, uint vertexID : SV_VertexID)
 {
     float baselineX = input.startPositionScreen.x;
-    float baselineY = input.startPositionScreen.y;
+    float baselineY = windowHeight - input.startPositionScreen.y;
 
     float topY = baselineY + (float)input.glyphHeight + input.offsetY;
     float bottomY = baselineY + input.offsetY;
-    float2 topLeft     = float2(baselineX + (float)input.offsetX, topY);
-    float2 topRight    = float2(baselineX + (float)input.offsetX + (float)input.glyphWidth, topY);
-    float2 bottomLeft  = float2(baselineX + (float)input.offsetX, bottomY);
-    float2 bottomRight = float2(baselineX + (float)input.offsetX + (float)input.glyphWidth, bottomY);
+    float2 topLeft     = float2(baselineX + input.offsetX, topY);
+    float2 topRight    = float2(baselineX + input.offsetX + (float)input.glyphWidth, topY);
+    float2 bottomLeft  = float2(baselineX + input.offsetX, bottomY);
+    float2 bottomRight = float2(baselineX + input.offsetX + (float)input.glyphWidth, bottomY);
 
     float2 positions[4] = {
                               float2(NORMALIZE(topLeft.x, 0, 2, windowWidth, -1), NORMALIZE(topLeft.y, 0, 2, windowHeight, -1)),
