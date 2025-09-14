@@ -30,8 +30,6 @@ cbuffer cbPerTile : register(b2)
 
 // Debug texture
 Texture2D g_texture    : register(t0);
-// Font atlas
-Texture2D fontAtlas    : register(t1);
 SamplerState g_sampler : register(s0);
 
 #define NORMALIZE(OldValue, OldMin, NewRange, OldRange, NewMin) ((((OldValue) - (OldMin)) * (NewRange)) / (OldRange)) + (NewMin) 
@@ -47,11 +45,21 @@ struct VS_INPUT {
 };
 
 struct VS_INPUT_TEXT {
-    uint offsetX           : OFFSET_X;
-    uint atlasRowOffset    : ATLAS_ROW_OFFSET;
-    uint atlasColumnOffset : ATLAS_COLUMN_OFFSET;
-    uint glyphWidth        : GLYPH_WIDTH;
-    uint glyphHeight       : GLYPH_HEIGHT;
+    uint   offsetX             : OFFSET_X;
+    int    offsetY             : OFFSET_Y;
+    uint   atlasRowOffset      : ATLAS_ROW_OFFSET;
+    uint   atlasColumnOffset   : ATLAS_COLUMN_OFFSET;
+    uint   glyphWidth          : GLYPH_WIDTH;
+    uint   glyphHeight         : GLYPH_HEIGHT;
+    float2 startPositionScreen : START_POSITION;
+    float3 fontColor           : FONT_COLOR;
+};
+
+struct VS_OUTPUT_TEXT
+{
+    float4 position : SV_POSITION;
+    float2 uv       : TEXCOORD;
+    float3 fontColor: COLOR;
 };
 
 struct VS_OUTPUT
@@ -113,15 +121,17 @@ VS_OUTPUT vsPoint(VS_INPUT input, uint vertexID : SV_VertexID)
     return output;
 }
 
-VS_OUTPUT_TEXTURE vsText(VS_INPUT_TEXT input, uint vertexID : SV_VertexID)
+VS_OUTPUT_TEXT vsText(VS_INPUT_TEXT input, uint vertexID : SV_VertexID)
 {
-    float baselineX = 500.0f;
-    float baselineY = 500.0f;
+    float baselineX = input.startPositionScreen.x;
+    float baselineY = input.startPositionScreen.y;
 
-    float2 topLeft     = float2(baselineX + (float)input.offsetX, baselineY);
-    float2 topRight    = float2(baselineX + (float)input.offsetX + (float)input.glyphWidth, baselineY);
-    float2 bottomLeft  = float2(baselineX + (float)input.offsetX, baselineY - (float)input.glyphHeight);
-    float2 bottomRight = float2(baselineX + (float)input.offsetX + (float)input.glyphWidth, baselineY - (float)input.glyphHeight);
+    float topY = baselineY + (float)input.glyphHeight + input.offsetY;
+    float bottomY = baselineY + input.offsetY;
+    float2 topLeft     = float2(baselineX + (float)input.offsetX, topY);
+    float2 topRight    = float2(baselineX + (float)input.offsetX + (float)input.glyphWidth, topY);
+    float2 bottomLeft  = float2(baselineX + (float)input.offsetX, bottomY);
+    float2 bottomRight = float2(baselineX + (float)input.offsetX + (float)input.glyphWidth, bottomY);
 
     float2 positions[4] = {
                               float2(NORMALIZE(topLeft.x, 0, 2, windowWidth, -1), NORMALIZE(topLeft.y, 0, 2, windowHeight, -1)),
@@ -143,9 +153,10 @@ VS_OUTPUT_TEXTURE vsText(VS_INPUT_TEXT input, uint vertexID : SV_VertexID)
     uvs[1] = float2((atlasColumnOffsetF + glyphWidthF) / atlasWidthF, atlasRowOffsetF / atlasHeightF);
     uvs[3] = float2((atlasColumnOffsetF + glyphWidthF) / atlasWidthF, (atlasRowOffsetF + glyphHeightF) / atlasHeightF);
 
-    VS_OUTPUT_TEXTURE output;
-    output.position = float4(positions[vertexID], 0.1f, 1.0f);
-    output.uv       = uvs[vertexID];
+    VS_OUTPUT_TEXT output;
+    output.position  = float4(positions[vertexID], 0.1f, 1.0f);
+    output.uv        = uvs[vertexID];
+    output.fontColor = input.fontColor;
     
     return output;
 }
@@ -307,12 +318,9 @@ float4 psTextureDebug(VS_OUTPUT_TEXTURE input) : SV_TARGET
     return color;
 }
 
-float4 psText(VS_OUTPUT_TEXTURE input) : SV_TARGET
+float4 psText(VS_OUTPUT_TEXT input) : SV_TARGET
 {
-#if 1
-    float4 color = float4(g_texture.Sample(g_sampler, input.uv).rgb, 1.0f);
-    return color;
-#else
-    return float4(0.0f, 1.0f, 0.0f, 1.0f);
-#endif
+    float alpha = g_texture.Sample(g_sampler, input.uv).a;
+    clip(alpha - 0.1f);
+    return float4(input.fontColor, 1.0f);
 }

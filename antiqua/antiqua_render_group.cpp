@@ -148,6 +148,8 @@ void pushRenderEntryTextureDebug(MemoryArena *arena,
 void pushRenderEntryText(MemoryArena *arena,
                          RenderGroup *renderGroup,
                          s8 *text,
+                         V2 posScreen,
+                         V3 color,
                          AssetHeader *atlasHeader,
                          GlyphMetadata *glyphMetadata,
                          s8 firstGlyphCode,
@@ -162,6 +164,8 @@ void pushRenderEntryText(MemoryArena *arena,
     entry->atlasHeader = atlasHeader;
     entry->glyphMetadata = glyphMetadata;
     entry->text = text;
+    entry->color = color;
+    entry->posScreen = posScreen;
     entry->firstGlyphCode = firstGlyphCode;
 
     renderGroup->pushBufferSize += sizeof(RenderEntryTextureDebug);

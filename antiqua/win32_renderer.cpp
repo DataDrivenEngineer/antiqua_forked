@@ -81,7 +81,7 @@ internal ComPtr<ID3D12Resource> renderGroupPerObjectCB = NULL;
 internal ComPtr<ID3D12Resource> renderGroupVb[SWAP_CHAIN_BUFFER_COUNT] = {NULL, NULL};
 
 internal D3D12_RASTERIZER_DESC rasterizerDesc = {};
-internal D3D12_BLEND_DESC blendDesc = {};
+internal D3D12_BLEND_DESC defaultBlendDesc = {};
 
 // Synchronization objects.
 internal u32 frameIndex;
@@ -94,11 +94,9 @@ internal u32 renderGroupVBCurrentSize = 0;
 internal u32 currentCbvSrvUavDescriptorIdx = 0;
 internal u32 currentPerObjectCBOffset = 0;
 
-// TEXTURES BEGIN
+// Textures
 AntiquaTextureUploadHeap textureUploadHeap = {};
-
 internal AntiquaTexture textureAtlas = {};
-// TEXTURES END
 
 internal void GetHardwareAdapter(
     IDXGIFactory1* pFactory,
@@ -774,18 +772,18 @@ INIT_RENDERER(initRenderer)
     }
 
     {
-        blendDesc.AlphaToCoverageEnable = false;
-        blendDesc.IndependentBlendEnable = false;
-        blendDesc.RenderTarget[0].BlendEnable = false;
-        blendDesc.RenderTarget[0].LogicOpEnable = false;
-        blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
-        blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
-        blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-        blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-        blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
-        blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
-        blendDesc.RenderTarget[0].LogicOp = D3D12_LOGIC_OP_NOOP;
-        blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+        defaultBlendDesc.AlphaToCoverageEnable = false;
+        defaultBlendDesc.IndependentBlendEnable = false;
+        defaultBlendDesc.RenderTarget[0].BlendEnable = false;
+        defaultBlendDesc.RenderTarget[0].LogicOpEnable = false;
+        defaultBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+        defaultBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
+        defaultBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        defaultBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+        defaultBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+        defaultBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+        defaultBlendDesc.RenderTarget[0].LogicOp = D3D12_LOGIC_OP_NOOP;
+        defaultBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
     }
 
     // NOTE(dima): create per-pass CB
@@ -827,7 +825,7 @@ INIT_RENDERER(initRenderer)
         }
 
         desc.RasterizerState = rasterizerDesc;
-        desc.BlendState = blendDesc;
+        desc.BlendState = defaultBlendDesc;
 
         {
             D3D12_DEPTH_STENCILOP_DESC DefaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
@@ -894,7 +892,7 @@ INIT_RENDERER(initRenderer)
         }
 
         desc.RasterizerState = rasterizerDesc;
-        desc.BlendState = blendDesc;
+        desc.BlendState = defaultBlendDesc;
 
         {
             D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
@@ -962,7 +960,7 @@ INIT_RENDERER(initRenderer)
 
         desc.RasterizerState = rasterizerDesc;
         desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-        desc.BlendState = blendDesc;
+        desc.BlendState = defaultBlendDesc;
 
         {
             D3D12_DEPTH_STENCILOP_DESC DefaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
@@ -1022,7 +1020,7 @@ INIT_RENDERER(initRenderer)
         }
 
         desc.RasterizerState = rasterizerDesc;
-        desc.BlendState = blendDesc;
+        desc.BlendState = defaultBlendDesc;
 
         {
             D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
@@ -1082,7 +1080,7 @@ INIT_RENDERER(initRenderer)
         }
 
         desc.RasterizerState = rasterizerDesc;
-        desc.BlendState = blendDesc;
+        desc.BlendState = defaultBlendDesc;
 
         {
             D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
@@ -1117,11 +1115,14 @@ INIT_RENDERER(initRenderer)
 
         {
             D3D12_INPUT_ELEMENT_DESC InputLayout[] = {
-                { "OFFSET_X",            0, DXGI_FORMAT_R32_UINT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-                { "ATLAS_ROW_OFFSET",    0, DXGI_FORMAT_R32_UINT, 0, 4, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-                { "ATLAS_COLUMN_OFFSET", 0, DXGI_FORMAT_R32_UINT, 0, 8, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-                { "GLYPH_WIDTH",         0, DXGI_FORMAT_R32_UINT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-                { "GLYPH_HEIGHT",        0, DXGI_FORMAT_R32_UINT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 }
+{ "OFFSET_X",            0, DXGI_FORMAT_R32_UINT,        0, 0,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "OFFSET_Y",            0, DXGI_FORMAT_R32_SINT,        0, 4,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "ATLAS_ROW_OFFSET",    0, DXGI_FORMAT_R32_UINT,        0, 8,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "ATLAS_COLUMN_OFFSET", 0, DXGI_FORMAT_R32_UINT,        0, 12, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "GLYPH_WIDTH",         0, DXGI_FORMAT_R32_UINT,        0, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "GLYPH_HEIGHT",        0, DXGI_FORMAT_R32_UINT,        0, 20, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "START_POSITION",      0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "FONT_COLOR",          0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 }
             }; 
 
             desc.InputLayout = { InputLayout, ARRAY_COUNT(InputLayout) };
@@ -1154,7 +1155,7 @@ INIT_RENDERER(initRenderer)
         }
 
         desc.RasterizerState = rasterizerDesc;
-        desc.BlendState = blendDesc;
+        desc.BlendState = defaultBlendDesc;
 
         {
             D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
@@ -1658,10 +1659,13 @@ RENDER_ON_GPU(renderOnGPU)
 
                         GlyphMetadata *currentCharMetadata = entry->glyphMetadata + (c - entry->firstGlyphCode);
 
-                        u32 atlasRowOffset    = currentCharMetadata->atlasRowOffset;
-                        u32 atlasColumnOffset = currentCharMetadata->atlasColumnOffset;
-                        u32 glyphWidth        = currentCharMetadata->glyphWidth;
-                        u32 glyphHeight       = currentCharMetadata->glyphHeight;
+                        u32 atlasRowOffset      = currentCharMetadata->atlasRowOffset;
+                        u32 atlasColumnOffset   = currentCharMetadata->atlasColumnOffset;
+                        u32 glyphWidth          = currentCharMetadata->glyphWidth;
+                        u32 glyphHeight         = currentCharMetadata->glyphHeight;
+                        V2  startPositionScreen = entry->posScreen;
+                        s32 offsetY             = -currentCharMetadata->yNegativeOffset;
+                        V3 fontColor            = entry->color;
 
                         u32 renderGroupVBStartOffset = renderGroupVBCurrentSize;
 
@@ -1671,10 +1675,13 @@ RENDER_ON_GPU(renderOnGPU)
 
                         u32 offset = 0;
                         memCopyAndUpdateOffset(mappedData + offset, &offsetX, sizeof(offsetX), &offset);
+                        memCopyAndUpdateOffset(mappedData + offset, &offsetY, sizeof(offsetY), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &atlasRowOffset, sizeof(atlasRowOffset), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &atlasColumnOffset, sizeof(atlasColumnOffset), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &glyphWidth, sizeof(glyphWidth), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &glyphHeight, sizeof(glyphHeight), &offset);
+                        memCopyAndUpdateOffset(mappedData + offset, &startPositionScreen, sizeof(startPositionScreen), &offset);
+                        memCopyAndUpdateOffset(mappedData + offset, &fontColor, sizeof(fontColor), &offset);
 
                         renderGroupVb[frameIndex]->Unmap(0, NULL);
 
@@ -1687,7 +1694,7 @@ RENDER_ON_GPU(renderOnGPU)
                     view.BufferLocation = renderGroupVb[frameIndex]->GetGPUVirtualAddress() + bufferLocationOffset;
                     view.SizeInBytes = renderGroupVBCurrentSize - bufferLocationOffset;
                     // TODO(dima): currently, will have to modify this every time InputLayout changes
-                    view.StrideInBytes = 20;
+                    view.StrideInBytes = 44;
 
                     commandList->IASetVertexBuffers(0, 1, &view);
 

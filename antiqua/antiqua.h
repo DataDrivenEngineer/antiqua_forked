@@ -2,6 +2,7 @@
 
 #include "antiqua_platform.h"
 #include "antiqua_math.h"
+#include "antiqua_font.h"
 
 typedef struct Rect
 {
@@ -34,24 +35,6 @@ typedef struct AssetHeader
     u32 height;
     u32 pixelSizeBytes;
 } AssetHeader;
-
-typedef struct GlyphMetadata
-{
-    u32 atlasRowOffset;
-    u32 atlasColumnOffset;
-    u32 glyphWidth;
-    u32 glyphHeight;
-} GlyphMetadata;
-
-typedef struct Font
-{
-    GlyphMetadata *glyphMetadata;
-    AssetHeader *atlasHeader;
-    u8 firstGlyphCode;
-    u8 lastGlyphCode;
-    u32 glyphCount;
-    b32 needsGpuReupload;
-} Font;
 
 typedef struct GameState
 {
