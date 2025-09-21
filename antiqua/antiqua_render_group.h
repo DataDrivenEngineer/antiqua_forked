@@ -67,12 +67,11 @@ typedef struct RenderEntryTextureDebug
 typedef struct RenderEntryText
 {
     V3 color;
-    GlyphMetadata *glyphMetadata;
-    AssetHeader *atlasHeader;
     V2 posScreen;
+    Font *font;
     s8 *text;
     b32 needsGpuReupload;
-    u8 firstGlyphCode;
+    u8 fontSizePx;
 } RenderEntryText;
 
 typedef struct RenderGroup

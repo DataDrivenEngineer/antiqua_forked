@@ -6,8 +6,6 @@
 
 #if 0
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#endif
-#if 0
 #include "stb_image_write.h"
 #endif
 
@@ -17,9 +15,11 @@ typedef struct GlyphMetadata
 {
     u32 atlasRowOffset;
     u32 atlasColumnOffset;
-    u32 glyphWidth;
-    u32 glyphHeight;
-    s32 yNegativeOffset;
+    r32 defaultGlyphWidth;
+    r32 defaultGlyphHeight;
+    r32 glyphWidth;
+    r32 glyphHeight;
+    r32 yNegativeOffset;
     r32 advanceWidth;
     r32 leftSideBearing;
 } GlyphMetadata;
@@ -28,10 +28,14 @@ typedef struct Font
 {
     GlyphMetadata *glyphMetadata;
     AssetHeader *atlasHeader;
-    u8 firstGlyphCode;
-    u8 lastGlyphCode;
     u32 glyphCount;
     b32 needsGpuReupload;
+    s32 ascent;
+    s32 descent;
+    s32 lineGap;
+    u8 firstGlyphCode;
+    u8 lastGlyphCode;
+    u8 defaultFontSizePx;
 } Font;
 
 #endif

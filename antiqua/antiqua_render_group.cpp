@@ -147,12 +147,11 @@ void pushRenderEntryTextureDebug(MemoryArena *arena,
 
 void pushRenderEntryText(MemoryArena *arena,
                          RenderGroup *renderGroup,
+                         Font *font,
+                         u8 fontSizePx,
                          s8 *text,
                          V2 posScreen,
                          V3 color,
-                         AssetHeader *atlasHeader,
-                         GlyphMetadata *glyphMetadata,
-                         s8 firstGlyphCode,
                          b32 needsGpuReupload)
 {
     ASSERT(renderGroup->pushBufferElementCount > 0);
@@ -161,12 +160,11 @@ void pushRenderEntryText(MemoryArena *arena,
     entryHeader->type = RenderGroupEntryType_RenderEntryText;
     renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
     RenderEntryText *entry = PUSH_STRUCT(arena, RenderEntryText);
-    entry->atlasHeader = atlasHeader;
-    entry->glyphMetadata = glyphMetadata;
+    entry->font = font;
+    entry->fontSizePx = fontSizePx;
     entry->text = text;
     entry->color = color;
     entry->posScreen = posScreen;
-    entry->firstGlyphCode = firstGlyphCode;
 
     renderGroup->pushBufferSize += sizeof(RenderEntryTextureDebug);
     renderGroup->pushBufferElementCount++;

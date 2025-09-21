@@ -46,11 +46,13 @@ struct VS_INPUT {
 
 struct VS_INPUT_TEXT {
     float  offsetX             : OFFSET_X;
-    int    offsetY             : OFFSET_Y;
+    float  offsetY             : OFFSET_Y;
     uint   atlasRowOffset      : ATLAS_ROW_OFFSET;
     uint   atlasColumnOffset   : ATLAS_COLUMN_OFFSET;
-    uint   glyphWidth          : GLYPH_WIDTH;
-    uint   glyphHeight         : GLYPH_HEIGHT;
+    float  defaultGlyphWidth   : DEFAULT_GLYPH_WIDTH;
+    float  defaultGlyphHeight  : DEFAULT_GLYPH_HEIGHT;
+    float  glyphWidth          : GLYPH_WIDTH;
+    float  glyphHeight         : GLYPH_HEIGHT;
     float2 startPositionScreen : START_POSITION;
     float3 fontColor           : FONT_COLOR;
 };
@@ -126,8 +128,8 @@ VS_OUTPUT_TEXT vsText(VS_INPUT_TEXT input, uint vertexID : SV_VertexID)
     float baselineX = input.startPositionScreen.x;
     float baselineY = windowHeight - input.startPositionScreen.y;
 
-    float topY = baselineY + (float)input.glyphHeight + input.offsetY;
-    float bottomY = baselineY + input.offsetY;
+    float topY         = baselineY + (float)input.glyphHeight + input.offsetY;
+    float bottomY      = baselineY + input.offsetY;
     float2 topLeft     = float2(baselineX + input.offsetX, topY);
     float2 topRight    = float2(baselineX + input.offsetX + (float)input.glyphWidth, topY);
     float2 bottomLeft  = float2(baselineX + input.offsetX, bottomY);
@@ -142,16 +144,14 @@ VS_OUTPUT_TEXT vsText(VS_INPUT_TEXT input, uint vertexID : SV_VertexID)
 
     float atlasRowOffsetF    = (float)input.atlasRowOffset;
     float atlasColumnOffsetF = (float)(input.atlasColumnOffset / 4);
-    float glyphWidthF        = (float)input.glyphWidth;
-    float glyphHeightF       = (float)input.glyphHeight;
     float atlasWidthF        = (float)atlasWidth;
     float atlasHeightF       = (float)atlasHeight;
 
     float2 uvs[4];
-    uvs[2] = float2(atlasColumnOffsetF / atlasWidthF, (atlasRowOffsetF + glyphHeightF) / atlasHeightF);
+    uvs[2] = float2(atlasColumnOffsetF / atlasWidthF, (atlasRowOffsetF + input.defaultGlyphHeight) / atlasHeightF);
     uvs[0] = float2(atlasColumnOffsetF / atlasWidthF, atlasRowOffsetF / atlasHeightF);
-    uvs[1] = float2((atlasColumnOffsetF + glyphWidthF) / atlasWidthF, atlasRowOffsetF / atlasHeightF);
-    uvs[3] = float2((atlasColumnOffsetF + glyphWidthF) / atlasWidthF, (atlasRowOffsetF + glyphHeightF) / atlasHeightF);
+    uvs[1] = float2((atlasColumnOffsetF + input.defaultGlyphWidth) / atlasWidthF, atlasRowOffsetF / atlasHeightF);
+    uvs[3] = float2((atlasColumnOffsetF + input.defaultGlyphWidth) / atlasWidthF, (atlasRowOffsetF + input.defaultGlyphHeight) / atlasHeightF);
 
     VS_OUTPUT_TEXT output;
     output.position  = float4(positions[vertexID], 0.1f, 1.0f);
@@ -167,7 +167,7 @@ VS_OUTPUT vs(VS_INPUT input)
     
     output.position = mul(float4(input.position, 1.0f), transpose(viewMatrix));
     output.position = mul(output.position, transpose(projectionMatrix));
-    output.color = input.color;
+    output.color    = input.color;
     
     return output;
 }
@@ -320,7 +320,11 @@ float4 psTextureDebug(VS_OUTPUT_TEXTURE input) : SV_TARGET
 
 float4 psText(VS_OUTPUT_TEXT input) : SV_TARGET
 {
+#if 1
     float alpha = g_texture.Sample(g_sampler, input.uv).a;
     clip(alpha - 0.1f);
     return float4(input.fontColor, 1.0f);
+#else
+    return float4(0.0f, 0.0f, 1.0f, 1.0f);
+#endif
 }

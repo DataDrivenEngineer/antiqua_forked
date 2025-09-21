@@ -1114,14 +1114,16 @@ INIT_RENDERER(initRenderer)
 
         {
             D3D12_INPUT_ELEMENT_DESC InputLayout[] = {
-{ "OFFSET_X",            0, DXGI_FORMAT_R32_FLOAT,       0, 0,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "OFFSET_Y",            0, DXGI_FORMAT_R32_SINT,        0, 4,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "ATLAS_ROW_OFFSET",    0, DXGI_FORMAT_R32_UINT,        0, 8,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "ATLAS_COLUMN_OFFSET", 0, DXGI_FORMAT_R32_UINT,        0, 12, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "GLYPH_WIDTH",         0, DXGI_FORMAT_R32_UINT,        0, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "GLYPH_HEIGHT",        0, DXGI_FORMAT_R32_UINT,        0, 20, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "START_POSITION",      0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "FONT_COLOR",          0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 }
+{ "OFFSET_X",             0, DXGI_FORMAT_R32_FLOAT,       0, 0,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "OFFSET_Y",             0, DXGI_FORMAT_R32_FLOAT,       0, 4,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "ATLAS_ROW_OFFSET",     0, DXGI_FORMAT_R32_UINT,        0, 8,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "ATLAS_COLUMN_OFFSET",  0, DXGI_FORMAT_R32_UINT,        0, 12, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "DEFAULT_GLYPH_WIDTH",  0, DXGI_FORMAT_R32_FLOAT,       0, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "DEFAULT_GLYPH_HEIGHT", 0, DXGI_FORMAT_R32_FLOAT,       0, 20, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "GLYPH_WIDTH",          0, DXGI_FORMAT_R32_FLOAT,       0, 24, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "GLYPH_HEIGHT",         0, DXGI_FORMAT_R32_FLOAT,       0, 28, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "START_POSITION",       0, DXGI_FORMAT_R32G32_FLOAT,    0, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "FONT_COLOR",           0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 }
             }; 
 
             desc.InputLayout = { InputLayout, ARRAY_COUNT(InputLayout) };
@@ -1654,19 +1656,35 @@ RENDER_ON_GPU(renderOnGPU)
                     s8 *ch = entry->text;
                     while (s8 c = *ch++)
                     {
-                        ASSERT(entry->firstGlyphCode >= 32 && entry->firstGlyphCode < 127);
+                        ASSERT(entry->font->firstGlyphCode >= 31 && entry->font->firstGlyphCode < 127);
 
-                        GlyphMetadata *currentCharMetadata = entry->glyphMetadata + (c - entry->firstGlyphCode);
+                        GlyphMetadata *currentCharMetadataAtDefaultScale = entry->font->glyphMetadata + (c - entry->font->firstGlyphCode);
+                        GlyphMetadata currentCharMetadata = *currentCharMetadataAtDefaultScale;
 
-                        offsetX += currentCharMetadata->leftSideBearing;
-
-                        u32 atlasRowOffset      = currentCharMetadata->atlasRowOffset;
-                        u32 atlasColumnOffset   = currentCharMetadata->atlasColumnOffset;
-                        u32 glyphWidth          = currentCharMetadata->glyphWidth;
-                        u32 glyphHeight         = currentCharMetadata->glyphHeight;
+                        u32 atlasRowOffset      = currentCharMetadata.atlasRowOffset;
+                        u32 atlasColumnOffset   = currentCharMetadata.atlasColumnOffset;
+                        r32 glyphWidth          = currentCharMetadata.glyphWidth;
+                        r32 glyphHeight         = currentCharMetadata.glyphHeight;
+                        r32 defaultGlyphWidth   = currentCharMetadata.defaultGlyphWidth;
+                        r32 defaultGlyphHeight  = currentCharMetadata.defaultGlyphHeight;
                         V2  startPositionScreen = entry->posScreen;
-                        s32 offsetY             = -currentCharMetadata->yNegativeOffset;
-                        V3 fontColor            = entry->color;
+                        r32 offsetY             = -currentCharMetadata.yNegativeOffset;
+                        V3  fontColor           = entry->color;
+
+                        r32 advanceWidth        = currentCharMetadata.advanceWidth;
+                        r32 leftSideBearing     = currentCharMetadata.leftSideBearing;
+
+                        {
+                            r32 fontScale = (r32)entry->fontSizePx / entry->font->defaultFontSizePx;
+
+                            glyphWidth      *= fontScale;
+                            glyphHeight     *= fontScale;
+                            offsetY         *= fontScale;
+                            advanceWidth    *= fontScale;
+                            leftSideBearing *= fontScale;
+                        }
+
+                        offsetX += leftSideBearing;
 
                         u32 renderGroupVBStartOffset = renderGroupVBCurrentSize;
 
@@ -1679,6 +1697,8 @@ RENDER_ON_GPU(renderOnGPU)
                         memCopyAndUpdateOffset(mappedData + offset, &offsetY, sizeof(offsetY), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &atlasRowOffset, sizeof(atlasRowOffset), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &atlasColumnOffset, sizeof(atlasColumnOffset), &offset);
+                        memCopyAndUpdateOffset(mappedData + offset, &defaultGlyphWidth, sizeof(defaultGlyphWidth), &offset);
+                        memCopyAndUpdateOffset(mappedData + offset, &defaultGlyphHeight, sizeof(defaultGlyphHeight), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &glyphWidth, sizeof(glyphWidth), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &glyphHeight, sizeof(glyphHeight), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &startPositionScreen, sizeof(startPositionScreen), &offset);
@@ -1688,14 +1708,14 @@ RENDER_ON_GPU(renderOnGPU)
 
                         renderGroupVBCurrentSize += offset;
 
-                        offsetX += currentCharMetadata->advanceWidth;
+                        offsetX += advanceWidth;
                     }
 
                     D3D12_VERTEX_BUFFER_VIEW view;
                     view.BufferLocation = renderGroupVb[frameIndex]->GetGPUVirtualAddress() + bufferLocationOffset;
                     view.SizeInBytes = renderGroupVBCurrentSize - bufferLocationOffset;
                     // TODO(dima): currently, will have to modify this every time InputLayout changes
-                    view.StrideInBytes = 44;
+                    view.StrideInBytes = 52;
 
                     commandList->IASetVertexBuffers(0, 1, &view);
 

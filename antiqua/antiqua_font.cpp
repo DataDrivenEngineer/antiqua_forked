@@ -1,5 +1,4 @@
-internal void
-LoadFont(GameState *gameState, GameMemory *memory)
+void LoadFont(GameState *gameState, GameMemory *memory)
 {
     debug_ReadFileResult ttfFile;
 #define FILENAME "C:/Windows/Fonts/arial.ttf"
@@ -9,31 +8,38 @@ LoadFont(GameState *gameState, GameMemory *memory)
 
     stbtt_fontinfo font;
     stbtt_InitFont(&font, (u8 *)ttfFile.contents, stbtt_GetFontOffsetForIndex((u8 *)ttfFile.contents, 0));
-    r32 fontScale = stbtt_ScaleForPixelHeight(&font, 128.0f);
+
+    s32 ascent, descent, lineGap;
+    stbtt_GetFontVMetrics(&font, &ascent, &descent, &lineGap);
 
     memory->debug_platformFreeFileMemory(NULL, &ttfFile);
 
     MemoryArena fontArena;
     initializeArenaFromPermanentStorage(memory, &fontArena, MB(5));
 
-    gameState->font.firstGlyphCode = 32;
+    gameState->font.firstGlyphCode = 31;
     gameState->font.lastGlyphCode = 127;
     gameState->font.glyphCount = gameState->font.lastGlyphCode - gameState->font.firstGlyphCode;
     gameState->font.atlasHeader = PUSH_STRUCT(&fontArena, AssetHeader);
     gameState->font.needsGpuReupload = true;
+    gameState->font.ascent = ascent;
+    gameState->font.descent = descent;
+    gameState->font.lineGap = lineGap;
+    gameState->font.defaultFontSizePx = 128;
     AssetHeader *atlasHeader = gameState->font.atlasHeader;
     atlasHeader->pixelSizeBytes = 4;
     atlasHeader->width = 1024;
     atlasHeader->height = 1024;
 
+    // Default scale, actual scaling will be applied by renderer depending on the px size passed into API
+    r32 fontScale = stbtt_ScaleForPixelHeight(&font, (r32)gameState->font.defaultFontSizePx);
+
     MemoryArena monoBitmapArena;
     u32 sizeOfMonoBitmapArena = MB(5);
     initializeArenaFromTransientStorage(memory, &monoBitmapArena, sizeOfMonoBitmapArena);
 
-#define ATLAS_WIDTH (s32)atlasHeader->width
-#define ATLAS_HEIGHT (s32)atlasHeader->height
-#define ATLAS_PITCH (s32)atlasHeader->pixelSizeBytes*ATLAS_WIDTH
-    u8 *fontAtlas = PUSH_ARRAY(&fontArena, ATLAS_PITCH*ATLAS_HEIGHT, u8);
+    s32 atlasPitch = atlasHeader->width*atlasHeader->pixelSizeBytes;
+    u8 *fontAtlas = PUSH_ARRAY(&fontArena, atlasPitch*atlasHeader->height, u8);
 
     gameState->font.glyphMetadata = PUSH_ARRAY(&fontArena, gameState->font.glyphCount, GlyphMetadata);
 
@@ -57,7 +63,7 @@ LoadFont(GameState *gameState, GameMemory *memory)
 
         u8 *srcBitmap = monoBitmap;
 
-        if (ATLAS_PITCH - currentAtlasColumn < (s32)atlasHeader->pixelSizeBytes*width)
+        if (atlasPitch - currentAtlasColumn < (s32)atlasHeader->pixelSizeBytes*width)
         {
             currentAtlasRow += offsetToNextAtlasRow;
             currentAtlasColumn = 0;
@@ -65,12 +71,12 @@ LoadFont(GameState *gameState, GameMemory *memory)
             offsetToNextAtlasRow = 0;
         }
 
-        ASSERT(ATLAS_PITCH - currentAtlasColumn >= (s32)atlasHeader->pixelSizeBytes*width);
-        ASSERT(ATLAS_HEIGHT - currentAtlasRow >= height);
+        ASSERT(atlasPitch - currentAtlasColumn >= (s32)atlasHeader->pixelSizeBytes*width);
+        ASSERT((s32)atlasHeader->height - currentAtlasRow >= height);
 
         offsetToNextAtlasRow = height > offsetToNextAtlasRow ? height : offsetToNextAtlasRow;
 
-        u8 *dstAtlas = fontAtlas + ATLAS_PITCH*currentAtlasRow + currentAtlasColumn;
+        u8 *dstAtlas = fontAtlas + atlasPitch*currentAtlasRow + currentAtlasColumn;
 
         for (s32 y = 0; y < height; y++)
         {
@@ -85,24 +91,23 @@ LoadFont(GameState *gameState, GameMemory *memory)
                           (alpha <<  0));
             }
 
-            dstAtlas += ATLAS_PITCH;
+            dstAtlas += atlasPitch;
         }
 
         GlyphMetadata *currentGlyphMetadata = gameState->font.glyphMetadata + (glyphASCIICode - gameState->font.firstGlyphCode);
 
-        currentGlyphMetadata->atlasRowOffset    = currentAtlasRow;
-        currentGlyphMetadata->atlasColumnOffset = currentAtlasColumn;
-        currentGlyphMetadata->glyphWidth        = width;
-        currentGlyphMetadata->glyphHeight       = height;
-        currentGlyphMetadata->yNegativeOffset   = iy1;
-        currentGlyphMetadata->advanceWidth      = advanceWidth*fontScale;
-        currentGlyphMetadata->leftSideBearing   = leftSideBearing*fontScale;
+        currentGlyphMetadata->atlasRowOffset     = currentAtlasRow;
+        currentGlyphMetadata->atlasColumnOffset  = currentAtlasColumn;
+        currentGlyphMetadata->defaultGlyphWidth  = (r32)width;
+        currentGlyphMetadata->defaultGlyphHeight = (r32)height;
+        currentGlyphMetadata->glyphWidth         = (r32)width;
+        currentGlyphMetadata->glyphHeight        = (r32)height;
+        currentGlyphMetadata->yNegativeOffset    = (r32)iy1;
+        currentGlyphMetadata->advanceWidth       = advanceWidth*fontScale;
+        currentGlyphMetadata->leftSideBearing    = leftSideBearing*fontScale;
 
         currentAtlasColumn += atlasHeader->pixelSizeBytes*width;
     }
-#undef ATLAS_PITCH
-#undef ATLAS_WIDTH
-#undef ATLAS_HEIGHT
 
     deallocateArenaFromTransientStorage(memory, sizeOfMonoBitmapArena);
 
@@ -110,4 +115,3 @@ LoadFont(GameState *gameState, GameMemory *memory)
     stbi_write_bmp("tmp\\fontAtlas.bmp", 1024, 1024, 4, fontAtlas);
 #endif
 }
-

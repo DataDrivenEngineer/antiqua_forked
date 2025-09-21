@@ -387,7 +387,11 @@ static void UpdateStaticEntity(GameState *gameState,
 /* TODO:
    - Do not allow making window smaller than certain width / height to prevent crashes when window width or height are zero
 
-   - add support for spaces in text
+   - change font rendering API to support y=0 at the top (Done)
+   - add support for rendering text of different colors (Done)
+   - fix crash error sometimes occurring on window resizing (Done)
+   - add support for spaces in text (Done)
+   - add support for font resizing (Done)
    - look into applying antialiasing for text
 */
 #if !XCODE_BUILD && !COMPILER_MSVC
@@ -852,15 +856,14 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                                 gameState->font.needsGpuReupload);
     gameState->font.needsGpuReupload = false;
 #else
-    s8 text[] = "HeljoWorld!";
+    s8 text[] = "Heljo World!";
     pushRenderEntryText(&renderGroupArena,
                         &renderGroup,
+                        &gameState->font,
+                        64,
                         text,
                         v2(5.0f, 100.0f),
                         v3(0.0f, 1.0f, 0.0f),
-                        gameState->font.atlasHeader,
-                        gameState->font.glyphMetadata,
-                        gameState->font.firstGlyphCode,
                         false);
 
 #endif
