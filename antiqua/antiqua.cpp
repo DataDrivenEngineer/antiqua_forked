@@ -393,10 +393,12 @@ static void UpdateStaticEntity(GameState *gameState,
    - fix crash error sometimes occurring on window resizing (Done)
    - add support for spaces in text (Done)
    - add support for font resizing (Done)
-   - Implement subpixel positioning / blending for text:
+   - Implement subpixel positioning / dual-source blending for text:
      - add 1 px left padding to every glyph in atlas (Done)
-     - pass fractional offsetX's part as a subpixel shift to vertex shader, and apply it in pixel shader
-     - return 2 colors from pixel shader and enable dual-source blending for pre-multiplied alpha
+     - pass fractional offsetX's part as a subpixel shift to vertex shader, and apply it in pixel shader (Done)
+     - return 2 colors from pixel shader and enable dual-source blending for pre-multiplied alpha (Done)
+   - Add kerning support by loading kerning table into memory during font initialization
+   - Add support for rendering multi-line text
 
    CAMERA
    - implement top-down camera (Done)
@@ -407,6 +409,8 @@ static void UpdateStaticEntity(GameState *gameState,
    - switch to click-to-move
 
    LEVEL EDITOR
+   - Add support for rendering of rectangles in screen coordinates (Done)
+   - Implement simple UI for changing font size: reinitialize font when font size is updated in UI
 */
 #if !XCODE_BUILD && !COMPILER_MSVC
 EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
