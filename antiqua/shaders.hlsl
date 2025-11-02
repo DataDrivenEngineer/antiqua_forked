@@ -12,12 +12,19 @@ cbuffer cbPerPass : register(b0)
 	uint            atlasHeight;
 };
 
-cbuffer cbPerObject : register(b1)
+cbuffer cbPerRectWorld : register(b1)
 {
     float3          rectCenterPositionWorld;
-    float           sideLengthW;
+    float           sideLengthWWorld;
     float3          rectColor;
-    float           sideLengthH;
+    float           sideLengthHWorld;
+};
+
+cbuffer cbPerRectScreen : register(b3)
+{
+    float2          rectTopLeftCornerScreen;
+    float           sideLengthWScreen;
+    float           sideLengthHScreen;
 };
 
 cbuffer cbPerTile : register(b2)
@@ -54,14 +61,23 @@ struct VS_INPUT_TEXT {
     float  glyphWidth          : GLYPH_WIDTH;
     float  glyphHeight         : GLYPH_HEIGHT;
     float2 startPositionScreen : START_POSITION;
-    float3 fontColor           : FONT_COLOR;
+    float4 fontColor           : FONT_COLOR;
+    float  subpixelShift       : SUBPIXEL_SHIFT;
 };
 
 struct VS_OUTPUT_TEXT
 {
-    float4 position : SV_POSITION;
-    float2 uv       : TEXCOORD;
-    float3 fontColor: COLOR;
+    float4 position          : SV_POSITION;
+    float2 uv                : TEXCOORD0;
+    float4 fontColor         : COLOR;
+    float4 subpixelShift_atlasRowOffset_atlasColumnOffset_glyphWidth : TEXCOORD1;
+    float glyphHeight        : TEXCOORD2;
+};
+
+struct PS_OUTPUT_TEXT
+{
+    float4 color        : SV_TARGET0;
+    float4 blendWeights : SV_TARGET1;
 };
 
 struct VS_OUTPUT
@@ -89,6 +105,24 @@ struct VS_OUTPUT_TEXTURE
 };
 
 //--------------------------------------------------------------------------------------
+// Common Functions
+//--------------------------------------------------------------------------------------
+
+void screenToNDC(out float2 outPositions[4],
+                               in float windowWidth,
+                               in float windowHeight,
+                               in float2 topLeft,
+                               in float2 topRight,
+                               in float2 bottomLeft,
+                               in float2 bottomRight)
+{
+    outPositions[0] = float2(NORMALIZE(topLeft.x, 0, 2, windowWidth, -1), NORMALIZE(topLeft.y, 0, 2, windowHeight, -1));
+    outPositions[1] = float2(NORMALIZE(topRight.x, 0, 2, windowWidth, -1), NORMALIZE(topRight.y, 0, 2, windowHeight, -1));
+    outPositions[2] = float2(NORMALIZE(bottomLeft.x, 0, 2, windowWidth, -1), NORMALIZE(bottomLeft.y, 0, 2, windowHeight, -1));
+    outPositions[3] = float2(NORMALIZE(bottomRight.x, 0, 2, windowWidth, -1), NORMALIZE(bottomRight.y, 0, 2, windowHeight, -1));
+}
+
+//--------------------------------------------------------------------------------------
 // Vertex Shader
 //--------------------------------------------------------------------------------------
 VS_OUTPUT vsPoint(VS_INPUT input, uint vertexID : SV_VertexID)
@@ -110,12 +144,8 @@ VS_OUTPUT vsPoint(VS_INPUT input, uint vertexID : SV_VertexID)
     float2 bottomRight = float2(pointCenterX + POINT_SIZE_PX / 2,
                                 pointCenterY - POINT_SIZE_PX / 2);
 
-    float2 positions[4] = {
-                              float2(NORMALIZE(topLeft.x, 0, 2, windowWidth, -1), NORMALIZE(topLeft.y, 0, 2, windowHeight, -1)),
-                              float2(NORMALIZE(topRight.x, 0, 2, windowWidth, -1), NORMALIZE(topRight.y, 0, 2, windowHeight, -1)),
-                              float2(NORMALIZE(bottomLeft.x, 0, 2, windowWidth, -1), NORMALIZE(bottomLeft.y, 0, 2, windowHeight, -1)),
-                              float2(NORMALIZE(bottomRight.x, 0, 2, windowWidth, -1), NORMALIZE(bottomRight.y, 0, 2, windowHeight, -1))
-                          };
+    float2 positions[4];
+    screenToNDC(positions, windowWidth, windowHeight, topLeft, topRight, bottomLeft, bottomRight);
 
     output.position = float4(positions[vertexID], 0.1f, 1.0f);
     output.color = input.color;
@@ -143,7 +173,7 @@ VS_OUTPUT_TEXT vsText(VS_INPUT_TEXT input, uint vertexID : SV_VertexID)
                           };
 
     float atlasRowOffsetF    = (float)input.atlasRowOffset;
-    float atlasColumnOffsetF = (float)(input.atlasColumnOffset / 4);
+    float atlasColumnOffsetF = (float)(input.atlasColumnOffset) / 4;
     float atlasWidthF        = (float)atlasWidth;
     float atlasHeightF       = (float)atlasHeight;
 
@@ -154,9 +184,12 @@ VS_OUTPUT_TEXT vsText(VS_INPUT_TEXT input, uint vertexID : SV_VertexID)
     uvs[3] = float2((atlasColumnOffsetF + input.defaultGlyphWidth) / atlasWidthF, (atlasRowOffsetF + input.defaultGlyphHeight) / atlasHeightF);
 
     VS_OUTPUT_TEXT output;
-    output.position  = float4(positions[vertexID], 0.1f, 1.0f);
-    output.uv        = uvs[vertexID];
-    output.fontColor = input.fontColor;
+    output.position          = float4(positions[vertexID], 0.1f, 1.0f);
+    output.uv                = uvs[vertexID];
+    // NOTE(dima): premultiplied alpha
+    output.fontColor         = float4(input.fontColor.rgb * input.fontColor.a, input.fontColor.a);
+    output.subpixelShift_atlasRowOffset_atlasColumnOffset_glyphWidth = float4(input.subpixelShift, input.atlasRowOffset, atlasColumnOffsetF, input.glyphWidth);
+    output.glyphHeight = input.glyphHeight;
     
     return output;
 }
@@ -183,7 +216,7 @@ VS_OUTPUT_TILE vsTile(uint vertexID : SV_VertexID,
     topLeftCornerPosWorld.y = Y;
     topLeftCornerPosWorld.z = originTileCenterPositionWorld.z + tileCountPerSide / 2;
 
-    uint rowOfTopLeftCornerPos = instanceID / tileCountPerSide;
+     uint rowOfTopLeftCornerPos = instanceID / tileCountPerSide;
     uint colOfTopLeftCornerPos = instanceID % tileCountPerSide;
 
     float4 tileVertexPositionsWorld[4];
@@ -222,7 +255,7 @@ VS_OUTPUT_TILE vsTile(uint vertexID : SV_VertexID,
     return output;
 }
 
-VS_OUTPUT_RECT vsRect(uint vertexID : SV_VertexID)
+VS_OUTPUT_RECT vsRectWorld(uint vertexID : SV_VertexID)
 {
     float4 rectVertexPositionsWorld[4];
     /* NOTE(dima): index 0 - top left corner of a rect
@@ -230,30 +263,61 @@ VS_OUTPUT_RECT vsRect(uint vertexID : SV_VertexID)
                    index 2 - bottom left corner of a rect
                    index 3 - bottom right corner of a rect
     */
-    rectVertexPositionsWorld[0].x = rectCenterPositionWorld.x - sideLengthW / 2;
+    rectVertexPositionsWorld[0].x = rectCenterPositionWorld.x - sideLengthWWorld / 2;
     rectVertexPositionsWorld[0].y = 0.0f;
-    rectVertexPositionsWorld[0].z = rectCenterPositionWorld.z + sideLengthH / 2;
+    rectVertexPositionsWorld[0].z = rectCenterPositionWorld.z + sideLengthHWorld / 2;
     rectVertexPositionsWorld[0].w = 1.0f;
 
-    rectVertexPositionsWorld[1].x = rectVertexPositionsWorld[0].x + sideLengthW;
+    rectVertexPositionsWorld[1].x = rectVertexPositionsWorld[0].x + sideLengthWWorld;
     rectVertexPositionsWorld[1].y = 0.0f;
     rectVertexPositionsWorld[1].z = rectVertexPositionsWorld[0].z;
     rectVertexPositionsWorld[1].w = 1.0f;
 
     rectVertexPositionsWorld[2].x = rectVertexPositionsWorld[0].x;
     rectVertexPositionsWorld[2].y = 0.0f;
-    rectVertexPositionsWorld[2].z = rectVertexPositionsWorld[0].z - sideLengthH;
+    rectVertexPositionsWorld[2].z = rectVertexPositionsWorld[0].z - sideLengthHWorld;
     rectVertexPositionsWorld[2].w = 1.0f;
 
-    rectVertexPositionsWorld[3].x = rectVertexPositionsWorld[0].x + sideLengthW;
+    rectVertexPositionsWorld[3].x = rectVertexPositionsWorld[0].x + sideLengthWWorld;
     rectVertexPositionsWorld[3].y = 0.0f;
-    rectVertexPositionsWorld[3].z = rectVertexPositionsWorld[0].z - sideLengthH;
+    rectVertexPositionsWorld[3].z = rectVertexPositionsWorld[0].z - sideLengthHWorld;
     rectVertexPositionsWorld[3].w = 1.0f;
 
     VS_OUTPUT_RECT output;
     output.position = mul(rectVertexPositionsWorld[vertexID], transpose(viewMatrix));
     output.position = mul(output.position, transpose(projectionMatrix));
     output.color = rectColor;
+    
+    return output;
+}
+
+VS_OUTPUT_RECT vsRectScreen(uint vertexID : SV_VertexID)
+{
+    float yPosRelativeToWindowBottom = windowHeight - rectTopLeftCornerScreen.y;
+
+    float2 rectVertexPositionsScreen[4];
+    /* NOTE(dima): index 0 - top left corner of a rect
+                   index 1 - top right corner of a rect
+                   index 2 - bottom left corner of a rect
+                   index 3 - bottom right corner of a rect
+    */
+    rectVertexPositionsScreen[0].x = rectTopLeftCornerScreen.x;
+    rectVertexPositionsScreen[0].y = yPosRelativeToWindowBottom;
+
+    rectVertexPositionsScreen[1].x = rectTopLeftCornerScreen.x + sideLengthWScreen;
+    rectVertexPositionsScreen[1].y = yPosRelativeToWindowBottom;
+
+    rectVertexPositionsScreen[2].x = rectVertexPositionsScreen[0].x;
+    rectVertexPositionsScreen[2].y = yPosRelativeToWindowBottom - sideLengthHScreen;
+
+    rectVertexPositionsScreen[3].x = rectTopLeftCornerScreen.x + sideLengthWScreen;
+    rectVertexPositionsScreen[3].y = yPosRelativeToWindowBottom - sideLengthHScreen;
+
+    screenToNDC(rectVertexPositionsScreen, windowWidth, windowHeight, rectVertexPositionsScreen[0], rectVertexPositionsScreen[1], rectVertexPositionsScreen[2], rectVertexPositionsScreen[3]);
+
+    VS_OUTPUT_RECT output;
+    output.position = float4(rectVertexPositionsScreen[vertexID], 0.1f, 1.0f);
+    output.color = float3(1.0f, 0.0f, 0.0f);
     
     return output;
 }
@@ -307,7 +371,12 @@ float4 psTile(VS_OUTPUT_TILE input) : SV_TARGET
     return float4(input.color, 1.0f);
 }
 
-float4 psRect(VS_OUTPUT_RECT input) : SV_TARGET
+float4 psRectWorld(VS_OUTPUT_RECT input) : SV_TARGET
+{
+    return float4(input.color, 1.0f);
+}
+
+float4 psRectScreen(VS_OUTPUT_RECT input) : SV_TARGET
 {
     return float4(input.color, 1.0f);
 }
@@ -318,13 +387,51 @@ float4 psTextureDebug(VS_OUTPUT_TEXTURE input) : SV_TARGET
     return color;
 }
 
-float4 psText(VS_OUTPUT_TEXT input) : SV_TARGET
+PS_OUTPUT_TEXT psText(VS_OUTPUT_TEXT input)
 {
-#if 1
-    float alpha = g_texture.Sample(g_sampler, input.uv).a;
-    clip(alpha - 0.1f);
-    return float4(input.fontColor, 1.0f);
-#else
-    return float4(0.0f, 0.0f, 1.0f, 1.0f);
-#endif
+    float textureWidth;
+    float textureHeight;
+    g_texture.GetDimensions(textureWidth, textureHeight);
+    float2 onePixel = float2(1.0f, 1.0f) / float2(textureWidth, textureHeight);
+
+    float2 offsetWithinGlyphToCurrentPixelFloat2 = float2(textureWidth, textureHeight) * input.uv;
+    float2 offsetWithinGlyphToPreviousPixelFloat2 = float2(textureWidth, textureHeight) * (input.uv - float2(onePixel.x, 0.0f));
+
+    int3 offsetWithinGlyphToCurrentPixel = int3(int2(offsetWithinGlyphToCurrentPixelFloat2), 0);
+    int3 offsetWithinGlyphToPreviousPixel = int3(int2(offsetWithinGlyphToPreviousPixelFloat2), 0);                                                
+    float4 currentTexel = g_texture.Load(offsetWithinGlyphToCurrentPixel);
+    float4 previousTexel = g_texture.Load(offsetWithinGlyphToPreviousPixel);
+
+    float r = currentTexel.r;
+    float g = currentTexel.g;
+    float b = currentTexel.b;
+    float a = currentTexel.a;
+    float subpixelShift = input.subpixelShift_atlasRowOffset_atlasColumnOffset_glyphWidth.x;
+    if (subpixelShift <= 1.0f/3.0f)
+    {
+        float z = 3.0f*subpixelShift;
+        r = lerp(currentTexel.r, previousTexel.b, z);
+        g = lerp(currentTexel.g, currentTexel.r, z);
+        b = lerp(currentTexel.b, currentTexel.g, z);
+    }
+    else if (subpixelShift <= 2.0f/3.0f)
+    {
+        float z = 3.0f*subpixelShift - 1.0f;
+        r = lerp(previousTexel.b, previousTexel.g, z);
+        g = lerp(currentTexel.r, previousTexel.b, z);
+        b = lerp(currentTexel.g, currentTexel.r, z);
+    }
+    else if (subpixelShift < 1.0f)
+    {
+        float z = 3.0f*subpixelShift - 2.0f;
+        r = lerp(previousTexel.g, previousTexel.r, z);
+        g = lerp(previousTexel.b, previousTexel.g, z);
+        b = lerp(currentTexel.r, previousTexel.b, z);
+    }
+
+    PS_OUTPUT_TEXT output;
+    output.color = input.fontColor * float4(r, g, b, 1.0f);
+    output.blendWeights = float4(input.fontColor.a * float3(r, g, b), input.fontColor.a);
+
+    return output;
 }

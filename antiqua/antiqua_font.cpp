@@ -14,18 +14,19 @@ void LoadFont(GameState *gameState, GameMemory *memory)
 
     memory->debug_platformFreeFileMemory(NULL, &ttfFile);
 
-    MemoryArena fontArena;
-    initializeArenaFromPermanentStorage(memory, &fontArena, MB(5));
+    MemoryArena fontAtlasArena;
+    u32 fontAtlasArenaSize = MB(5);
+    initializeArenaFromPermanentStorage(memory, &fontAtlasArena, fontAtlasArenaSize);
 
     gameState->font.firstGlyphCode = 31;
     gameState->font.lastGlyphCode = 127;
     gameState->font.glyphCount = gameState->font.lastGlyphCode - gameState->font.firstGlyphCode;
-    gameState->font.atlasHeader = PUSH_STRUCT(&fontArena, AssetHeader);
+    gameState->font.atlasHeader = PUSH_STRUCT(&fontAtlasArena, AssetHeader);
     gameState->font.needsGpuReupload = true;
     gameState->font.ascent = ascent;
     gameState->font.descent = descent;
     gameState->font.lineGap = lineGap;
-    gameState->font.defaultFontSizePx = 128;
+    gameState->font.defaultFontSizePx = 32;
     AssetHeader *atlasHeader = gameState->font.atlasHeader;
     atlasHeader->pixelSizeBytes = 4;
     atlasHeader->width = 1024;
@@ -39,9 +40,9 @@ void LoadFont(GameState *gameState, GameMemory *memory)
     initializeArenaFromTransientStorage(memory, &monoBitmapArena, sizeOfMonoBitmapArena);
 
     s32 atlasPitch = atlasHeader->width*atlasHeader->pixelSizeBytes;
-    u8 *fontAtlas = PUSH_ARRAY(&fontArena, atlasPitch*atlasHeader->height, u8);
+    u8 *fontAtlas = PUSH_ARRAY(&fontAtlasArena, atlasPitch*atlasHeader->height, u8);
 
-    gameState->font.glyphMetadata = PUSH_ARRAY(&fontArena, gameState->font.glyphCount, GlyphMetadata);
+    gameState->font.glyphMetadata = PUSH_ARRAY(&fontAtlasArena, gameState->font.glyphCount, GlyphMetadata);
 
     s32 offsetToNextAtlasRow = 0, currentAtlasRow = 0, currentAtlasColumn = 0;
 
@@ -63,20 +64,26 @@ void LoadFont(GameState *gameState, GameMemory *memory)
 
         u8 *srcBitmap = monoBitmap;
 
+        // Add 1px (each pixel has 4 subpixels) offset to every glyph
+        u8 glyphLeftPaddingPx = 4;
+        u8 glyphRightPaddingPx = 0;
+        currentAtlasColumn += glyphLeftPaddingPx;
+
         if (atlasPitch - currentAtlasColumn < (s32)atlasHeader->pixelSizeBytes*width)
         {
             currentAtlasRow += offsetToNextAtlasRow;
-            currentAtlasColumn = 0;
+            currentAtlasColumn = 0 + glyphLeftPaddingPx;
 
             offsetToNextAtlasRow = 0;
         }
 
-        ASSERT(atlasPitch - currentAtlasColumn >= (s32)atlasHeader->pixelSizeBytes*width);
+        ASSERT(atlasPitch - currentAtlasColumn >= (s32)atlasHeader->pixelSizeBytes*width + glyphRightPaddingPx);
         ASSERT((s32)atlasHeader->height - currentAtlasRow >= height);
 
         offsetToNextAtlasRow = height > offsetToNextAtlasRow ? height : offsetToNextAtlasRow;
 
         u8 *dstAtlas = fontAtlas + atlasPitch*currentAtlasRow + currentAtlasColumn;
+        ASSERT(dstAtlas - fontAtlas < fontAtlasArenaSize);
 
         for (s32 y = 0; y < height; y++)
         {
@@ -84,7 +91,6 @@ void LoadFont(GameState *gameState, GameMemory *memory)
             for (s32 x = 0; x < width; x++)
             {
                 u8 alpha = *srcBitmap++;
-//TODO: figure out how to resolve color dynamically in shader. Right now below just hardcodes white.
                 *dst++ = ((alpha << 24) |
                           (alpha << 16) |
                           (alpha <<  8) |
@@ -98,15 +104,15 @@ void LoadFont(GameState *gameState, GameMemory *memory)
 
         currentGlyphMetadata->atlasRowOffset     = currentAtlasRow;
         currentGlyphMetadata->atlasColumnOffset  = currentAtlasColumn;
-        currentGlyphMetadata->defaultGlyphWidth  = (r32)width;
+        currentGlyphMetadata->defaultGlyphWidth  = (r32)width + 1;
         currentGlyphMetadata->defaultGlyphHeight = (r32)height;
-        currentGlyphMetadata->glyphWidth         = (r32)width;
+        currentGlyphMetadata->glyphWidth         = (r32)width + 1;
         currentGlyphMetadata->glyphHeight        = (r32)height;
         currentGlyphMetadata->yNegativeOffset    = (r32)iy1;
         currentGlyphMetadata->advanceWidth       = advanceWidth*fontScale;
         currentGlyphMetadata->leftSideBearing    = leftSideBearing*fontScale;
 
-        currentAtlasColumn += atlasHeader->pixelSizeBytes*width;
+        currentAtlasColumn += atlasHeader->pixelSizeBytes*width + glyphRightPaddingPx;
     }
 
     deallocateArenaFromTransientStorage(memory, sizeOfMonoBitmapArena);

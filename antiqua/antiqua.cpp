@@ -385,6 +385,7 @@ static void UpdateStaticEntity(GameState *gameState,
 }
 
 /* TODO:
+   FONT RENDERING
    - Do not allow making window smaller than certain width / height to prevent crashes when window width or height are zero
 
    - change font rendering API to support y=0 at the top (Done)
@@ -392,7 +393,20 @@ static void UpdateStaticEntity(GameState *gameState,
    - fix crash error sometimes occurring on window resizing (Done)
    - add support for spaces in text (Done)
    - add support for font resizing (Done)
-   - look into applying antialiasing for text
+   - Implement subpixel positioning / blending for text:
+     - add 1 px left padding to every glyph in atlas (Done)
+     - pass fractional offsetX's part as a subpixel shift to vertex shader, and apply it in pixel shader
+     - return 2 colors from pixel shader and enable dual-source blending for pre-multiplied alpha
+
+   CAMERA
+   - implement top-down camera (Done)
+   - implement UI for switching between different cameras
+   - clean up code for camera
+
+   MOVEMENT
+   - switch to click-to-move
+
+   LEVEL EDITOR
 */
 #if !XCODE_BUILD && !COMPILER_MSVC
 EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
@@ -440,7 +454,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->playerSpeed = 17.0f;
 
         gameState->cameraMinDistance = 5.0f;
-        gameState->cameraMaxDistance = 20.0f;
+        gameState->cameraMaxDistance = 50.0f;
         gameState->cameraCurrDistance = gameState->cameraMinDistance;
 
         gameState->cameraRotationSpeed = 0.3f;
@@ -457,6 +471,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->tileCountPerSide = 64;
         gameState->tileSideLength = 1.0f;
 
+#if 0
         { 
             // NOTE(dima): Below is isometric camera setup
             gameState->cameraIsometricVerticalAxisRotationAngleDegrees = 45.0f;
@@ -470,7 +485,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                    gameState->isometricV,
                    gameState->cameraIsometricVerticalAxisRotationAngleDegrees);
 
-            // NOTE(dima): rotate around horizontal axis by 45 degrees
+            // NOTE(dima): rotate around horizontal axis
             gameState->isometricU = cross(gameState->isometricV, gameState->isometricN);
             normalize(&gameState->isometricU);
             rotate(&gameState->isometricN,
@@ -480,6 +495,22 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             gameState->isometricV = cross(gameState->isometricN, gameState->isometricU);
             normalize(&gameState->isometricV);
         }
+#else
+        // Below is top-down camera setup
+        {
+            gameState->cameraIsometricHorizontalAxisRotationAngleDegrees = 90.0f;
+            gameState->isometricV = gameState->v; gameState->isometricN = gameState->n; gameState->isometricU = gameState->u;
+            // NOTE(dima): rotate around horizontal axis
+            gameState->isometricU = cross(gameState->isometricV, gameState->isometricN);
+            normalize(&gameState->isometricU);
+            rotate(&gameState->isometricN,
+                   gameState->isometricU,
+                   gameState->cameraIsometricHorizontalAxisRotationAngleDegrees);
+
+            gameState->isometricV = cross(gameState->isometricN, gameState->isometricU);
+            normalize(&gameState->isometricV);
+        }
+#endif
 
         // NOTE(dima): below is code to initially position entities in the world
         {
@@ -521,7 +552,11 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
     pushRenderEntryClear(&renderGroupArena,
                          &renderGroup,
+#if 1
                          v3(0.3f, 0.3f, 0.3f));
+#else
+                         v3(0.0f, 0.0f, 0.0f));
+#endif
     pushRenderEntryTile(&renderGroupArena,
                          &renderGroup,
                          gameState->tileCountPerSide,
@@ -601,11 +636,11 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         {
             Entity *entity = gameState->entities + entityIndex;
 
-            pushRenderEntryRect(&renderGroupArena,
-                                &renderGroup,
-                                entity->posWorld,
-                                entity->scaleFactor.x * gameState->tileSideLength,
-                                entity->scaleFactor.z * gameState->tileSideLength);
+            pushRenderEntryRectWorld(&renderGroupArena,
+                                     &renderGroup,
+                                     entity->posWorld,
+                                     entity->scaleFactor.x * gameState->tileSideLength,
+                                     entity->scaleFactor.z * gameState->tileSideLength);
         }
     }
     else
@@ -719,11 +754,11 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                 INVALID_CODE_PATH;
             }
 
-            pushRenderEntryRect(&renderGroupArena,
-                                &renderGroup,
-                                entity->posWorld,
-                                entity->scaleFactor.x * gameState->tileSideLength,
-                                entity->scaleFactor.z * gameState->tileSideLength);
+            pushRenderEntryRectWorld(&renderGroupArena,
+                                     &renderGroup,
+                                     entity->posWorld,
+                                     entity->scaleFactor.x * gameState->tileSideLength,
+                                     entity->scaleFactor.z * gameState->tileSideLength);
         }
 
         // NOTE(dima): set up camera to look at entity it follows
@@ -856,16 +891,28 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                                 gameState->font.needsGpuReupload);
     gameState->font.needsGpuReupload = false;
 #else
-    s8 text[] = "Heljo World!";
+    s8 text[] = "$7 The quick brown fox jumps over the ljazy dog.";
     pushRenderEntryText(&renderGroupArena,
                         &renderGroup,
                         &gameState->font,
-                        64,
+                        32,
                         text,
-                        v2(5.0f, 100.0f),
-                        v3(0.0f, 1.0f, 0.0f),
-                        false);
+                        v2(200.0f, 50.0f),
+                        v4(0.0f, 1.0f, 0.0f, 1.0f),
+                        gameState->font.needsGpuReupload);
 
+    gameState->font.needsGpuReupload = false;
+#endif
+
+#if 1
+    // Draw camera selection UI
+    {
+        V2 widgetTopLeftCornerScreen = v2(10.0f, 10.0f);
+        u32 widgetWidth              = 100;
+        u32 widgetHeight             = 100;
+
+        pushRenderEntryRectScreen(&renderGroupArena, &renderGroup, widgetTopLeftCornerScreen, widgetWidth, widgetHeight);
+    }
 #endif
 
 #if 0

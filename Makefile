@@ -20,8 +20,10 @@ POINT_VSHADER_NAME=d3d11_vshader_point
 POINT_PSHADER_NAME=d3d11_pshader_point
 LINE_VSHADER_NAME=d3d11_vshader_line
 LINE_PSHADER_NAME=d3d11_pshader_line
-RECT_VSHADER_NAME=d3d11_vshader_rect
-RECT_PSHADER_NAME=d3d11_pshader_rect
+RECT_WORLD_VSHADER_NAME=d3d11_vshader_rect_world
+RECT_WORLD_PSHADER_NAME=d3d11_pshader_rect_world
+RECT_SCREEN_VSHADER_NAME=d3d11_vshader_rect_screen
+RECT_SCREEN_PSHADER_NAME=d3d11_pshader_rect_screen
 TILE_VSHADER_NAME=d3d11_vshader_tile
 TILE_PSHADER_NAME=d3d11_pshader_tile
 TEXTURE_DEBUG_VSHADER_NAME=d3d11_vshader_texture_debug
@@ -35,8 +37,10 @@ build: clean
 	fxc.exe /nologo /T ps_5_0 /E psPoint /Od /WX /Zpc /Zi /Ges /Fo $(BUILD_DIR)\$(POINT_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(POINT_PSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(POINT_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
 	fxc.exe /nologo /T vs_5_0 /E vs /Od /WX /Zpc /Zi /Ges /Fo $(BUILD_DIR)\$(LINE_VSHADER_NAME).cso /Fd $(BUILD_DIR)\$(LINE_VSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(LINE_VSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
 	fxc.exe /nologo /T ps_5_0 /E ps /Od /WX /Zpc /Zi /Ges /Fo $(BUILD_DIR)\$(LINE_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(LINE_PSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(LINE_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
-	fxc.exe /nologo /T vs_5_0 /E vsRect /Od /WX /Zi /Zpc /Ges /Fo $(BUILD_DIR)\$(RECT_VSHADER_NAME).cso /Fd $(BUILD_DIR)\$(RECT_VSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(RECT_VSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
-	fxc.exe /nologo /T ps_5_0 /E psRect /Od /WX /Zi /Zpc /Ges /Fo $(BUILD_DIR)\$(RECT_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(RECT_PSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(RECT_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
+	fxc.exe /nologo /T vs_5_0 /E vsRectWorld /Od /WX /Zi /Zpc /Ges /Fo $(BUILD_DIR)\$(RECT_WORLD_VSHADER_NAME).cso /Fd $(BUILD_DIR)\$(RECT_WORLD_VSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(RECT_WORLD_VSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
+	fxc.exe /nologo /T ps_5_0 /E psRectWorld /Od /WX /Zi /Zpc /Ges /Fo $(BUILD_DIR)\$(RECT_WORLD_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(RECT_WORLD_PSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(RECT_WORLD_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
+	fxc.exe /nologo /T vs_5_0 /E vsRectScreen /Od /WX /Zi /Zpc /Ges /Fo $(BUILD_DIR)\$(RECT_SCREEN_VSHADER_NAME).cso /Fd $(BUILD_DIR)\$(RECT_SCREEN_VSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(RECT_SCREEN_VSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
+	fxc.exe /nologo /T ps_5_0 /E psRectScreen /Od /WX /Zi /Zpc /Ges /Fo $(BUILD_DIR)\$(RECT_SCREEN_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(RECT_SCREEN_PSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(RECT_SCREEN_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
 	fxc.exe /nologo /T vs_5_0 /E vsTile /Od /WX /Zpc /Zi /Ges /Fo $(BUILD_DIR)\$(TILE_VSHADER_NAME).cso /Fd $(BUILD_DIR)\$(TILE_VSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(TILE_VSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
 	fxc.exe /nologo /T ps_5_0 /E psTile /Od /WX /Zpc /Zi /Ges /Fo $(BUILD_DIR)\$(TILE_PSHADER_NAME).cso /Fd $(BUILD_DIR)\$(TILE_PSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(TILE_PSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL
 	fxc.exe /nologo /T vs_5_0 /E vsTextureDebug /Od /WX /Zpc /Zi /Ges /Fo $(BUILD_DIR)\$(TEXTURE_DEBUG_VSHADER_NAME).cso /Fd $(BUILD_DIR)\$(TEXTURE_DEBUG_VSHADER_NAME).pdb /Fc $(BUILD_DIR)\$(TEXTURE_DEBUG_VSHADER_NAME).asm ..\antiqua\shaders.hlsl >NUL

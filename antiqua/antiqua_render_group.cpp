@@ -98,24 +98,49 @@ void pushRenderEntryTile(MemoryArena *arena,
     entryHeader->next = 0;
 }
 
-void pushRenderEntryRect(MemoryArena *arena,
-                         RenderGroup *renderGroup,
-                         V3 rectCenterPositionWorld,
-                         r32 scaledSideLengthW,
-                         r32 scaledSideLengthH)
+void pushRenderEntryRectWorld(MemoryArena *arena,
+                              RenderGroup *renderGroup,
+                              V3 rectCenterPositionWorld,
+                              r32 scaledSideLengthW,
+                              r32 scaledSideLengthH)
 {
     ASSERT(renderGroup->pushBufferElementCount > 0);
 
     RenderGroupEntryHeader *entryHeader = PUSH_STRUCT(arena, RenderGroupEntryHeader);
-    entryHeader->type = RenderGroupEntryType_RenderEntryRect;
+    entryHeader->type = RenderGroupEntryType_RenderEntryRectWorld;
     renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
-    RenderEntryRect *entry = PUSH_STRUCT(arena, RenderEntryRect);
+    RenderEntryRectWorld *entry = PUSH_STRUCT(arena, RenderEntryRectWorld);
     entry->sideLengthW = scaledSideLengthW;
     entry->sideLengthH = scaledSideLengthH;
     entry->rectCenterPositionWorld = rectCenterPositionWorld;
     entry->color = v3(0.0f, 1.0f, 1.0f);
 
-    renderGroup->pushBufferSize += sizeof(RenderEntryRect);
+    renderGroup->pushBufferSize += sizeof(RenderEntryRectWorld);
+    renderGroup->pushBufferElementCount++;
+
+    renderGroup->prevHeader->next = entryHeader;
+    renderGroup->prevHeader = entryHeader;
+    entryHeader->next = 0;
+}
+
+void pushRenderEntryRectScreen(MemoryArena *arena,
+                               RenderGroup *renderGroup,
+                               V2 rectTopLeftCornerScreen,
+                               u32 sideLengthW,
+                               u32 sideLengthH)
+{
+    ASSERT(renderGroup->pushBufferElementCount > 0);
+
+    RenderGroupEntryHeader *entryHeader = PUSH_STRUCT(arena, RenderGroupEntryHeader);
+    entryHeader->type = RenderGroupEntryType_RenderEntryRectScreen;
+    renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
+    RenderEntryRectScreen *entry = PUSH_STRUCT(arena, RenderEntryRectScreen);
+
+    entry->sideLengthW = (r32)sideLengthW;
+    entry->sideLengthH = (r32)sideLengthH;
+    entry->rectTopLeftCornerScreen = rectTopLeftCornerScreen;
+
+    renderGroup->pushBufferSize += sizeof(RenderEntryRectScreen);
     renderGroup->pushBufferElementCount++;
 
     renderGroup->prevHeader->next = entryHeader;
@@ -151,7 +176,7 @@ void pushRenderEntryText(MemoryArena *arena,
                          u8 fontSizePx,
                          s8 *text,
                          V2 posScreen,
-                         V3 color,
+                         V4 color,
                          b32 needsGpuReupload)
 {
     ASSERT(renderGroup->pushBufferElementCount > 0);
@@ -165,8 +190,9 @@ void pushRenderEntryText(MemoryArena *arena,
     entry->text = text;
     entry->color = color;
     entry->posScreen = posScreen;
+    entry->needsGpuReupload = needsGpuReupload;
 
-    renderGroup->pushBufferSize += sizeof(RenderEntryTextureDebug);
+    renderGroup->pushBufferSize += sizeof(RenderEntryText);
     renderGroup->pushBufferElementCount++;
 
     renderGroup->prevHeader->next = entryHeader;

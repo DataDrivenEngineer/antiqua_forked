@@ -9,14 +9,15 @@
 #define CULLING_ENABLED 1
 #define WIREFRAME_MODE_ENABLED 0
 
-#define RECT_PIPELINE_STATE_IDX 0
-#define LINE_PIPELINE_STATE_IDX 1
-#define POINT_PIPELINE_STATE_IDX 2
-#define TILE_PIPELINE_STATE_IDX 3
-#define TEXTURE_DEBUG_PIPELINE_STATE_IDX 4
-#define TEXT_PIPELINE_STATE_IDX 5
+#define RECT_WORLD_PIPELINE_STATE_IDX 0
+#define RECT_SCREEN_PIPELINE_STATE_IDX 1
+#define LINE_PIPELINE_STATE_IDX 2
+#define POINT_PIPELINE_STATE_IDX 3
+#define TILE_PIPELINE_STATE_IDX 4
+#define TEXTURE_DEBUG_PIPELINE_STATE_IDX 5
+#define TEXT_PIPELINE_STATE_IDX 6
 
-#define PIPELINE_STATE_COUNT 6
+#define PIPELINE_STATE_COUNT 7
 
 #define SWAP_CHAIN_BUFFER_COUNT 2
 
@@ -24,7 +25,7 @@
 #define MAX_RENDER_GROUP_PER_OBJECT_CB_SIZE KB(512)
 #define MAX_RENDER_GROUP_PER_PASS_CB_SIZE KB(1)
 
-// NOTE(dima): descriptor per renderable object + 1 for per pass descriptor + 1 for SRV descriptor
+// NOTE(dima): descriptor per renderable object (entities + UI elements) + 1 for per pass descriptor + 1 for SRV descriptor
 // TODO(dima): do not hardcode max renderable object count!
 #define MAX_CBV_SRV_UAV_DESCRIPTOR_COUNT SWAP_CHAIN_BUFFER_COUNT*(256 + 1 + 1)
 
@@ -674,72 +675,87 @@ INIT_RENDERER(initRenderer)
 
     // NOTE(dima): create root signature
     {
-        D3D12_DESCRIPTOR_RANGE perPassRange = GetDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND);
+        D3D12_DESCRIPTOR_RANGE perPassRange       = GetDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND);
 
-        D3D12_DESCRIPTOR_RANGE perObjectRange = GetDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND);
-
-        D3D12_DESCRIPTOR_RANGE srvRange = GetDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND);
-
-        D3D12_ROOT_DESCRIPTOR_TABLE perPassRootDescriptorTable = {};
-        perPassRootDescriptorTable.NumDescriptorRanges = 1;
-        perPassRootDescriptorTable.pDescriptorRanges = &perPassRange;
-
-        D3D12_ROOT_DESCRIPTOR_TABLE perObjectRootDescriptorTable = {};
-        perObjectRootDescriptorTable.NumDescriptorRanges = 1;
-        perObjectRootDescriptorTable.pDescriptorRanges = &perObjectRange;
-
-        D3D12_ROOT_DESCRIPTOR_TABLE srvRootDescriptorTable = {};
-        srvRootDescriptorTable.NumDescriptorRanges = 1;
-        srvRootDescriptorTable.pDescriptorRanges = &srvRange;
+        D3D12_DESCRIPTOR_RANGE perRectWorldRange  = GetDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND);
 
         D3D12_ROOT_DESCRIPTOR tileRootDescriptor;
         tileRootDescriptor.ShaderRegister = 2;
-        tileRootDescriptor.RegisterSpace = 0;
+        tileRootDescriptor.RegisterSpace  = 0;
 
-        D3D12_ROOT_PARAMETER slotRootParameters[4];
-        slotRootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        slotRootParameters[0].DescriptorTable = perPassRootDescriptorTable;
+        D3D12_DESCRIPTOR_RANGE perRectScreenRange = GetDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 3, 0, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND);
+
+        D3D12_DESCRIPTOR_RANGE srvRange           = GetDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND);
+
+        D3D12_ROOT_DESCRIPTOR_TABLE perPassRootDescriptorTable = {};
+        perPassRootDescriptorTable.NumDescriptorRanges         = 1;
+        perPassRootDescriptorTable.pDescriptorRanges           = &perPassRange;
+
+        D3D12_ROOT_DESCRIPTOR_TABLE perRectWorldRootDescriptorTable    = {};
+        perRectWorldRootDescriptorTable.NumDescriptorRanges            = 1;
+        perRectWorldRootDescriptorTable.pDescriptorRanges              = &perRectWorldRange;
+
+        D3D12_ROOT_DESCRIPTOR_TABLE perRectScreenRootDescriptorTable     = {};
+        perRectScreenRootDescriptorTable.NumDescriptorRanges             = 1;
+        perRectScreenRootDescriptorTable.pDescriptorRanges               = &perRectScreenRange;
+
+        D3D12_ROOT_DESCRIPTOR_TABLE srvRootDescriptorTable = {};
+        srvRootDescriptorTable.NumDescriptorRanges         = 1;
+        srvRootDescriptorTable.pDescriptorRanges           = &srvRange;
+
+        D3D12_ROOT_PARAMETER slotRootParameters[5];
+        slotRootParameters[0].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        slotRootParameters[0].DescriptorTable  = perPassRootDescriptorTable;
         slotRootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-        slotRootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        slotRootParameters[1].DescriptorTable = perObjectRootDescriptorTable;
+        slotRootParameters[1].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        slotRootParameters[1].DescriptorTable  = perRectWorldRootDescriptorTable;
         slotRootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-        slotRootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-        slotRootParameters[2].Descriptor = tileRootDescriptor;
+        slotRootParameters[2].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_CBV;
+        slotRootParameters[2].Descriptor       = tileRootDescriptor;
         slotRootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-        slotRootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        slotRootParameters[3].DescriptorTable = srvRootDescriptorTable;
+        slotRootParameters[3].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        slotRootParameters[3].DescriptorTable  = srvRootDescriptorTable;
         slotRootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
+        slotRootParameters[4].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        slotRootParameters[4].DescriptorTable  = perRectScreenRootDescriptorTable;
+        slotRootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
         D3D12_STATIC_SAMPLER_DESC sampler = {};
-        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler.MipLODBias = 0;
-        sampler.MaxAnisotropy = 16;
-        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-        sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-        sampler.MinLOD = 0.0f;
-        sampler.MaxLOD = D3D12_FLOAT32_MAX;
-        sampler.ShaderRegister = 0;
-        sampler.RegisterSpace = 0;
-        sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        sampler.Filter                    = D3D12_FILTER_MIN_MAG_MIP_POINT;
+        sampler.AddressU                  = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler.AddressV                  = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler.AddressW                  = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler.MipLODBias                = 0;
+        sampler.MaxAnisotropy             = 16;
+        sampler.ComparisonFunc            = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        sampler.BorderColor               = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+        sampler.MinLOD                    = 0.0f;
+        sampler.MaxLOD                    = D3D12_FLOAT32_MAX;
+        sampler.ShaderRegister            = 0;
+        sampler.RegisterSpace             = 0;
+        sampler.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
 
         D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-        rootSignatureDesc.NumParameters = 4;
-        rootSignatureDesc.pParameters = slotRootParameters;
-        rootSignatureDesc.NumStaticSamplers = 1;
-        rootSignatureDesc.pStaticSamplers = &sampler;
-        rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+        rootSignatureDesc.NumParameters             = ARRAY_COUNT(slotRootParameters);
+        rootSignatureDesc.pParameters               = slotRootParameters;
+        rootSignatureDesc.NumStaticSamplers         = 1;
+        rootSignatureDesc.pStaticSamplers           = &sampler;
+        rootSignatureDesc.Flags                     = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
         ComPtr<ID3DBlob> serializedRootSignature;
-        ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc,
-                                                  D3D_ROOT_SIGNATURE_VERSION_1,
-                                                  serializedRootSignature.ReleaseAndGetAddressOf(),
-                                                  NULL));
+        ComPtr<ID3DBlob> errorBlob;
+        HRESULT serializeRootSignatureResult = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, serializedRootSignature.ReleaseAndGetAddressOf(), errorBlob.ReleaseAndGetAddressOf());
+#if ANTIQUA_INTERNAL
+        if (errorBlob)
+        {
+            ::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+        }
+#endif
+        ThrowIfFailed(serializeRootSignatureResult);
 
         ThrowIfFailed(device->CreateRootSignature(0,
                                                   serializedRootSignature->GetBufferPointer(),
@@ -793,7 +809,7 @@ INIT_RENDERER(initRenderer)
     CreateBuffer(MAX_RENDER_GROUP_PER_OBJECT_CB_SIZE,
                  renderGroupPerObjectCB.ReleaseAndGetAddressOf());
 
-    // Create PSO for rects
+    // Create PSO for rects (world)
     {
         D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
 
@@ -801,7 +817,7 @@ INIT_RENDERER(initRenderer)
 
         {
             debug_ReadFileResult vsFile = {};
-#define FILENAME "build" DIR_SEPARATOR "d3d11_vshader_rect.cso"
+#define FILENAME "build" DIR_SEPARATOR "d3d11_vshader_rect_world.cso"
             gameMemory->debug_platformReadEntireFile(NULL, &vsFile, FILENAME);
 #undef FILENAME
             ASSERT(vsFile.contentsSize);
@@ -813,7 +829,7 @@ INIT_RENDERER(initRenderer)
 
         {
             debug_ReadFileResult psFile = {};
-#define FILENAME "build" DIR_SEPARATOR "d3d11_pshader_rect.cso"
+#define FILENAME "build" DIR_SEPARATOR "d3d11_pshader_rect_world.cso"
             gameMemory->debug_platformReadEntireFile(NULL, &psFile, FILENAME);
 #undef FILENAME
             ASSERT(psFile.contentsSize);
@@ -850,7 +866,67 @@ INIT_RENDERER(initRenderer)
         desc.SampleDesc.Quality = 0;
         desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
-        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[RECT_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[RECT_WORLD_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+    }
+
+    // Create PSO for rects (screen)
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+
+        desc.pRootSignature = rootSignature.Get();
+
+        {
+            debug_ReadFileResult vsFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_vshader_rect_screen.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &vsFile, FILENAME);
+#undef FILENAME
+            ASSERT(vsFile.contentsSize);
+
+            desc.VS = { vsFile.contents, vsFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &vsFile);
+        }
+
+        {
+            debug_ReadFileResult psFile = {};
+#define FILENAME "build" DIR_SEPARATOR "d3d11_pshader_rect_screen.cso"
+            gameMemory->debug_platformReadEntireFile(NULL, &psFile, FILENAME);
+#undef FILENAME
+            ASSERT(psFile.contentsSize);
+
+            desc.PS = { psFile.contents, psFile.contentsSize };
+
+            gameMemory->debug_platformFreeFileMemory(NULL, &psFile);
+        }
+
+        desc.RasterizerState = rasterizerDesc;
+        desc.BlendState = defaultBlendDesc;
+
+        {
+            D3D12_DEPTH_STENCILOP_DESC DefaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+
+            D3D12_DEPTH_STENCIL_DESC DepthStencilDesc = {};
+            DepthStencilDesc.DepthEnable = true;
+            DepthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            DepthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+            DepthStencilDesc.StencilEnable = false;
+            DepthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+            DepthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+            DepthStencilDesc.FrontFace = DefaultStencilOp;
+            DepthStencilDesc.BackFace = DefaultStencilOp;
+
+            desc.DepthStencilState = DepthStencilDesc;
+        }
+
+        desc.SampleMask = UINT_MAX;
+        desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        desc.NumRenderTargets = 1;
+        desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[RECT_SCREEN_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
     }
 
     // Create PSO for lines
@@ -1114,19 +1190,20 @@ INIT_RENDERER(initRenderer)
 
         {
             D3D12_INPUT_ELEMENT_DESC InputLayout[] = {
-{ "OFFSET_X",             0, DXGI_FORMAT_R32_FLOAT,       0, 0,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "OFFSET_Y",             0, DXGI_FORMAT_R32_FLOAT,       0, 4,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "ATLAS_ROW_OFFSET",     0, DXGI_FORMAT_R32_UINT,        0, 8,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "ATLAS_COLUMN_OFFSET",  0, DXGI_FORMAT_R32_UINT,        0, 12, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "DEFAULT_GLYPH_WIDTH",  0, DXGI_FORMAT_R32_FLOAT,       0, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "DEFAULT_GLYPH_HEIGHT", 0, DXGI_FORMAT_R32_FLOAT,       0, 20, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "GLYPH_WIDTH",          0, DXGI_FORMAT_R32_FLOAT,       0, 24, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "GLYPH_HEIGHT",         0, DXGI_FORMAT_R32_FLOAT,       0, 28, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "START_POSITION",       0, DXGI_FORMAT_R32G32_FLOAT,    0, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-{ "FONT_COLOR",           0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 }
+{ "OFFSET_X",             0, DXGI_FORMAT_R32_FLOAT,          0, 0,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "OFFSET_Y",             0, DXGI_FORMAT_R32_FLOAT,          0, 4,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "ATLAS_ROW_OFFSET",     0, DXGI_FORMAT_R32_UINT,           0, 8,  D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "ATLAS_COLUMN_OFFSET",  0, DXGI_FORMAT_R32_UINT,           0, 12, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "DEFAULT_GLYPH_WIDTH",  0, DXGI_FORMAT_R32_FLOAT,          0, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "DEFAULT_GLYPH_HEIGHT", 0, DXGI_FORMAT_R32_FLOAT,          0, 20, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "GLYPH_WIDTH",          0, DXGI_FORMAT_R32_FLOAT,          0, 24, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "GLYPH_HEIGHT",         0, DXGI_FORMAT_R32_FLOAT,          0, 28, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "START_POSITION",       0, DXGI_FORMAT_R32G32_FLOAT,       0, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "FONT_COLOR",           0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+{ "SUBPIXEL_SHIFT",       0, DXGI_FORMAT_R32_FLOAT,          0, 56, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 }
             }; 
 
-            desc.InputLayout = { InputLayout, ARRAY_COUNT(InputLayout) };
+            desc.InputLayout = { InputLayout, ARRAY_COUNT(   InputLayout) };
         }
 
         desc.pRootSignature = rootSignature.Get();
@@ -1156,7 +1233,31 @@ INIT_RENDERER(initRenderer)
         }
 
         desc.RasterizerState = rasterizerDesc;
+#if 1
+        {
+            D3D12_BLEND_DESC textBlendDesc = {};
+            textBlendDesc.AlphaToCoverageEnable = false;
+            textBlendDesc.IndependentBlendEnable = false;
+#if 0
+            textBlendDesc.RenderTarget[0].BlendEnable = false;
+#else
+            textBlendDesc.RenderTarget[0].BlendEnable = true;
+#endif
+            textBlendDesc.RenderTarget[0].LogicOpEnable = false;
+            textBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+            textBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC1_COLOR;
+            textBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+            textBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+            textBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+            textBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+            textBlendDesc.RenderTarget[0].LogicOp = D3D12_LOGIC_OP_NOOP;
+            textBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+            desc.BlendState = textBlendDesc;
+        }
+#else
         desc.BlendState = defaultBlendDesc;
+#endif
 
         {
             D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =  { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
@@ -1442,11 +1543,11 @@ RENDER_ON_GPU(renderOnGPU)
 
                 } break;
 
-                case RenderGroupEntryType_RenderEntryRect:
+                case RenderGroupEntryType_RenderEntryRectWorld:
                 {
-                    commandList->SetPipelineState(pipelineState[RECT_PIPELINE_STATE_IDX].Get());
+                    commandList->SetPipelineState(pipelineState[RECT_WORLD_PIPELINE_STATE_IDX].Get());
 
-                    RenderEntryRect *entry = (RenderEntryRect *)(entryHeader + 1);
+                    RenderEntryRectWorld *entry = (RenderEntryRectWorld *)(entryHeader + 1);
 
                     D3D12_GPU_DESCRIPTOR_HANDLE perObjectCbvGpuHndl = GetGPUDescriptorHandle(cbvSrvUavHeap[frameIndex].Get(),
                                                                                              cbvSrvUavDescriptorSize,
@@ -1477,6 +1578,59 @@ RENDER_ON_GPU(renderOnGPU)
 
                         memcpy(mappedData, &entry->color, colorLength);
                         mappedData += colorLength;
+
+                        memcpy(mappedData, &entry->sideLengthH, sideLengthHLength);
+
+                        renderGroupPerObjectCB->Unmap(0, NULL);
+
+                        // NOTE(dima): create CBV for the data we just copied
+                        CreateConstantBufferView(renderGroupPerObjectCB.Get(),
+                                                 cbvSrvUavHeap[frameIndex].Get(),
+                                                 cbvSrvUavDescriptorSize,
+                                                 currentCbvSrvUavDescriptorIdx,
+                                                 currentPerObjectCBOffset,
+                                                 totalSize);
+                                                 
+                        ++currentCbvSrvUavDescriptorIdx;
+
+                        currentPerObjectCBOffset += totalSize;
+                    }
+
+                    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+                    commandList->DrawInstanced(4, 1, 0, 0);
+
+                    break;
+                }
+
+                case RenderGroupEntryType_RenderEntryRectScreen:
+                {
+                    commandList->SetPipelineState(pipelineState[RECT_SCREEN_PIPELINE_STATE_IDX].Get());
+
+                    RenderEntryRectScreen *entry = (RenderEntryRectScreen *)(entryHeader + 1);
+
+                    D3D12_GPU_DESCRIPTOR_HANDLE perObjectCbvGpuHndl = GetGPUDescriptorHandle(cbvSrvUavHeap[frameIndex].Get(),
+                                                                                             cbvSrvUavDescriptorSize,
+                                                                                             currentCbvSrvUavDescriptorIdx);
+                                                                                             
+                    commandList->SetGraphicsRootDescriptorTable(4, perObjectCbvGpuHndl);
+
+                    {
+                        u32 sideLengthWLength             = sizeof(entry->sideLengthW);
+                        u32 sideLengthHLength             = sizeof(entry->sideLengthH);
+                        u32 rectTopLeftCornerScreenLength = sizeof(entry->rectTopLeftCornerScreen);
+                        u32 totalSize                     = RoundToNearestMultipleOf256(sideLengthWLength + sideLengthHLength + rectTopLeftCornerScreenLength);
+
+                        u8 *mappedData;
+                        ThrowIfFailed(renderGroupPerObjectCB->Map(0, NULL, (void **)&mappedData));
+
+                        mappedData += currentPerObjectCBOffset;
+
+                        memcpy(mappedData, &entry->rectTopLeftCornerScreen, rectTopLeftCornerScreenLength);
+                        mappedData += rectTopLeftCornerScreenLength;
+
+                        memcpy(mappedData, &entry->sideLengthW, sideLengthWLength);
+                        mappedData += sideLengthWLength;
 
                         memcpy(mappedData, &entry->sideLengthH, sideLengthHLength);
 
@@ -1654,11 +1808,11 @@ RENDER_ON_GPU(renderOnGPU)
                     u32 bufferLocationOffset = renderGroupVBCurrentSize;
                     r32 offsetX = 0;
                     s8 *ch = entry->text;
-                    while (s8 c = *ch++)
+                    while (s8 currentCodepoint = *ch++)
                     {
                         ASSERT(entry->font->firstGlyphCode >= 31 && entry->font->firstGlyphCode < 127);
 
-                        GlyphMetadata *currentCharMetadataAtDefaultScale = entry->font->glyphMetadata + (c - entry->font->firstGlyphCode);
+                        GlyphMetadata *currentCharMetadataAtDefaultScale = entry->font->glyphMetadata + (currentCodepoint - entry->font->firstGlyphCode);
                         GlyphMetadata currentCharMetadata = *currentCharMetadataAtDefaultScale;
 
                         u32 atlasRowOffset      = currentCharMetadata.atlasRowOffset;
@@ -1669,11 +1823,12 @@ RENDER_ON_GPU(renderOnGPU)
                         r32 defaultGlyphHeight  = currentCharMetadata.defaultGlyphHeight;
                         V2  startPositionScreen = entry->posScreen;
                         r32 offsetY             = -currentCharMetadata.yNegativeOffset;
-                        V3  fontColor           = entry->color;
+                        V4  fontColor           = entry->color;
 
                         r32 advanceWidth        = currentCharMetadata.advanceWidth;
                         r32 leftSideBearing     = currentCharMetadata.leftSideBearing;
 
+#if 0
                         {
                             r32 fontScale = (r32)entry->fontSizePx / entry->font->defaultFontSizePx;
 
@@ -1683,8 +1838,11 @@ RENDER_ON_GPU(renderOnGPU)
                             advanceWidth    *= fontScale;
                             leftSideBearing *= fontScale;
                         }
+#endif
 
                         offsetX += leftSideBearing;
+                        r32 pixelShift, subpixelShift;
+                        splitFloatIntoIntegerAndFractional(offsetX, &subpixelShift, &pixelShift);
 
                         u32 renderGroupVBStartOffset = renderGroupVBCurrentSize;
 
@@ -1693,7 +1851,7 @@ RENDER_ON_GPU(renderOnGPU)
                         mappedData += renderGroupVBStartOffset;
 
                         u32 offset = 0;
-                        memCopyAndUpdateOffset(mappedData + offset, &offsetX, sizeof(offsetX), &offset);
+                        memCopyAndUpdateOffset(mappedData + offset, &pixelShift, sizeof(pixelShift), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &offsetY, sizeof(offsetY), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &atlasRowOffset, sizeof(atlasRowOffset), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &atlasColumnOffset, sizeof(atlasColumnOffset), &offset);
@@ -1703,6 +1861,7 @@ RENDER_ON_GPU(renderOnGPU)
                         memCopyAndUpdateOffset(mappedData + offset, &glyphHeight, sizeof(glyphHeight), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &startPositionScreen, sizeof(startPositionScreen), &offset);
                         memCopyAndUpdateOffset(mappedData + offset, &fontColor, sizeof(fontColor), &offset);
+                        memCopyAndUpdateOffset(mappedData + offset, &subpixelShift, sizeof(subpixelShift), &offset);
 
                         renderGroupVb[frameIndex]->Unmap(0, NULL);
 
@@ -1715,7 +1874,7 @@ RENDER_ON_GPU(renderOnGPU)
                     view.BufferLocation = renderGroupVb[frameIndex]->GetGPUVirtualAddress() + bufferLocationOffset;
                     view.SizeInBytes = renderGroupVBCurrentSize - bufferLocationOffset;
                     // TODO(dima): currently, will have to modify this every time InputLayout changes
-                    view.StrideInBytes = 52;
+                    view.StrideInBytes = 60;
 
                     commandList->IASetVertexBuffers(0, 1, &view);
 

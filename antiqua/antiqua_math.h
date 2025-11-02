@@ -298,4 +298,9 @@ inline u32 RoundToNearestMultipleOf256(u32 value)
     return (value + 255) & ~255;
 }
 
+inline void splitFloatIntoIntegerAndFractional(r32 val, r32 *fractional, r32 *integer)
+{
+    *fractional = modff(val, integer);
+}
+
 #endif

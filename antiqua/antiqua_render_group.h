@@ -10,7 +10,8 @@ typedef enum RenderGroupEntryType
     RenderGroupEntryType_RenderEntryPoint,
     RenderGroupEntryType_RenderEntryLine,
     RenderGroupEntryType_RenderEntryTile,
-    RenderGroupEntryType_RenderEntryRect,
+    RenderGroupEntryType_RenderEntryRectWorld,
+    RenderGroupEntryType_RenderEntryRectScreen,
     RenderGroupEntryType_RenderEntryTextureDebug,
     RenderGroupEntryType_RenderEntryText,
 
@@ -50,13 +51,20 @@ typedef struct RenderEntryTile
     V3 originTileCenterPositionWorld;
 } RenderEntryTile;
 
-typedef struct RenderEntryRect
+typedef struct RenderEntryRectWorld
 {
     r32 sideLengthW;
     r32 sideLengthH;
     V3 rectCenterPositionWorld;
     V3 color;
-} RenderEntryRect;
+} RenderEntryRectWorld;
+
+typedef struct RenderEntryRectScreen
+{
+    r32 sideLengthW;
+    r32 sideLengthH;
+    V2 rectTopLeftCornerScreen;
+} RenderEntryRectScreen;
 
 typedef struct RenderEntryTextureDebug
 {
@@ -66,7 +74,7 @@ typedef struct RenderEntryTextureDebug
 
 typedef struct RenderEntryText
 {
-    V3 color;
+    V4 color;
     V2 posScreen;
     Font *font;
     s8 *text;
