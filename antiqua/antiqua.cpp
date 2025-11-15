@@ -899,7 +899,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     pushRenderEntryText(&renderGroupArena,
                         &renderGroup,
                         &gameState->font,
-                        32,
                         text,
                         v2(200.0f, 50.0f),
                         v4(0.0f, 1.0f, 0.0f, 1.0f),

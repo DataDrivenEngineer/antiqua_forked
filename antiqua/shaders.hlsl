@@ -42,6 +42,7 @@ SamplerState g_sampler : register(s0);
 #define NORMALIZE(OldValue, OldMin, NewRange, OldRange, NewMin) ((((OldValue) - (OldMin)) * (NewRange)) / (OldRange)) + (NewMin) 
 
 #define POINT_SIZE_PX 10
+#define SUBPIXEL_ANTIALIASING_ENABLED 0
 
 //--------------------------------------------------------------------------------------
 // Input / Output structures
@@ -405,7 +406,7 @@ PS_OUTPUT_TEXT psText(VS_OUTPUT_TEXT input)
     float r = currentTexel.r;
     float g = currentTexel.g;
     float b = currentTexel.b;
-    float a = currentTexel.a;
+#if SUBPIXEL_ANTIALIASING_ENABLED
     float subpixelShift = input.subpixelShift_atlasRowOffset_atlasColumnOffset_glyphWidth.x;
     if (subpixelShift <= 1.0f/3.0f)
     {
@@ -428,6 +429,7 @@ PS_OUTPUT_TEXT psText(VS_OUTPUT_TEXT input)
         g = lerp(previousTexel.b, previousTexel.g, z);
         b = lerp(currentTexel.r, previousTexel.b, z);
     }
+#endif
 
     PS_OUTPUT_TEXT output;
     output.color = input.fontColor * float4(r, g, b, 1.0f);

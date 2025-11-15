@@ -26,14 +26,14 @@ void LoadFont(GameState *gameState, GameMemory *memory)
     gameState->font.ascent = ascent;
     gameState->font.descent = descent;
     gameState->font.lineGap = lineGap;
-    gameState->font.defaultFontSizePx = 32;
+    gameState->font.defaultFontSizePt = 16;
     AssetHeader *atlasHeader = gameState->font.atlasHeader;
     atlasHeader->pixelSizeBytes = 4;
     atlasHeader->width = 1024;
     atlasHeader->height = 1024;
 
-    // Default scale, actual scaling will be applied by renderer depending on the px size passed into API
-    r32 fontScale = stbtt_ScaleForPixelHeight(&font, (r32)gameState->font.defaultFontSizePx);
+    r32 fontSizePx = 1.333333f*gameState->font.defaultFontSizePt;
+    r32 fontScale = stbtt_ScaleForMappingEmToPixels(&font, fontSizePx);
 
     MemoryArena monoBitmapArena;
     u32 sizeOfMonoBitmapArena = MB(5);

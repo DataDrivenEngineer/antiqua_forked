@@ -79,7 +79,6 @@ typedef struct RenderEntryText
     Font *font;
     s8 *text;
     b32 needsGpuReupload;
-    u8 fontSizePx;
 } RenderEntryText;
 
 typedef struct RenderGroup

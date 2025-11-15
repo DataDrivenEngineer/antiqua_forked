@@ -1828,18 +1828,6 @@ RENDER_ON_GPU(renderOnGPU)
                         r32 advanceWidth        = currentCharMetadata.advanceWidth;
                         r32 leftSideBearing     = currentCharMetadata.leftSideBearing;
 
-#if 0
-                        {
-                            r32 fontScale = (r32)entry->fontSizePx / entry->font->defaultFontSizePx;
-
-                            glyphWidth      *= fontScale;
-                            glyphHeight     *= fontScale;
-                            offsetY         *= fontScale;
-                            advanceWidth    *= fontScale;
-                            leftSideBearing *= fontScale;
-                        }
-#endif
-
                         offsetX += leftSideBearing;
                         r32 pixelShift, subpixelShift;
                         splitFloatIntoIntegerAndFractional(offsetX, &subpixelShift, &pixelShift);

@@ -35,7 +35,7 @@ typedef struct Font
     s32 lineGap;
     u8 firstGlyphCode;
     u8 lastGlyphCode;
-    u8 defaultFontSizePx;
+    u8 defaultFontSizePt;
 } Font;
 
 #endif
