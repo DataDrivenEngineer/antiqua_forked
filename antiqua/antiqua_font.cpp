@@ -50,17 +50,19 @@ void LoadFont(GameState *gameState, GameMemory *memory)
          glyphASCIICode < gameState->font.lastGlyphCode;
          ++glyphASCIICode)
     {
+        s32 glyphIdx = stbtt_FindGlyphIndex(&font, glyphASCIICode);
+
         s32 ix0, ix1, iy0, iy1;
-        stbtt_GetCodepointBitmapBox(&font, glyphASCIICode, fontScale, fontScale, &ix0, &iy0, &ix1, &iy1);
+        stbtt_GetGlyphBitmapBox(&font, glyphIdx, fontScale, fontScale, &ix0, &iy0, &ix1, &iy1);
         s32 width = ix1 - ix0;
         s32 height = iy1 - iy0;
 
         s32 advanceWidth, leftSideBearing;
-        stbtt_GetCodepointHMetrics(&font, glyphASCIICode, &advanceWidth, &leftSideBearing);
+        stbtt_GetGlyphHMetrics(&font, glyphIdx, &advanceWidth, &leftSideBearing);
 
         u8 *monoBitmap = PUSH_ARRAY(&monoBitmapArena, width*height, u8);
 
-        stbtt_MakeCodepointBitmap(&font, monoBitmap, width, height, width, fontScale, fontScale, glyphASCIICode);
+        stbtt_MakeGlyphBitmap(&font, monoBitmap, width, height, width, fontScale, fontScale, glyphIdx);
 
         u8 *srcBitmap = monoBitmap;
 
