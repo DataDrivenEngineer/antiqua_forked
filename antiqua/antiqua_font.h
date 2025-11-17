@@ -13,6 +13,7 @@ struct AssetHeader;
 
 typedef struct GlyphMetadata
 {
+    s32 glyphIdx;
     u32 atlasRowOffset;
     u32 atlasColumnOffset;
     r32 defaultGlyphWidth;
@@ -24,10 +25,21 @@ typedef struct GlyphMetadata
     r32 leftSideBearing;
 } GlyphMetadata;
 
+typedef struct KerningTableEntry KerningTableEntry;
+struct KerningTableEntry
+{
+   s32 glyphIndex1;
+   s32 glyphIndex2;
+   s32 advance;
+};
+
 typedef struct Font
 {
     GlyphMetadata *glyphMetadata;
     AssetHeader *atlasHeader;
+    KerningTableEntry *kerningTable;
+    r32 scale;
+    u32 kerningTableEntryCount;
     u32 glyphCount;
     b32 needsGpuReupload;
     s32 ascent;

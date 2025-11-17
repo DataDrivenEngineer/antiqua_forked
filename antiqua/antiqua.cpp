@@ -895,7 +895,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                                 gameState->font.needsGpuReupload);
     gameState->font.needsGpuReupload = false;
 #else
-    s8 text[] = "$7 The quick brown fox jumps over the ljazy dog.";
+    s8 text[] = "AV The quick brown fox jumps over the ljazy dog.";
     pushRenderEntryText(&renderGroupArena,
                         &renderGroup,
                         &gameState->font,

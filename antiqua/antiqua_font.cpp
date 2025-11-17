@@ -34,6 +34,7 @@ void LoadFont(GameState *gameState, GameMemory *memory)
 
     r32 fontSizePx = 1.333333f*gameState->font.defaultFontSizePt;
     r32 fontScale = stbtt_ScaleForMappingEmToPixels(&font, fontSizePx);
+    gameState->font.scale = fontScale;
 
     MemoryArena monoBitmapArena;
     u32 sizeOfMonoBitmapArena = MB(5);
@@ -43,6 +44,12 @@ void LoadFont(GameState *gameState, GameMemory *memory)
     u8 *fontAtlas = PUSH_ARRAY(&fontAtlasArena, atlasPitch*atlasHeader->height, u8);
 
     gameState->font.glyphMetadata = PUSH_ARRAY(&fontAtlasArena, gameState->font.glyphCount, GlyphMetadata);
+
+    s32 kerningTableSizeBytes = stbtt_GetKerningTableLength(&font);
+    KerningTableEntry *kerningTable = PUSH_SIZE(&fontAtlasArena, kerningTableSizeBytes, KerningTableEntry);
+    s32 kerningEntryCount = stbtt_GetKerningTable(&font, (stbtt_kerningentry *)kerningTable, kerningTableSizeBytes);
+    gameState->font.kerningTable = kerningTable;
+    gameState->font.kerningTableEntryCount = kerningEntryCount;
 
     s32 offsetToNextAtlasRow = 0, currentAtlasRow = 0, currentAtlasColumn = 0;
 
@@ -104,6 +111,7 @@ void LoadFont(GameState *gameState, GameMemory *memory)
 
         GlyphMetadata *currentGlyphMetadata = gameState->font.glyphMetadata + (glyphASCIICode - gameState->font.firstGlyphCode);
 
+        currentGlyphMetadata->glyphIdx           = glyphIdx;
         currentGlyphMetadata->atlasRowOffset     = currentAtlasRow;
         currentGlyphMetadata->atlasColumnOffset  = currentAtlasColumn;
         currentGlyphMetadata->defaultGlyphWidth  = (r32)width + 1;
@@ -122,4 +130,45 @@ void LoadFont(GameState *gameState, GameMemory *memory)
 #if 0
     stbi_write_bmp("tmp\\fontAtlas.bmp", 1024, 1024, 4, fontAtlas);
 #endif
+}
+
+b32 findKerningEntry(Font *font, s32 currentGlyphIdx, s32 prevGlyphIdx, s32 *advance)
+{
+    u32 l = 0, r = font->kerningTableEntryCount - 1, mid;
+    while (l <= r)
+    {
+        mid = l + (r - l) / 2;
+        KerningTableEntry *entry = font->kerningTable + mid;
+        if (entry->glyphIndex1 == prevGlyphIdx)
+        {
+            KerningTableEntry *prevEntry = entry;
+            while (entry >= font->kerningTable
+                   && entry - font->kerningTable < font->kerningTableEntryCount
+                   && entry->glyphIndex1 == prevGlyphIdx)
+            {
+                if ((entry->glyphIndex2 < currentGlyphIdx && prevEntry->glyphIndex2 > currentGlyphIdx)
+                    || (entry->glyphIndex2 > currentGlyphIdx && prevEntry->glyphIndex2 < currentGlyphIdx)) return false;
+
+                if (entry->glyphIndex2 == currentGlyphIdx)
+                {
+                    *advance = entry->advance;
+                    return true;
+                }
+                else if (entry->glyphIndex2 < currentGlyphIdx) entry++;
+                else if (entry->glyphIndex2 > currentGlyphIdx) entry--;
+            }
+
+            return false;
+        }
+        else if (entry->glyphIndex1 < prevGlyphIdx)
+        {
+            l = mid + 1;
+        }
+        else
+        {
+            r = mid - 1;
+        }
+    }
+
+    return false;
 }

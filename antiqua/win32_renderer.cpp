@@ -1808,6 +1808,7 @@ RENDER_ON_GPU(renderOnGPU)
                     u32 bufferLocationOffset = renderGroupVBCurrentSize;
                     r32 offsetX = 0;
                     s8 *ch = entry->text;
+                    s32 prevGlyphIdx = -1;
                     while (s8 currentCodepoint = *ch++)
                     {
                         ASSERT(entry->font->firstGlyphCode >= 31 && entry->font->firstGlyphCode < 127);
@@ -1815,6 +1816,7 @@ RENDER_ON_GPU(renderOnGPU)
                         GlyphMetadata *currentCharMetadataAtDefaultScale = entry->font->glyphMetadata + (currentCodepoint - entry->font->firstGlyphCode);
                         GlyphMetadata currentCharMetadata = *currentCharMetadataAtDefaultScale;
 
+                        s32 currentGlyphIdx     = currentCharMetadata.glyphIdx;
                         u32 atlasRowOffset      = currentCharMetadata.atlasRowOffset;
                         u32 atlasColumnOffset   = currentCharMetadata.atlasColumnOffset;
                         r32 glyphWidth          = currentCharMetadata.glyphWidth;
@@ -1829,6 +1831,18 @@ RENDER_ON_GPU(renderOnGPU)
                         r32 leftSideBearing     = currentCharMetadata.leftSideBearing;
 
                         offsetX += leftSideBearing;
+
+                        if (prevGlyphIdx >= 0)
+                        {
+                            s32 kerningAdvance;
+                            b32 kerningEntryFound = findKerningEntry(entry->font, currentGlyphIdx, prevGlyphIdx, &kerningAdvance);
+                            if (kerningEntryFound)
+                            {
+                                offsetX += kerningAdvance*entry->font->scale;
+                            }
+                        }
+                        prevGlyphIdx = currentGlyphIdx;
+
                         r32 pixelShift, subpixelShift;
                         splitFloatIntoIntegerAndFractional(offsetX, &subpixelShift, &pixelShift);
 
