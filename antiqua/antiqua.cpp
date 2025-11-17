@@ -8,6 +8,8 @@
 
 #define TEXTURE_DEBUG_MODE 0
 
+#define UNINITIALIZED -9999
+
 static void CastRayToClickPositionOnTilemap(GameState *gameState,
                                             r32 drawableWidthWithoutScaleFactor,
                                             r32 drawableHeightWithoutScaleFactor)
@@ -127,7 +129,7 @@ internal void MoveEntity(GameState *gameState,
         r32 tMin = 1.0f;
         V3 lineNormalVector = {0};
 
-        r32 tEpsilon = 0.001f;
+        r32 tEpsilon = 0.0005f;
 
         for (u32 entityIndex = 0;
              entityIndex < gameState->entityCount;
@@ -231,13 +233,13 @@ internal void MoveEntity(GameState *gameState,
                             lineNormalVector.x = -dz;
                             lineNormalVector.z = dx;
 
-                            if (!gameState->prevTimeOfCollision)
+                            if (gameState->prevTimeOfCollision == UNINITIALIZED)
                             {
                                gameState->prevTimeOfCollision = t;
                             }
                             else
                             {
-                                if (t > 0.0005f
+                                if (t > tEpsilon
                                     && t > gameState->prevTimeOfCollision)
                                 {
                                     t = gameState->prevTimeOfCollision;
@@ -474,6 +476,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
         gameState->tilemapOriginPositionWorld = v3(0.0f, 0.0f, 0.0f);
         gameState->tileCountPerSide = 64;
         gameState->tileSideLength = 1.0f;
+
+        gameState->prevTimeOfCollision = UNINITIALIZED;
 
 #if 0
         { 
