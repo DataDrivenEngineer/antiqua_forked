@@ -87,6 +87,7 @@ typedef struct RenderGroup
     u8 *pushBufferBase;
     RenderGroupEntryHeader *prevHeader;
     AssetHeader *atlasHeader;
+
     u32 maxPushBufferSize;
     u32 pushBufferSize;
     u32 pushBufferElementCount;

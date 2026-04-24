@@ -6,6 +6,11 @@
 #define DEBUG_CONSOLE_ENABLED 0
 #define DISPLAY_FRAME_TIME 0
 
+/* To be used for things that rely on relative offset in screen coordinates.
+   For example: to calculate at what distance from the entity sprite we should put its healthbar in screen coordinates */
+#define UNSCALED_WINDOW_WIDTH 1920.0f
+#define UNSCALED_WINDOW_HEIGHT 1080.0f
+
 #define _CRTDBG_MAP_ALLOC
 #include <crtdbg.h>
 
@@ -14,6 +19,15 @@ internal RECT WindowRect;
 
 internal b32 GlobalRunning = false;
 internal b32 FullscreenMode = false;
+
+void platform_reserve_and_commit_virtual_memory(void **address, unsigned long memory_to_allocate_bytes)
+{
+    *address = VirtualAlloc(NULL, memory_to_allocate_bytes, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+    if (!*address)
+    {
+        fprintf(stderr, "Virtual Alloc failed for platform_reserve_and_commit_virtual_memory()!\n");
+    }
+}
 
 DEBUG_PLATFORM_FREE_FILE_MEMORY(DEBUGPlatformFreeFileMemory)
 {
@@ -381,6 +395,7 @@ s32 WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine, s3
     gameMemory.debug_platformFreeFileMemory = DEBUGPlatformFreeFileMemory;
     gameMemory.debug_platformReadEntireFile = DEBUGPlatformReadEntireFile;
     gameMemory.debug_platformWriteEntireFile = DEBUGPlatformWriteEntireFile;
+    gameMemory.platform_reserve_and_commit_virtual_memory = platform_reserve_and_commit_virtual_memory;
 
     State win32_State = {};
 
@@ -478,7 +493,7 @@ s32 WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CmdLine, s3
         ThreadContext thread = {};
         SoundState soundState = {};
 
-        updateGameAndRender(&thread, DeltaTimeSec, &NewInput, &soundState, &gameMemory, (r32)Width, (r32)Height);
+        updateGameAndRender(&thread, DeltaTimeSec, &NewInput, &soundState, &gameMemory, (r32)Width, (r32)Height, UNSCALED_WINDOW_WIDTH, UNSCALED_WINDOW_HEIGHT);
 
         OldInput = NewInput;
     }

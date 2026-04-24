@@ -110,17 +110,26 @@ struct VS_OUTPUT_TEXTURE
 //--------------------------------------------------------------------------------------
 
 void screenToNDC(out float2 outPositions[4],
-                               in float windowWidth,
-                               in float windowHeight,
-                               in float2 topLeft,
-                               in float2 topRight,
-                               in float2 bottomLeft,
-                               in float2 bottomRight)
+                 in float windowWidth,
+                 in float windowHeight,
+                 in float2 topLeft,
+                 in float2 topRight,
+                 in float2 bottomLeft,
+                 in float2 bottomRight)
 {
     outPositions[0] = float2(NORMALIZE(topLeft.x, 0, 2, windowWidth, -1), NORMALIZE(topLeft.y, 0, 2, windowHeight, -1));
     outPositions[1] = float2(NORMALIZE(topRight.x, 0, 2, windowWidth, -1), NORMALIZE(topRight.y, 0, 2, windowHeight, -1));
     outPositions[2] = float2(NORMALIZE(bottomLeft.x, 0, 2, windowWidth, -1), NORMALIZE(bottomLeft.y, 0, 2, windowHeight, -1));
     outPositions[3] = float2(NORMALIZE(bottomRight.x, 0, 2, windowWidth, -1), NORMALIZE(bottomRight.y, 0, 2, windowHeight, -1));
+}
+
+void ndcToScreen(out float2 out_position,
+                 in float4 ndc_after_perspective_divide,
+                 in float window_width,
+                 in float window_height)
+{
+    out_position.x = (ndc_after_perspective_divide.x + 1) * 0.5f * window_width;
+    out_position.y = (ndc_after_perspective_divide.y + 1) * 0.5f * window_height;
 }
 
 //--------------------------------------------------------------------------------------

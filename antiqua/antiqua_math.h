@@ -303,4 +303,18 @@ inline void splitFloatIntoIntegerAndFractional(r32 val, r32 *fractional, r32 *in
     *fractional = modff(val, integer);
 }
 
+inline float scaleValueBasedOnReferenceValue(float val_to_scale, float reference_val, float current_val_opposed_to_reference_val)
+{
+    float result = val_to_scale * current_val_opposed_to_reference_val / reference_val;
+
+    return result;
+}
+
+inline float normalizeFromToRange(float val_to_normalize, float old_range_min, float old_range_max, float new_range_min, float new_range_max)
+{
+    float result = new_range_min + (val_to_normalize - old_range_min) * ((new_range_max - new_range_min) / (old_range_max - old_range_min));
+
+    return result;
+}
+
 #endif

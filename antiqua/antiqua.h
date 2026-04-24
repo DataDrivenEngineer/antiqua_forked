@@ -26,6 +26,12 @@ typedef struct Entity
     V3 posWorld;
     V3 dPos;
     V3 scaleFactor;
+
+    u32 idxOfEntityToFollow;
+
+    r32 health;
+
+    s32 strength;
 } Entity;
 
 typedef struct AssetHeader
@@ -100,6 +106,12 @@ typedef struct GameState
 #endif
 
     M44 viewMatrix;
+
+    float healthbar_offset_from_entity_top_world;
+    float healthbar_height_world;
+
+    float unscaled_window_width;
+    float unscaled_window_height;
 } GameState;
 
 #define _ANTIQUA_H_

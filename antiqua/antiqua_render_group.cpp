@@ -101,6 +101,7 @@ void pushRenderEntryTile(MemoryArena *arena,
 void pushRenderEntryRectWorld(MemoryArena *arena,
                               RenderGroup *renderGroup,
                               V3 rectCenterPositionWorld,
+                              V3 color,
                               r32 scaledSideLengthW,
                               r32 scaledSideLengthH)
 {
@@ -113,7 +114,7 @@ void pushRenderEntryRectWorld(MemoryArena *arena,
     entry->sideLengthW = scaledSideLengthW;
     entry->sideLengthH = scaledSideLengthH;
     entry->rectCenterPositionWorld = rectCenterPositionWorld;
-    entry->color = v3(0.0f, 1.0f, 1.0f);
+    entry->color = color;
 
     renderGroup->pushBufferSize += sizeof(RenderEntryRectWorld);
     renderGroup->pushBufferElementCount++;
@@ -175,8 +176,7 @@ void pushRenderEntryText(MemoryArena *arena,
                          Font *font,
                          s8 *text,
                          V2 posScreen,
-                         V4 color,
-                         b32 needsGpuReupload)
+                         V4 color)
 {
     ASSERT(renderGroup->pushBufferElementCount > 0);
 
@@ -185,10 +185,10 @@ void pushRenderEntryText(MemoryArena *arena,
     renderGroup->pushBufferSize += sizeof(RenderGroupEntryHeader);
     RenderEntryText *entry = PUSH_STRUCT(arena, RenderEntryText);
     entry->font = font;
-    entry->text = text;
+    entry->text = (s8 *)text;
     entry->color = color;
     entry->posScreen = posScreen;
-    entry->needsGpuReupload = needsGpuReupload;
+    entry->needsGpuReupload = font->needsGpuReupload;
 
     renderGroup->pushBufferSize += sizeof(RenderEntryText);
     renderGroup->pushBufferElementCount++;

@@ -8,8 +8,6 @@
 
 #define TEXTURE_DEBUG_MODE 0
 
-#define UNINITIALIZED -9999
-
 static void CastRayToClickPositionOnTilemap(GameState *gameState,
                                             r32 drawableWidthWithoutScaleFactor,
                                             r32 drawableHeightWithoutScaleFactor)
@@ -354,20 +352,40 @@ static void UpdatePlayer(GameState *gameState,
 }
 
 static void UpdateEnemy(GameState *gameState,
+                        MemoryArena *renderGroupArena,
+                        RenderGroup *renderGroup,
                         Entity *entity,
                         u32 entityIndex,
                         r32 deltaTimeSec)
 {
-    static r32 counter = 0.0f;
-    counter += 0.01f;
-    if (counter > 10000.0f)
+    Entity *entityToFollow = gameState->entities + entity->idxOfEntityToFollow;
+    V3 directionTowardsEntityToFollow = entityToFollow->posWorld - entity->posWorld;
+
     {
-        counter = 0.0f;
+        r32 meleeRange = 1.5f;
+        r32 normalizedBaseMeleeDamage = (r32)rand() / RAND_MAX;
+        r32 distance = length(directionTowardsEntityToFollow);
+        if (distance <= meleeRange)
+        {
+            if (entityToFollow->health <= 0.0f)
+            {
+                pushRenderEntryText(renderGroupArena,
+                                    renderGroup,
+                                    &gameState->font,
+                                    (s8 *)"Dead!",
+                                    v2(500.0f, 500.0f),
+                                    v4(1.0f, 0.0f, 0.0f, 1.0f));
+            }
+            else
+            {
+                r32 meleeDamage = normalizedBaseMeleeDamage * entity->strength;
+                entityToFollow->health -= meleeDamage;
+            }
+        }
     }
 
-    V3 acceleration = v3(cosine(counter),
-                         0.0f,
-                         sine((counter)));
+    V3 acceleration = directionTowardsEntityToFollow;
+    ASSERT(!acceleration.y);
 
     normalize(&acceleration);
     acceleration *= 0.5f*gameState->playerSpeed;
@@ -395,11 +413,11 @@ static void UpdateStaticEntity(GameState *gameState,
    - fix crash error sometimes occurring on window resizing (Done)
    - add support for spaces in text (Done)
    - add support for font resizing (Done)
-   - Implement subpixel positioning / dual-source blending for text:
+   - Implement subpixel positioning / dual-source blending for text (Done):
      - add 1 px left padding to every glyph in atlas (Done)
      - pass fractional offsetX's part as a subpixel shift to vertex shader, and apply it in pixel shader (Done)
      - return 2 colors from pixel shader and enable dual-source blending for pre-multiplied alpha (Done)
-   - Add kerning support by loading kerning table into memory during font initialization
+   - Add kerning support by loading kerning table into memory during font initialization (Done)
    - Add support for rendering multi-line text
 
    CAMERA
@@ -413,6 +431,12 @@ static void UpdateStaticEntity(GameState *gameState,
    LEVEL EDITOR
    - Add support for rendering of rectangles in screen coordinates (Done)
    - Implement simple UI for changing font size: reinitialize font when font size is updated in UI
+
+   GAMEPLAY UI
+   - Implement healthbars (Done)
+
+   COMBAT
+   - Implement pathfinding
 */
 #if !XCODE_BUILD && !COMPILER_MSVC
 EXPORT MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender)
@@ -438,11 +462,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                                         &renderGroupArena,
                                         renderGroupArenaSize);
 
-    MemoryArena scratchArena;
-    u32 scratchArenaSize = KB(256);
-    initializeArenaFromTransientStorage(memory,
-                                        &scratchArena,
-                                        scratchArenaSize);
+    MemoryArena assetArena;
 
     ASSERT(&gcInput->terminator - &gcInput->buttons[0] == ARRAY_COUNT(gcInput->buttons));
     if (!memory->isInitialized)
@@ -451,7 +471,10 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
 
         memory->usedPermanentStorage += sizeof(GameState);
 
-        LoadFont(gameState, memory);
+        u32 assetArenaSize = MB(32);
+        initializeArenaFromPermanentStorage(memory, &assetArena, assetArenaSize);
+
+        LoadFont(gameState, memory, &assetArena);
 
         gameState->nearPlane = 1.0f;
         gameState->farPlane = 100.0f;
@@ -526,6 +549,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             newEntity->flags = (EntityFlags)(EntityFlags_Moving | EntityFlags_PlayerControlled);
             newEntity->posWorld = v3(0.0f, 0.0f, 0.0f);
             newEntity->scaleFactor = v3(1.0f, 1.0f, 1.0f);
+            newEntity->idxOfEntityToFollow = UNINITIALIZED;
+            newEntity->health = 100;
             gameState->entityCount++;
         }
         {
@@ -533,6 +558,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             newEntity->flags = (EntityFlags)(EntityFlags_Static);
             newEntity->posWorld = v3(5.0f, 0.0f, 5.0f);
             newEntity->scaleFactor = v3(20.0f, 1.0f, 2.0f);
+            newEntity->idxOfEntityToFollow = UNINITIALIZED;
+            newEntity->health = 0;
             gameState->entityCount++;
         }
         {
@@ -540,10 +567,23 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             newEntity->flags = (EntityFlags)(EntityFlags_Moving | EntityFlags_Enemy);
             newEntity->posWorld = v3(6.5f, 0.0f, 7.5f);
             newEntity->scaleFactor = v3(1.0f, 2.0f, 1.0f);
+            newEntity->idxOfEntityToFollow = 0;
+            newEntity->health = 0;
+            newEntity->strength = 5;
             gameState->entityCount++;
         }
 
         gameState->cameraFollowingEntityIndex = 0;
+
+        {
+            gameState->unscaled_window_width  = unscaled_window_width;
+            gameState->unscaled_window_height = unscaled_window_height;
+        }
+
+        {
+            gameState->healthbar_offset_from_entity_top_world = 0.25f;
+            gameState->healthbar_height_world = 0.25f;
+        }
 
         memory->isInitialized = true;
     }
@@ -576,6 +616,8 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
     // NOTE(dima): for visualizing purposes only
     gameState->collisionPointDebug = {0};
 #endif
+
+    V3 playerAcceleration = {};
 
     if (gameState->debugCameraEnabled)
     {
@@ -637,25 +679,10 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
             gameState->mousePos[0] = gcInput->mouseX;
             gameState->mousePos[1] = gcInput->mouseY;
         }
-
-        for (s32 entityIndex = gameState->entityCount - 1;
-             entityIndex >= 0;
-             --entityIndex)
-        {
-            Entity *entity = gameState->entities + entityIndex;
-
-            pushRenderEntryRectWorld(&renderGroupArena,
-                                     &renderGroup,
-                                     entity->posWorld,
-                                     entity->scaleFactor.x * gameState->tileSideLength,
-                                     entity->scaleFactor.z * gameState->tileSideLength);
-        }
     }
     else
     {
         Entity *cameraFollowingEntity = gameState->entities + gameState->cameraFollowingEntityIndex;
-
-        V3 playerAcceleration = {};
 
         if (gcInput->up.endedDown)
         {
@@ -725,48 +752,6 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                 playerAcceleration.x = uWithoutY.x;
                 playerAcceleration.z = uWithoutY.z;
             }
-        }
-
-        for (s32 entityIndex = gameState->entityCount - 1;
-             entityIndex >= 0;
-             --entityIndex)
-        {
-            Entity *entity = gameState->entities + entityIndex;
-            EntityFlags flags = entity->flags;
-            if ((flags & EntityFlags_PlayerControlled) == EntityFlags_PlayerControlled)
-            {
-                UpdatePlayer(gameState,
-                             entity,
-                             entityIndex,
-                             deltaTimeSec,
-                             playerAcceleration);
-            }
-            else if ((flags & EntityFlags_Enemy) == EntityFlags_Enemy)
-            {
-#if 1
-                UpdateEnemy(gameState,
-                            entity,
-                            entityIndex,
-                            deltaTimeSec);
-#endif
-            }
-            else if ((flags & EntityFlags_Static) == EntityFlags_Static)
-            {
-                /* TODO(dima): this only calculates AABB!
-                               DON'T do it every frame. Do it only once at loading! */
-                UpdateStaticEntity(gameState,
-                                   entity);
-            }
-            else
-            {
-                INVALID_CODE_PATH;
-            }
-
-            pushRenderEntryRectWorld(&renderGroupArena,
-                                     &renderGroup,
-                                     entity->posWorld,
-                                     entity->scaleFactor.x * gameState->tileSideLength,
-                                     entity->scaleFactor.z * gameState->tileSideLength);
         }
 
         // NOTE(dima): set up camera to look at entity it follows
@@ -863,6 +848,70 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                             gameState->cameraDirectonPosVectorEndWorld);
     }
 
+    for (s32 entityIndex = gameState->entityCount - 1;
+         entityIndex >= 0;
+         --entityIndex)
+    {
+        Entity *entity = gameState->entities + entityIndex;
+        EntityFlags flags = entity->flags;
+
+        if ((flags & EntityFlags_PlayerControlled) == EntityFlags_PlayerControlled)
+        {
+            UpdatePlayer(gameState,
+                         entity,
+                         entityIndex,
+                         deltaTimeSec,
+                         playerAcceleration);
+        }
+        else if ((flags & EntityFlags_Enemy) == EntityFlags_Enemy)
+        {
+#if 1
+            UpdateEnemy(gameState,
+                        &renderGroupArena,
+                        &renderGroup,
+                        entity,
+                        entityIndex,
+                        deltaTimeSec);
+#endif
+        }
+        else if ((flags & EntityFlags_Static) == EntityFlags_Static)
+        {
+            /* TODO(dima): this only calculates AABB!
+                           DON'T do it every frame. Do it only once at loading! */
+            UpdateStaticEntity(gameState,
+                               entity);
+        }
+        else
+        {
+            INVALID_CODE_PATH;
+        }
+
+        float entity_scale_width = entity->scaleFactor.x * gameState->tileSideLength;
+        float entity_scale_height = entity->scaleFactor.z * gameState->tileSideLength;
+#if 1
+        pushRenderEntryRectWorld(&renderGroupArena,
+                                 &renderGroup,
+                                 entity->posWorld,
+                                 v3(0.0f, 1.0f, 0.0f),
+                                 entity_scale_width,
+                                 entity_scale_height);
+#endif
+
+        // Draw healthbars
+        {
+            if (entity->health > 0)
+            {
+                V3 healthbar_center_pos_world = entity->posWorld + v3(0.0f, 0.0f, entity_scale_height / 2 + gameState->healthbar_offset_from_entity_top_world);
+                pushRenderEntryRectWorld(&renderGroupArena,
+                                         &renderGroup,
+                                         healthbar_center_pos_world,
+                                         v3(1.0f, 0.0f, 0.0f),
+                                         entity_scale_width,
+                                         gameState->healthbar_height_world);
+            }
+        }
+    }
+
 #if ANTIQUA_INTERNAL
     pushRenderEntryLine(&renderGroupArena,
                         &renderGroup,
@@ -905,8 +954,7 @@ UPDATE_GAME_AND_RENDER(updateGameAndRender)
                         &gameState->font,
                         text,
                         v2(200.0f, 50.0f),
-                        v4(0.0f, 1.0f, 0.0f, 1.0f),
-                        gameState->font.needsGpuReupload);
+                        v4(0.0f, 1.0f, 0.0f, 1.0f));
 
     gameState->font.needsGpuReupload = false;
 #endif

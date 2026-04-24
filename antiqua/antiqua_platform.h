@@ -25,6 +25,8 @@
 #endif
 #endif
 
+#include <cstring>
+
 #if COMPILER_LLVM
 
 #define DIR_SEPARATOR "/"
@@ -88,6 +90,8 @@ typedef double r64;
 
 #define INVALID_CODE_PATH ASSERT(!"InvalidCodePath")
 
+#define UNINITIALIZED 0xEFEF
+
 #define PI32 3.14159265359f
 #define RADIANS(value) ((value)/180.0f)*PI32
 #define DEGREES(value) (value)*(180.0f/PI32)
@@ -146,7 +150,7 @@ typedef INIT_RENDERER(InitRenderer);
 typedef RENDER_ON_GPU(RenderOnGPU);
 #define RESIZE_WINDOW(name) void name(u32 width, u32 height, b32 minimized)
 
-#define UPDATE_GAME_AND_RENDER(name) void name(ThreadContext *thread, r32 deltaTimeSec, GameControllerInput *gcInput, SoundState *soundState, GameMemory *memory, r32 drawableWidthWithoutScaleFactor, r32 drawableHeightWithoutScaleFactor)
+#define UPDATE_GAME_AND_RENDER(name) void name(ThreadContext *thread, r32 deltaTimeSec, GameControllerInput *gcInput, SoundState *soundState, GameMemory *memory, r32 drawableWidthWithoutScaleFactor, r32 drawableHeightWithoutScaleFactor, float unscaled_window_width, float unscaled_window_height)
 typedef UPDATE_GAME_AND_RENDER(UpdateGameAndRender);
 #if XCODE_BUILD
 MONExternC UPDATE_GAME_AND_RENDER(updateGameAndRender);
@@ -240,6 +244,8 @@ typedef struct GameMemory
 
   RenderOnGPU *renderOnGPU;
 
+  void (*platform_reserve_and_commit_virtual_memory) (void **address, unsigned long memory_to_allocate_bytes);
+
 #if ANTIQUA_INTERNAL
   Debug_PlatformReadEntireFile *debug_platformReadEntireFile;
   Debug_PlatformFreeFileMemory *debug_platformFreeFileMemory;
@@ -247,18 +253,20 @@ typedef struct GameMemory
 #endif
 } GameMemory;
 
-typedef struct MemoryArena
-{
+typedef struct MemoryArena MemoryArena;
+struct MemoryArena {
   u32 size;
   u8 *base;
   u32 used;
-} MemoryArena;
+  b32 isInitialized;
+};
 
 inline void initializeArena(MemoryArena *arena, u32 size, u8 *globalMemoryBase, u32 usedGlobalMemory)
 {
   arena->size = size;
   arena->base = globalMemoryBase + usedGlobalMemory;
   arena->used = 0;
+  arena->isInitialized = true;
 }
 
 inline void initializeArenaFromPermanentStorage(GameMemory *globalMemory, MemoryArena *arena, u32 size)
@@ -287,12 +295,65 @@ inline void deallocateArenaFromTransientStorage(GameMemory *globalMemory, u32 ar
 #define PUSH_SIZE(arena, size, Type) (Type *) pushSize_(arena, (size))
 void * pushSize_(MemoryArena *arena, u32 size)
 {
-  ASSERT((arena->used + size) <= arena->size);
-  void *result = arena->base + arena->used;
-  arena->used += size;
+    ASSERT(arena->isInitialized);
+    ASSERT((arena->used + size) <= arena->size);
+    void *result = arena->base + arena->used;
+    arena->used += size;
 
-  return result;
+    return result;
 }
+
+/* START VirtualArray */
+
+typedef struct VirtualArray
+{
+    void *data;
+    unsigned long reserved_memory_bytes;
+    unsigned int num_of_elements;
+    unsigned int element_size_bytes;
+} VirtualArray;
+
+inline void virtual_array_allocate(GameMemory *game_memory,
+                                   VirtualArray *arr,
+                                   unsigned long memory_to_reserve_bytes)
+{
+    game_memory->platform_reserve_and_commit_virtual_memory(&arr->data, memory_to_reserve_bytes);
+
+    arr->reserved_memory_bytes = memory_to_reserve_bytes;
+}
+
+inline void virtual_array_initialize(VirtualArray *arr,
+                                     unsigned int element_size_bytes)
+{
+    arr->num_of_elements = 0;
+    arr->element_size_bytes = element_size_bytes;
+}
+
+inline void virtual_array_clear(VirtualArray *arr)
+{
+    arr->num_of_elements = 0;
+}
+
+inline void virtual_array_add(VirtualArray *arr,
+                              void *item_to_add)
+{
+    ASSERT((arr->num_of_elements + 1) * arr->element_size_bytes <= arr->reserved_memory_bytes);
+
+    unsigned char *add_at = (unsigned char *)arr->data + arr->num_of_elements * arr->element_size_bytes;
+    memcpy(add_at, item_to_add, arr->element_size_bytes);
+
+    arr->num_of_elements++;
+}
+
+inline void *virtual_array_get_element_by_index(VirtualArray *arr, unsigned int index)
+{
+    void *result = (void *)((unsigned char *)arr->data + index * arr->element_size_bytes);
+
+    return result;
+}
+
+/* END VirtualArray */
+
 
 #include "antiqua_common_functions.h"
 

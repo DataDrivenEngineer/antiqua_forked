@@ -9,16 +9,6 @@
 #define CULLING_ENABLED 1
 #define WIREFRAME_MODE_ENABLED 0
 
-#define RECT_WORLD_PIPELINE_STATE_IDX 0
-#define RECT_SCREEN_PIPELINE_STATE_IDX 1
-#define LINE_PIPELINE_STATE_IDX 2
-#define POINT_PIPELINE_STATE_IDX 3
-#define TILE_PIPELINE_STATE_IDX 4
-#define TEXTURE_DEBUG_PIPELINE_STATE_IDX 5
-#define TEXT_PIPELINE_STATE_IDX 6
-
-#define PIPELINE_STATE_COUNT 7
-
 #define SWAP_CHAIN_BUFFER_COUNT 2
 
 #define MAX_RENDER_GROUP_VB_SIZE KB(256)
@@ -35,6 +25,19 @@
 
 #define MAX_D3D_RESET_ATTEMPTS 3
 u32 currentD3DResetAttempt = 0;
+
+typedef enum PipelineStateType
+{
+    PipelineStateType_RectWorld,
+    PipelineStateType_RectScreen,
+    PipelineStateType_Line,
+    PipelineStateType_Point,
+    PipelineStateType_Tile,
+    PipelineStateType_TextureDebug,
+    PipelineStateType_Text,
+
+    PipelineStateType_Count,
+} PipelineStateType;
 
 State *win32State = NULL;
 
@@ -62,7 +65,7 @@ internal ComPtr<ID3D12Resource> depthStencilBuffer = NULL;
 
 internal ComPtr<ID3D12RootSignature> rootSignature = NULL;
 
-internal ComPtr<ID3D12PipelineState> pipelineState[PIPELINE_STATE_COUNT];
+internal ComPtr<ID3D12PipelineState> pipelineState[PipelineStateType_Count];
 
 internal ComPtr<ID3D12CommandQueue> commandQueue = NULL;
 internal ComPtr<ID3D12CommandAllocator> commandAllocators[SWAP_CHAIN_BUFFER_COUNT] = { NULL, NULL };
@@ -866,7 +869,7 @@ INIT_RENDERER(initRenderer)
         desc.SampleDesc.Quality = 0;
         desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
-        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[RECT_WORLD_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[PipelineStateType_RectWorld].ReleaseAndGetAddressOf())));
     }
 
     // Create PSO for rects (screen)
@@ -926,7 +929,7 @@ INIT_RENDERER(initRenderer)
         desc.SampleDesc.Quality = 0;
         desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
-        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[RECT_SCREEN_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[PipelineStateType_RectScreen].ReleaseAndGetAddressOf())));
     }
 
     // Create PSO for lines
@@ -993,7 +996,7 @@ INIT_RENDERER(initRenderer)
         desc.SampleDesc.Quality = 0;
         desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
-        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[LINE_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[PipelineStateType_Line].ReleaseAndGetAddressOf())));
     }
 
     // Create PSO for points
@@ -1061,7 +1064,7 @@ INIT_RENDERER(initRenderer)
         desc.SampleDesc.Quality = 0;
         desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
-        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[POINT_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[PipelineStateType_Point].ReleaseAndGetAddressOf())));
     }
 
     // NOTE(dima): create PSO for tiles
@@ -1121,7 +1124,7 @@ INIT_RENDERER(initRenderer)
         desc.SampleDesc.Quality = 0;
         desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
-        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[TILE_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[PipelineStateType_Tile].ReleaseAndGetAddressOf())));
     }
 
     // NOTE(dima): create PSO for debugging textures
@@ -1181,7 +1184,7 @@ INIT_RENDERER(initRenderer)
         desc.SampleDesc.Quality = 0;
         desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
-        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[TEXTURE_DEBUG_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[PipelineStateType_TextureDebug].ReleaseAndGetAddressOf())));
     }
 
     // NOTE(dima): create PSO for text
@@ -1283,7 +1286,7 @@ INIT_RENDERER(initRenderer)
         desc.SampleDesc.Quality = 0;
         desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
-        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[TEXT_PIPELINE_STATE_IDX].ReleaseAndGetAddressOf())));
+        ThrowIfFailed(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(pipelineState[PipelineStateType_Text].ReleaseAndGetAddressOf())));
     }
 
     // Create texture upload heap
@@ -1358,16 +1361,26 @@ RENDER_ON_GPU(renderOnGPU)
             ThrowIfFailed(renderGroupPerPassCB->Map(0, NULL, (void **)&mappedData));
 
             u32 offset = 0;
-            u32 dataLength = sizeof(renderGroup->uniforms);
-            memCopyAndUpdateOffset(mappedData + offset, renderGroup->uniforms, dataLength, &offset);
-            memCopyAndUpdateOffset(mappedData + offset, &viewport.Width, sizeof(viewport.Width), &offset);
-            memCopyAndUpdateOffset(mappedData + offset, &viewport.Height, sizeof(viewport.Height), &offset);
-            memCopyAndUpdateOffset(mappedData + offset, &renderGroup->atlasHeader->width, sizeof(renderGroup->atlasHeader->width), &offset);
-            memCopyAndUpdateOffset(mappedData + offset, &renderGroup->atlasHeader->height, sizeof(renderGroup->atlasHeader->height), &offset);
+            unsigned int uniforms_size_bytes = sizeof(renderGroup->uniforms);
+            unsigned int viewport_width_size_bytes = sizeof(viewport.Width);
+            unsigned int viewport_height_size_bytes = sizeof(viewport.Height);
+            unsigned int atlas_header_width_size_bytes = sizeof(renderGroup->atlasHeader->width);
+            unsigned int atlas_header_height_size_bytes = sizeof(renderGroup->atlasHeader->height);
+
+            memCopyAndUpdateOffset(mappedData + offset, renderGroup->uniforms, uniforms_size_bytes, &offset);
+            memCopyAndUpdateOffset(mappedData + offset, &viewport.Width, viewport_width_size_bytes, &offset);
+            memCopyAndUpdateOffset(mappedData + offset, &viewport.Height, viewport_height_size_bytes, &offset);
+            memCopyAndUpdateOffset(mappedData + offset, &renderGroup->atlasHeader->width, atlas_header_width_size_bytes, &offset);
+            memCopyAndUpdateOffset(mappedData + offset, &renderGroup->atlasHeader->height, atlas_header_height_size_bytes, &offset);
 
             renderGroupPerPassCB->Unmap(0, NULL);
 
-            u32 sizeOfData = RoundToNearestMultipleOf256(sizeof(renderGroup->uniforms) + sizeof(viewport.Width) + sizeof(viewport.Height));
+            u32 sizeOfData = RoundToNearestMultipleOf256(uniforms_size_bytes +
+                                                         viewport_width_size_bytes +
+                                                         viewport_height_size_bytes +
+                                                         atlas_header_width_size_bytes +
+                                                         atlas_header_height_size_bytes);
+
             CreateConstantBufferView(renderGroupPerPassCB.Get(),
                                      cbvSrvUavHeap[frameIndex].Get(),
                                      cbvSrvUavDescriptorSize,
@@ -1401,7 +1414,7 @@ RENDER_ON_GPU(renderOnGPU)
 
                 case RenderGroupEntryType_RenderEntryPoint:
                 {
-                    commandList->SetPipelineState(pipelineState[POINT_PIPELINE_STATE_IDX].Get());
+                    commandList->SetPipelineState(pipelineState[PipelineStateType_Point].Get());
 
                     RenderEntryPoint *entry = (RenderEntryPoint *)(entryHeader + 1);
 
@@ -1450,7 +1463,7 @@ RENDER_ON_GPU(renderOnGPU)
 
                 case RenderGroupEntryType_RenderEntryLine:
                 {
-                    commandList->SetPipelineState(pipelineState[LINE_PIPELINE_STATE_IDX].Get());
+                    commandList->SetPipelineState(pipelineState[PipelineStateType_Line].Get());
 
                     RenderEntryLine *entry = (RenderEntryLine *)(entryHeader + 1);
 
@@ -1491,7 +1504,7 @@ RENDER_ON_GPU(renderOnGPU)
 
                 case RenderGroupEntryType_RenderEntryTile:
                 {
-                    commandList->SetPipelineState(pipelineState[TILE_PIPELINE_STATE_IDX].Get());
+                    commandList->SetPipelineState(pipelineState[PipelineStateType_Tile].Get());
 
                     RenderEntryTile *entry = (RenderEntryTile *)(entryHeader + 1);
 
@@ -1545,7 +1558,7 @@ RENDER_ON_GPU(renderOnGPU)
 
                 case RenderGroupEntryType_RenderEntryRectWorld:
                 {
-                    commandList->SetPipelineState(pipelineState[RECT_WORLD_PIPELINE_STATE_IDX].Get());
+                    commandList->SetPipelineState(pipelineState[PipelineStateType_RectWorld].Get());
 
                     RenderEntryRectWorld *entry = (RenderEntryRectWorld *)(entryHeader + 1);
 
@@ -1605,7 +1618,7 @@ RENDER_ON_GPU(renderOnGPU)
 
                 case RenderGroupEntryType_RenderEntryRectScreen:
                 {
-                    commandList->SetPipelineState(pipelineState[RECT_SCREEN_PIPELINE_STATE_IDX].Get());
+                    commandList->SetPipelineState(pipelineState[PipelineStateType_RectScreen].Get());
 
                     RenderEntryRectScreen *entry = (RenderEntryRectScreen *)(entryHeader + 1);
 
@@ -1661,7 +1674,7 @@ RENDER_ON_GPU(renderOnGPU)
                     RenderEntryTextureDebug *entry = (RenderEntryTextureDebug *)(entryHeader + 1);
                     AssetHeader *textureHeader = entry->textureHeader;
 
-                    commandList->SetPipelineState(pipelineState[TEXTURE_DEBUG_PIPELINE_STATE_IDX].Get());
+                    commandList->SetPipelineState(pipelineState[PipelineStateType_TextureDebug].Get());
 
                     D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHndl = GetGPUDescriptorHandle(cbvSrvUavHeap[frameIndex].Get(),
                                                                                     cbvSrvUavDescriptorSize,
@@ -1796,7 +1809,7 @@ RENDER_ON_GPU(renderOnGPU)
                     RenderEntryText *entry = (RenderEntryText *)(entryHeader + 1);
                     AssetHeader *textureHeader = renderGroup->atlasHeader;
 
-                    commandList->SetPipelineState(pipelineState[TEXT_PIPELINE_STATE_IDX].Get());
+                    commandList->SetPipelineState(pipelineState[PipelineStateType_Text].Get());
 
                     D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHndl = GetGPUDescriptorHandle(cbvSrvUavHeap[frameIndex].Get(),
                                                                                     cbvSrvUavDescriptorSize,
